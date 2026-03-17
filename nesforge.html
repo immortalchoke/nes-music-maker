@@ -38,6 +38,8 @@ input[type=number], select {
   background: var(--bg2); color: var(--text); border: var(--border);
   font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 2px 4px;
 }
+#chord-panel { border-top: var(--border); padding: 4px; background: var(--bg2);
+  flex-wrap: wrap; display: none; max-height: 80px; overflow-y: auto; }
   </style>
 </head>
 <body>
@@ -1175,6 +1177,125 @@ function buildTopBar() {
   document.getElementById('load-input').onchange = e => { if (typeof ExportEngine !== 'undefined') ExportEngine.loadProject(e.target.files[0]); };
   document.getElementById('btn-export').onclick = () => { if (typeof ExportEngine !== 'undefined') ExportEngine.showModal(); };
 }
+
+// ============================================================
+// MODULE: ChordTool
+// ============================================================
+const ChordTool = {
+  // Scale degree intervals (from root) for triads and 7ths
+  DEGREE_OFFSETS: [0,2,4,6], // indices into scale degrees for chord tones (triad: 0,2,4; 7th: 0,2,4,6)
+  DEGREE_NAMES: ['I','II','III','IV','V','VI','VII'],
+
+  getDiatonicChords(key, scaleName) {
+    const root = Scales.getRootSemitone(key);
+    const intervals = Scales.SCALES[scaleName] || Scales.SCALES['Major'];
+    const scaleNotes = intervals.map(i => (root + i) % 12);
+
+    return scaleNotes.map((notePC, degreeIdx) => {
+      const baseMIDI = 60 + notePC - (notePC >= root ? 0 : 12); // near C4
+      // Triad: 1st, 3rd, 5th scale degrees from this root
+      const getScaleNote = (offset) => {
+        const idx = (degreeIdx + offset) % scaleNotes.length;
+        let pc = scaleNotes[idx];
+        let midi = baseMIDI;
+        // Ensure ascending
+        while (pc < (midi % 12)) pc += 12;
+        // Find MIDI note at correct octave
+        const base = baseMIDI - (baseMIDI % 12) + (pc % 12);
+        return base + (base < baseMIDI ? 12 : 0);
+      };
+
+      const triadNotes = [getScaleNote(0), getScaleNote(2), getScaleNote(4)];
+      const seventhNote = getScaleNote(6);
+
+      // Chord quality detection
+      const thirdInterval = triadNotes[1] - triadNotes[0];
+      const fifthInterval = triadNotes[2] - triadNotes[0];
+      let quality = thirdInterval === 4 ? (fifthInterval === 7 ? 'maj' : 'aug') :
+                    thirdInterval === 3 ? (fifthInterval === 7 ? 'm' : 'dim') : '?';
+      const seventh = seventhNote - triadNotes[0];
+      let quality7 = quality + (seventh === 11 ? 'maj7' : seventh === 10 ? '7' : '?');
+
+      return {
+        degree: this.DEGREE_NAMES[degreeIdx],
+        rootName: Scales.NOTE_ORDER[notePC],
+        triad: { name: `${Scales.NOTE_ORDER[notePC]}${quality}`, notes: triadNotes },
+        seventh: { name: `${Scales.NOTE_ORDER[notePC]}${quality7}`, notes: [...triadNotes, seventhNote] }
+      };
+    });
+  },
+
+  _insertChord(chordNotes, startBar, label) {
+    const ap = PR.activePattern;
+    if (!ap) return;
+    const id = makeId();
+    const sixteenth = (PR.sixteenthWidth() / PR.barWidth());
+    chordNotes.forEach(pitch => {
+      ap.pattern.notes.push({ pitch, start: startBar, duration: sixteenth * 2, velocity: 100,
+        chordId: id, chordLabel: label });
+    });
+    PR.draw(); PR.drawVelocity();
+  },
+
+  pasteAtPlayhead(chordNotes, label) {
+    const ap = PR.activePattern;
+    if (!ap) return;
+    const entry = ap.track.arrangement.find(e => e.patternId === ap.pattern.id);
+    const relBar = ProjectState.playheadBar - (entry ? entry.startBar : 0);
+    const sixteenth = PR.sixteenthWidth() / PR.barWidth();
+    const snapped = Math.floor(relBar / sixteenth) * sixteenth;
+    this._insertChord(chordNotes, snapped, label);
+  },
+
+  openInlinePicker(startBar, screenX, screenY) {
+    let el = document.getElementById('chord-picker');
+    if (el) el.remove();
+    el = document.createElement('div');
+    el.id = 'chord-picker';
+    el.style.cssText = `position:fixed;left:${screenX}px;top:${screenY}px;background:#111128;
+      border:1px solid #334;z-index:999;padding:6px;max-width:300px;`;
+
+    const chords = this.getDiatonicChords(ProjectState.key, ProjectState.scale);
+    const title = document.createElement('div');
+    title.textContent = `${ProjectState.key} ${ProjectState.scale}`;
+    title.style.cssText = 'font:6px "Press Start 2P";color:#00ccaa;margin-bottom:6px;';
+    el.appendChild(title);
+
+    chords.forEach(ch => {
+      ['triad','seventh'].forEach(type => {
+        const btn = document.createElement('button');
+        btn.className = 'nes-btn';
+        btn.style.margin = '2px';
+        btn.textContent = ch[type].name;
+        btn.onclick = () => {
+          this._insertChord(ch[type].notes, startBar, ch[type].name);
+          el.remove();
+        };
+        el.appendChild(btn);
+      });
+    });
+
+    document.body.appendChild(el);
+    setTimeout(() => document.addEventListener('click', () => el.remove(), { once: true }), 50);
+  },
+
+  renderPalette() {
+    const panel = document.getElementById('chord-panel');
+    if (!panel) return;
+    const chords = this.getDiatonicChords(ProjectState.key, ProjectState.scale);
+    panel.innerHTML = `<div style="padding:6px;font:6px 'Press Start 2P';color:#00ccaa;border-bottom:1px solid #334;margin-bottom:4px;">${ProjectState.key} ${ProjectState.scale} CHORDS</div>`;
+    chords.forEach(ch => {
+      ['triad','seventh'].forEach(type => {
+        const btn = document.createElement('button');
+        btn.className = 'nes-btn';
+        btn.style.margin = '2px';
+        btn.textContent = ch[type].name;
+        btn.onclick = () => this.pasteAtPlayhead(ch[type].notes, ch[type].name);
+        panel.appendChild(btn);
+      });
+    });
+  }
+};
 
 // ============================================================
 // MODULE: Sequencer
