@@ -806,8 +806,292 @@ html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text
     });
   };
 
+// ============================================================
+// MODULE: ArrangementView
+// ============================================================
+const AV = {
+  HEADER_WIDTH: 160,
+  TRACK_HEIGHT: 48,
+  BEAT_WIDTH: 20,
+  RULER_HEIGHT: 20,
+  scrollX: 0,
+  NOTE_COLORS: PR.NOTE_COLORS,
+
+  getCanvas() { return document.getElementById('arrangement-canvas'); },
+
+  barWidth() { return this.BEAT_WIDTH * ProjectState.timeSignature[0]; },
+
+  resize() {
+    const canvas = this.getCanvas();
+    const panel = document.getElementById('arrangement-panel');
+    canvas.width = panel.clientWidth;
+    canvas.height = panel.clientHeight;
+  },
+
+  draw() {
+    const canvas = this.getCanvas();
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const { width: W, height: H } = canvas;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(0, 0, W, H);
+
+    this._drawRuler(ctx, W);
+    this._drawTracks(ctx, W, H);
+  },
+
+  _drawRuler(ctx, W) {
+    const { HEADER_WIDTH, RULER_HEIGHT, scrollX } = this;
+    ctx.fillStyle = '#111128';
+    ctx.fillRect(0, 0, W, RULER_HEIGHT);
+    ctx.strokeStyle = '#334';
+    ctx.beginPath(); ctx.moveTo(0, RULER_HEIGHT); ctx.lineTo(W, RULER_HEIGHT); ctx.stroke();
+
+    const barW = this.barWidth();
+    const songLen = getSongLengthBars() + 4;
+    for (let b = 0; b <= songLen; b++) {
+      const x = HEADER_WIDTH + b * barW - scrollX;
+      if (x < HEADER_WIDTH || x > W) continue;
+      ctx.strokeStyle = '#334';
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, RULER_HEIGHT); ctx.stroke();
+      ctx.fillStyle = '#8888aa';
+      ctx.font = '6px "Press Start 2P"';
+      ctx.fillText(b + 1, x + 2, 13);
+    }
+
+    // Loop region
+    const lx1 = HEADER_WIDTH + ProjectState.loopStart * barW - scrollX;
+    const lx2 = HEADER_WIDTH + ProjectState.loopEnd * barW - scrollX;
+    ctx.fillStyle = 'rgba(255,220,0,0.15)';
+    ctx.fillRect(lx1, 0, lx2 - lx1, RULER_HEIGHT);
+    ctx.strokeStyle = '#ffdd00';
+    ctx.beginPath(); ctx.moveTo(lx1,0); ctx.lineTo(lx1,RULER_HEIGHT); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lx2,0); ctx.lineTo(lx2,RULER_HEIGHT); ctx.stroke();
+
+    // Playhead
+    const px = HEADER_WIDTH + ProjectState.playheadBar * barW - scrollX;
+    ctx.strokeStyle = '#ffff00';
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, RULER_HEIGHT); ctx.stroke();
+  },
+
+  _drawTracks(ctx, W, H) {
+    const { HEADER_WIDTH, TRACK_HEIGHT, RULER_HEIGHT, scrollX } = this;
+    const barW = this.barWidth();
+
+    ProjectState.tracks.forEach((track, i) => {
+      const y = RULER_HEIGHT + i * TRACK_HEIGHT;
+      if (y > H) return;
+
+      // Header
+      ctx.fillStyle = track.muted ? '#1a1a2a' : '#111128';
+      ctx.fillRect(0, y, HEADER_WIDTH, TRACK_HEIGHT);
+      ctx.strokeStyle = '#334';
+      ctx.strokeRect(0, y, HEADER_WIDTH, TRACK_HEIGHT);
+
+      // Track name
+      ctx.fillStyle = track.muted ? '#444' : '#ccccdd';
+      ctx.font = '6px "Press Start 2P"';
+      ctx.fillText(track.name.slice(0, 10), 4, y + 13);
+
+      // M / S buttons (simple text buttons)
+      ctx.fillStyle = track.muted ? '#cc2200' : '#334';
+      ctx.fillRect(4, y + 18, 14, 10);
+      ctx.fillStyle = '#fff';
+      ctx.font = '5px "Press Start 2P"';
+      ctx.fillText('M', 7, y + 26);
+
+      ctx.fillStyle = track.soloed ? '#ff9900' : '#334';
+      ctx.fillRect(22, y + 18, 14, 10);
+      ctx.fillStyle = '#fff';
+      ctx.fillText('S', 25, y + 26);
+
+      // Timeline area
+      ctx.fillStyle = '#0a0a14';
+      ctx.fillRect(HEADER_WIDTH, y, W - HEADER_WIDTH, TRACK_HEIGHT);
+      ctx.strokeStyle = '#222';
+      ctx.strokeRect(HEADER_WIDTH, y, W - HEADER_WIDTH, TRACK_HEIGHT);
+
+      // Playhead line
+      const px = HEADER_WIDTH + ProjectState.playheadBar * barW - scrollX;
+      ctx.strokeStyle = 'rgba(255,255,0,0.3)';
+      ctx.beginPath(); ctx.moveTo(px, y); ctx.lineTo(px, y + TRACK_HEIGHT); ctx.stroke();
+
+      // Pattern blocks
+      const color = this.NOTE_COLORS[track.channelType] || '#cc3300';
+      for (const entry of track.arrangement) {
+        const pat = track.patterns.find(p => p.id === entry.patternId);
+        if (!pat) continue;
+        const bx = HEADER_WIDTH + entry.startBar * barW - scrollX;
+        const bw = pat.lengthBars * barW - 2;
+        if (bx + bw < HEADER_WIDTH || bx > W) continue;
+        ctx.fillStyle = color + '55';
+        ctx.fillRect(bx, y + 2, bw, TRACK_HEIGHT - 4);
+        ctx.strokeStyle = color;
+        ctx.strokeRect(bx, y + 2, bw, TRACK_HEIGHT - 4);
+        ctx.fillStyle = color;
+        ctx.font = '5px "Press Start 2P"';
+        ctx.fillText(pat.name, bx + 3, y + 13);
+      }
+    });
+  }
+};
+
+AV.initEvents = function() {
+  const canvas = this.getCanvas();
+  let dragState = null;
+  let loopDrag = false;
+
+  const getHit = (mx, my) => {
+    const { HEADER_WIDTH, TRACK_HEIGHT, RULER_HEIGHT, scrollX } = this;
+    const barW = this.barWidth();
+    if (my < RULER_HEIGHT) return { zone: 'ruler' };
+    const trackIdx = Math.floor((my - RULER_HEIGHT) / TRACK_HEIGHT);
+    if (trackIdx < 0 || trackIdx >= ProjectState.tracks.length) return null;
+    const track = ProjectState.tracks[trackIdx];
+    if (mx < HEADER_WIDTH) {
+      // M button: x 4-18, y+18 to y+28
+      const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT;
+      if (mx >= 4 && mx <= 18 && my >= ty+18 && my <= ty+28) return { zone:'mute', track };
+      if (mx >= 22 && mx <= 36 && my >= ty+18 && my <= ty+28) return { zone:'solo', track };
+      return { zone: 'header', track, trackIdx };
+    }
+    const bar = Math.floor((mx - HEADER_WIDTH + scrollX) / barW);
+    for (const entry of track.arrangement) {
+      const pat = track.patterns.find(p => p.id === entry.patternId);
+      if (!pat) continue;
+      const bx = HEADER_WIDTH + entry.startBar * barW - scrollX;
+      const bw = pat.lengthBars * barW;
+      if (mx >= bx && mx <= bx + bw) return { zone:'pattern', track, entry, pat, bar };
+    }
+    return { zone:'empty', track, bar };
+  };
+
+  canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const hit = getHit(mx, my);
+    if (!hit) return;
+
+    if (hit.zone === 'ruler') {
+      const { HEADER_WIDTH, scrollX } = this;
+      const barW = this.barWidth();
+      const bar = (mx - HEADER_WIDTH + scrollX) / barW;
+      if (e.shiftKey) {
+        // Shift+click sets loop region start
+        ProjectState.loopStart = Math.max(0, Math.floor(bar));
+        loopDrag = true;
+      } else {
+        // Plain click moves playhead
+        ProjectState.playheadBar = Math.max(0, bar);
+        Sequencer._playStartBar = ProjectState.playheadBar;
+      }
+      AV.draw();
+      return;
+    }
+    if (hit.zone === 'mute') { hit.track.muted = !hit.track.muted; AV.draw(); return; }
+    if (hit.zone === 'solo') { hit.track.soloed = !hit.track.soloed; AV.draw(); return; }
+    if (hit.zone === 'empty') {
+      const pat = addPattern(hit.track.id, Math.max(0, hit.bar), 2);
+      AV.draw();
+      return;
+    }
+    if (hit.zone === 'pattern') {
+      if (e.detail === 2) { // double-click
+        ProjectState.selectedTrackId = hit.track.id;
+        ProjectState.selectedPatternId = hit.pat.id;
+        PR.open(hit.track, hit.pat);
+        AV.draw();
+        return;
+      }
+      dragState = {
+        entry: hit.entry, track: hit.track, pat: hit.pat,
+        startX: mx, origBar: hit.entry.startBar,
+        isAlt: e.altKey
+      };
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    if (loopDrag) {
+      const barW = this.barWidth();
+      const bar = (mx - this.HEADER_WIDTH + this.scrollX) / barW;
+      ProjectState.loopEnd = Math.max(ProjectState.loopStart + 1, Math.ceil(bar));
+      AV.draw(); return;
+    }
+    if (!dragState) return;
+    const barW = this.barWidth();
+    const deltaBars = Math.round((mx - dragState.startX) / barW);
+    if (dragState.isAlt && !dragState.cloned) {
+      // Duplicate pattern on first move
+      const newPat = { id: makeId(), name: dragState.pat.name, lengthBars: dragState.pat.lengthBars,
+        notes: JSON.parse(JSON.stringify(dragState.pat.notes)) };
+      dragState.track.patterns.push(newPat);
+      const newEntry = { patternId: newPat.id, startBar: dragState.origBar };
+      dragState.track.arrangement.push(newEntry);
+      dragState.entry = newEntry;
+      dragState.pat = newPat;
+      dragState.cloned = true;
+    }
+    dragState.entry.startBar = Math.max(0, dragState.origBar + deltaBars);
+    AV.draw();
+  });
+
+  canvas.addEventListener('mouseup', () => { dragState = null; loopDrag = false; });
+
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const hit = getHit(e.clientX - rect.left, e.clientY - rect.top);
+    if (hit && hit.zone === 'pattern') {
+      showContextMenu(e.clientX, e.clientY, [
+        { label: 'Open in Piano Roll', action: () => {
+          ProjectState.selectedTrackId = hit.track.id;
+          ProjectState.selectedPatternId = hit.pat.id;
+          PR.open(hit.track, hit.pat);
+          AV.draw();
+        }},
+        { label: 'Rename', action: () => {
+          const n = prompt('Pattern name:', hit.pat.name);
+          if (n) { hit.pat.name = n; AV.draw(); }
+        }},
+        { label: 'Delete', action: () => {
+          hit.track.arrangement = hit.track.arrangement.filter(en => en !== hit.entry);
+          AV.draw();
+        }}
+      ]);
+    }
+  });
+};
+
+function showContextMenu(x, y, items) {
+  let el = document.getElementById('ctx-menu');
+  if (el) el.remove();
+  el = document.createElement('div');
+  el.id = 'ctx-menu';
+  el.style.cssText = `position:fixed;left:${x}px;top:${y}px;background:#111128;
+    border:1px solid #334;z-index:1000;padding:2px;`;
+  items.forEach(item => {
+    const btn = document.createElement('div');
+    btn.textContent = item.label;
+    btn.style.cssText = 'padding:6px 10px;cursor:pointer;font:6px "Press Start 2P";color:#ccccdd;';
+    btn.onmouseenter = () => btn.style.background = '#334';
+    btn.onmouseleave = () => btn.style.background = '';
+    btn.onclick = () => { item.action(); el.remove(); };
+    el.appendChild(btn);
+  });
+  document.body.appendChild(el);
+  setTimeout(() => document.addEventListener('click', () => el.remove(), { once: true }), 0);
+}
+
   window.addEventListener('DOMContentLoaded', () => {
     PR.initEvents();
+    AV.resize();
+    AV.draw();
+    window.addEventListener('resize', () => { AV.resize(); AV.draw(); });
+    AV.initEvents();
   });
 
   </script>
