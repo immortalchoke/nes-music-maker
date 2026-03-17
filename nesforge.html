@@ -4,10 +4,48 @@
   <meta charset="UTF-8">
   <title>NESForge</title>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-  <style>/* STYLES */</style>
+  <style>/* STYLES */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0a1a; --bg2: #111128; --bg3: #1a1a35;
+  --accent: #cc2200; --accent2: #ff6600;
+  --hi: #00ccaa; --hi2: #00ffcc;
+  --gray: #444466; --gray2: #222240;
+  --text: #ccccdd; --text2: #8888aa;
+  --border: 1px solid var(--gray);
+}
+html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text);
+  font-family: 'Press Start 2P', monospace; font-size: 8px; overflow: hidden; }
+#app { display: flex; flex-direction: column; height: 100vh; }
+#topbar { height: 48px; background: var(--bg2); border-bottom: var(--border);
+  display: flex; align-items: center; padding: 0 8px; gap: 16px; flex-shrink: 0; }
+#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#arrangement-panel { flex: 1; overflow: hidden; min-height: 200px; }
+#arrangement-canvas { display: block; }
+#pianoroll-panel { height: 300px; border-top: var(--border); display: flex;
+  flex-direction: column; }
+#pianoroll-canvas { flex: 1; display: block; }
+#velocity-canvas { height: 60px; display: block; border-top: var(--border); }
+  </style>
 </head>
 <body>
-  <div id="app"></div>
+  <div id="app">
+  <div id="topbar">
+    <div id="transport"></div>
+    <div id="global-controls"></div>
+  </div>
+  <div id="main">
+    <div id="arrangement-panel">
+      <canvas id="arrangement-canvas"></canvas>
+    </div>
+    <div id="pianoroll-panel" style="display:none;">
+      <canvas id="pianoroll-canvas"></canvas>
+      <canvas id="velocity-canvas"></canvas>
+    </div>
+    <div id="chord-panel" style="display:none;"></div>
+  </div>
+  <div id="export-modal" style="display:none;"></div>
+</div>
   <script>
   'use strict';
 
@@ -376,6 +414,401 @@
       playPitchedNote(track, note.pitch, startTime, dur);
     }
   }
+
+
+  // ============================================================
+  // MODULE: Scales
+  // ============================================================
+  const Scales = {
+    NOTE_ORDER: ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],
+
+    SCALES: {
+      'Major':           [0,2,4,5,7,9,11],
+      'Minor':           [0,2,3,5,7,8,10],
+      'Pentatonic Minor':[0,3,5,7,10],
+      'Blues':           [0,3,5,6,7,10],
+      'Dorian':          [0,2,3,5,7,9,10],
+      'Phrygian':        [0,1,3,5,7,8,10],
+      'Chromatic':       [0,1,2,3,4,5,6,7,8,9,10,11]
+    },
+
+    getRootSemitone(key) {
+      return this.NOTE_ORDER.indexOf(key);
+    },
+
+    // Returns Set of pitch-class numbers (0-11) in scale
+    getInScalePitches(key, scaleName) {
+      const root = this.getRootSemitone(key);
+      const intervals = this.SCALES[scaleName] || this.SCALES['Chromatic'];
+      return new Set(intervals.map(i => (root + i) % 12));
+    },
+
+    snapToScale(pitch, key, scaleName) {
+      const inScale = this.getInScalePitches(key, scaleName);
+      if (inScale.has(pitch % 12)) return pitch;
+      // Try up then down
+      for (let delta = 1; delta <= 6; delta++) {
+        if (inScale.has((pitch + delta) % 12)) return pitch + delta;
+        if (inScale.has((pitch - delta + 12) % 12)) return pitch - delta;
+      }
+      return pitch;
+    }
+  };
+
+  // ============================================================
+  // MODULE: PianoRoll
+  // ============================================================
+  const PR = {
+    KEY_WIDTH: 32,
+    ROW_HEIGHT: 8,
+    BEAT_WIDTH: 40,       // pixels per beat
+    VELOCITY_HEIGHT: 60,
+    NOTE_COLORS: {
+      pulse50: '#cc3300', pulse25: '#ff6600',
+      triangle: '#00ccaa', noise: '#33aa66',
+      dpcm: '#9933cc', chord: '#ff9900'
+    },
+    DRUM_ROWS: [46, 42, 39, 37, 38, 36], // top to bottom: hihatO, hihatC, clap, rim, snare, kick
+    DRUM_NAMES: { 46:'HH OPEN', 42:'HH CLSD', 39:'CLAP', 37:'RIM', 38:'SNARE', 36:'KICK' },
+    NOTE_NAMES: ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],
+    scrollX: 0,
+    scrollY: 480, // start near middle C
+    activePattern: null, // { track, pattern }
+
+    getCanvas() { return document.getElementById('pianoroll-canvas'); },
+    getVelCanvas() { return document.getElementById('velocity-canvas'); },
+
+    sixteenthWidth() {
+      const [, denom] = ProjectState.timeSignature;
+      return this.BEAT_WIDTH / (denom / 4);
+    },
+
+    barWidth() {
+      return this.BEAT_WIDTH * ProjectState.timeSignature[0];
+    },
+
+    open(track, pattern) {
+      this.activePattern = { track, pattern };
+      const panel = document.getElementById('pianoroll-panel');
+      panel.style.display = 'flex';
+      this.resizeCanvases();
+      this.draw();
+      this.drawVelocity();
+      const chordPanel = document.getElementById('chord-panel');
+      chordPanel.style.display = track.channelType === 'chord' ? 'block' : 'none';
+      if (track.channelType === 'chord') ChordTool.renderPalette();
+    },
+
+    resizeCanvases() {
+      const prCanvas = this.getCanvas();
+      const velCanvas = this.getVelCanvas();
+      const panel = document.getElementById('pianoroll-panel');
+      const w = panel.clientWidth;
+      prCanvas.width = w;
+      prCanvas.height = panel.clientHeight - this.VELOCITY_HEIGHT;
+      velCanvas.width = w;
+      velCanvas.height = this.VELOCITY_HEIGHT;
+    },
+
+    draw() {
+      const canvas = this.getCanvas();
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const { width: W, height: H } = canvas;
+      const { KEY_WIDTH, ROW_HEIGHT, scrollX, scrollY } = this;
+      const ap = this.activePattern;
+      const isNoise = ap && ap.track.channelType === 'noise';
+      const rows = isNoise ? this.DRUM_ROWS : null;
+      const numRows = isNoise ? 6 : 128;
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#0a0a1a';
+      ctx.fillRect(0, 0, W, H);
+
+      // Piano key gutter
+      ctx.fillStyle = '#111128';
+      ctx.fillRect(0, 0, KEY_WIDTH, H);
+
+      const scalePitches = Scales.getInScalePitches(ProjectState.key, ProjectState.scale);
+
+      for (let i = 0; i < numRows; i++) {
+        const pitch = isNoise ? rows[i] : (127 - i);
+        const y = i * ROW_HEIGHT - scrollY;
+        if (y + ROW_HEIGHT < 0 || y > H) continue;
+
+        const noteName = this.NOTE_NAMES[pitch % 12];
+        const isBlack = noteName.includes('#');
+        const inScale = scalePitches.has(pitch % 12);
+
+        // Row background
+        if (isNoise) {
+          ctx.fillStyle = '#0f0f22';
+        } else if (inScale) {
+          ctx.fillStyle = isBlack ? '#0d1a18' : '#0a1614';
+        } else {
+          ctx.fillStyle = isBlack ? '#080810' : '#0a0a14';
+        }
+        ctx.fillRect(KEY_WIDTH, y, W - KEY_WIDTH, ROW_HEIGHT);
+
+        // Key gutter
+        if (isNoise) {
+          ctx.fillStyle = '#1a1a35';
+          ctx.fillRect(0, y, KEY_WIDTH, ROW_HEIGHT);
+          ctx.fillStyle = '#00ccaa';
+          ctx.font = '5px "Press Start 2P"';
+          ctx.fillText(this.DRUM_NAMES[pitch] || '', 2, y + 7);
+        } else {
+          ctx.fillStyle = isBlack ? '#222' : '#ddd';
+          ctx.fillRect(0, y, KEY_WIDTH - 2, ROW_HEIGHT - 1);
+          if (!isBlack && pitch % 12 === 0) {
+            ctx.fillStyle = '#00ccaa';
+            ctx.font = '5px "Press Start 2P"';
+            ctx.fillText('C' + Math.floor(pitch / 12), 1, y + 7);
+          }
+        }
+
+        // Grid line
+        ctx.strokeStyle = '#1a1a2e';
+        ctx.beginPath();
+        ctx.moveTo(KEY_WIDTH, y); ctx.lineTo(W, y);
+        ctx.stroke();
+      }
+
+      // Beat/bar grid lines
+      if (ap) {
+        const sixteenth = this.sixteenthWidth();
+        const patWidthPx = ap.pattern.lengthBars * this.barWidth();
+        for (let s = 0; s <= ap.pattern.lengthBars * ProjectState.timeSignature[0] * 4; s++) {
+          const x = KEY_WIDTH + s * sixteenth - scrollX;
+          if (x < KEY_WIDTH || x > W) continue;
+          const beat = s % 4 === 0;
+          const bar  = s % (ProjectState.timeSignature[0] * 4) === 0;
+          ctx.strokeStyle = bar ? '#334' : beat ? '#222' : '#181828';
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+        }
+      }
+
+      // Notes
+      if (ap) {
+        const color = this.NOTE_COLORS[ap.track.channelType] || '#cc3300';
+        for (const note of ap.pattern.notes) {
+          const rowIdx = isNoise ? rows.indexOf(note.pitch) : (127 - note.pitch);
+          if (rowIdx < 0) continue;
+          const y = rowIdx * ROW_HEIGHT - scrollY;
+          const x = KEY_WIDTH + note.start * this.barWidth() - scrollX;
+          const w = note.duration * this.barWidth() - 1;
+          const velBright = 0.4 + 0.6 * (note.velocity / 127);
+          ctx.globalAlpha = velBright;
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y + 1, Math.max(w, 4), ROW_HEIGHT - 2);
+          ctx.globalAlpha = 1;
+          // Chord label
+          if (note.chordLabel) {
+            ctx.fillStyle = '#fff';
+            ctx.font = '5px "Press Start 2P"';
+            ctx.fillText(note.chordLabel, x + 2, y + 7);
+          }
+        }
+      }
+
+      // Playhead
+      if (ap) {
+        const rel = ProjectState.playheadBar - (ap.track.arrangement.find(e => e.patternId === ap.pattern.id)?.startBar || 0);
+        const x = KEY_WIDTH + rel * this.barWidth() - scrollX;
+        if (x >= KEY_WIDTH && x <= W) {
+          ctx.strokeStyle = '#ffff00';
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+          ctx.lineWidth = 1;
+        }
+      }
+    },
+
+    drawVelocity() {
+      const canvas = this.getVelCanvas();
+      if (!canvas || !this.activePattern) return;
+      const ctx = canvas.getContext('2d');
+      const { width: W, height: H } = canvas;
+      const ap = this.activePattern;
+      const color = this.NOTE_COLORS[ap.track.channelType] || '#cc3300';
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#080810';
+      ctx.fillRect(0, 0, W, H);
+
+      // Deduplicate by chordId (show one bar per chord group)
+      const seen = new Set();
+      for (const note of ap.pattern.notes) {
+        const key = note.chordId || note.pitch + '_' + note.start;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const x = this.KEY_WIDTH + note.start * this.barWidth() - this.scrollX;
+        const barH = Math.max(2, (note.velocity / 127) * (H - 4));
+        ctx.fillStyle = color;
+        ctx.fillRect(x + 1, H - barH, Math.max(4, this.sixteenthWidth() - 2), barH);
+      }
+    }
+  };
+
+  // Temp test — remove in Phase 8
+  function testOpenPR() {
+    const t = addTrack('pulse50', 'TEST');
+    const p = addPattern(t.id, 0, 2);
+    PR.open(t, p);
+  }
+
+  // Add inside PR object or after its definition:
+  PR.initEvents = function() {
+    const canvas = this.getCanvas();
+    if (!canvas) return;
+    let dragState = null; // { type: 'resize'|'velocity', note, startX, startY, origDur, origVel }
+
+    const posToNote = (mx, my) => {
+      const ap = this.activePattern;
+      if (!ap) return null;
+      const isNoise = ap.track.channelType === 'noise';
+      const rows = isNoise ? this.DRUM_ROWS : null;
+      const relX = mx - this.KEY_WIDTH + this.scrollX;
+      const relY = my + this.scrollY;
+      const sixteenth = this.sixteenthWidth();
+      const barW = this.barWidth();
+      const snappedStart = Math.floor(relX / sixteenth) * sixteenth / barW;
+      const rowIdx = Math.floor(relY / this.ROW_HEIGHT);
+      const pitch = isNoise ? rows[rowIdx] : (127 - rowIdx);
+      return { snappedStart, rowIdx, pitch };
+    };
+
+    const hitTestNote = (mx, my) => {
+      const ap = this.activePattern;
+      if (!ap) return null;
+      const isNoise = ap.track.channelType === 'noise';
+      const rows = isNoise ? this.DRUM_ROWS : null;
+      const barW = this.barWidth();
+      for (const note of ap.pattern.notes) {
+        const rowIdx = isNoise ? rows.indexOf(note.pitch) : (127 - note.pitch);
+        const y = rowIdx * this.ROW_HEIGHT - this.scrollY;
+        const x = this.KEY_WIDTH + note.start * barW - this.scrollX;
+        const w = note.duration * barW;
+        if (mx >= x && mx <= x + w && my >= y && my <= y + this.ROW_HEIGHT) {
+          return { note, x, w, y };
+        }
+      }
+      return null;
+    };
+
+    canvas.addEventListener('mousedown', (e) => {
+      const ap = this.activePattern;
+      if (!ap) return;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      if (mx < this.KEY_WIDTH) return;
+
+      const hit = hitTestNote(mx, my);
+      if (hit) {
+        const { note, x, w } = hit;
+        // Near right edge → resize
+        if (mx > x + w - 6) {
+          dragState = { type: 'resize', note, startX: mx, origDur: note.duration };
+        } else {
+          // Click existing note: handle chordId group deletion
+          if (note.chordId) {
+            ap.pattern.notes = ap.pattern.notes.filter(n => n.chordId !== note.chordId);
+          } else {
+            ap.pattern.notes = ap.pattern.notes.filter(n => n !== note);
+          }
+          this.draw(); this.drawVelocity();
+        }
+      } else {
+        if (ap.track.channelType === 'chord') {
+          // Open inline chord picker
+          const pos = posToNote(mx, my);
+          ChordTool.openInlinePicker(pos.snappedStart, e.clientX, e.clientY);
+          return;
+        }
+        const pos = posToNote(mx, my);
+        if (pos.pitch < 0 || pos.pitch > 127) return;
+        const sixteenth = this.sixteenthWidth() / this.barWidth();
+        let pitch = pos.pitch;
+        if (ProjectState.scale !== 'Chromatic') {
+          pitch = Scales.snapToScale(pitch, ProjectState.key, ProjectState.scale);
+        }
+        const note = { pitch, start: pos.snappedStart, duration: sixteenth, velocity: 100 };
+        ap.pattern.notes.push(note);
+        this.draw(); this.drawVelocity();
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!dragState) return;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      if (dragState.type === 'resize') {
+        const sixteenth = this.sixteenthWidth() / this.barWidth();
+        const deltaBars = (mx - dragState.startX) / this.barWidth();
+        const newDur = Math.max(sixteenth, Math.round((dragState.origDur + deltaBars) / sixteenth) * sixteenth);
+        dragState.note.duration = newDur;
+        this.draw();
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => { dragState = null; });
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.shiftKey) {
+        PR.scrollX = Math.max(0, PR.scrollX + e.deltaY);
+      } else {
+        PR.scrollY = Math.max(0, Math.min(128 * PR.ROW_HEIGHT - canvas.height, PR.scrollY + e.deltaY));
+      }
+      PR.draw();
+    }, { passive: false });
+
+    // Velocity canvas interaction
+    const velCanvas = this.getVelCanvas();
+    velCanvas.addEventListener('mousedown', (e) => {
+      const ap = this.activePattern;
+      if (!ap) return;
+      const rect = velCanvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const barW = this.barWidth();
+      // Find closest note by x position
+      let closest = null, minDist = 20;
+      const seen = new Set();
+      for (const note of ap.pattern.notes) {
+        const key = note.chordId || (note.pitch + '_' + note.start);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const x = this.KEY_WIDTH + note.start * barW - this.scrollX;
+        if (Math.abs(x - mx) < minDist) { minDist = Math.abs(x - mx); closest = note; }
+      }
+      if (!closest) return;
+      dragState = { type: 'velocity', note: closest, startY: my, origVel: closest.velocity };
+      const onMove = (ev) => {
+        const dy = dragState.startY - (ev.clientY - rect.top);
+        const newVel = Math.max(1, Math.min(127, Math.round(dragState.origVel + dy * 1.5)));
+        // Apply to chord group if applicable
+        if (dragState.note.chordId) {
+          ap.pattern.notes.filter(n => n.chordId === dragState.note.chordId)
+            .forEach(n => n.velocity = newVel);
+        } else {
+          dragState.note.velocity = newVel;
+        }
+        this.draw(); this.drawVelocity();
+      };
+      const onUp = () => {
+        dragState = null;
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  };
+
+  window.addEventListener('DOMContentLoaded', () => {
+    PR.initEvents();
+  });
 
   </script>
 </body>
