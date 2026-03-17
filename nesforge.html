@@ -920,6 +920,15 @@ const AV = {
       ctx.fillStyle = '#fff';
       ctx.fillText('S', 25, y + 26);
 
+      if (track.channelType === 'dpcm') {
+        const isArmed = ProjectState.armedTrackId === track.id;
+        ctx.fillStyle = isArmed ? '#cc2200' : '#334';
+        ctx.fillRect(40, y + 18, 24, 10);
+        ctx.fillStyle = '#fff';
+        ctx.font = '5px "Press Start 2P"';
+        ctx.fillText('REC', 42, y + 26);
+      }
+
       // Timeline area
       ctx.fillStyle = '#0a0a14';
       ctx.fillRect(HEADER_WIDTH, y, W - HEADER_WIDTH, TRACK_HEIGHT);
@@ -1002,6 +1011,20 @@ AV.initEvents = function() {
       }
       AV.draw();
       return;
+    }
+    if (hit.track) {
+      const track = hit.track;
+      const trackIdx = ProjectState.tracks.indexOf(track);
+      if (track.channelType === 'dpcm') {
+        const { RULER_HEIGHT, TRACK_HEIGHT } = this;
+        const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT;
+        if (mx >= 40 && mx <= 64 && my >= ty+18 && my <= ty+28) {
+          if (ProjectState.armedTrackId === track.id) {
+            DPCMSampler.record(track);
+          }
+          return;
+        }
+      }
     }
     if (hit.zone === 'mute') { hit.track.muted = !hit.track.muted; AV.draw(); return; }
     if (hit.zone === 'solo') { hit.track.soloed = !hit.track.soloed; AV.draw(); return; }
@@ -1296,6 +1319,105 @@ const ChordTool = {
     });
   }
 };
+
+// ============================================================
+// MODULE: DPCMSampler
+// ============================================================
+const DPCMSampler = {
+  MAX_DURATION: 2, // seconds
+  TARGET_RATE: 8000,
+  BIT_DEPTH: 4, // 16 levels
+
+  async record(track) {
+    if (!navigator.mediaDevices) {
+      alert('Mic access unavailable on file:// — serve from localhost for recording.');
+      return;
+    }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch(e) { alert('Mic access denied: ' + e.message); return; }
+
+    const ctx = getAudioCtx();
+    const src = ctx.createMediaStreamSource(stream);
+    const bufLen = ctx.sampleRate * this.MAX_DURATION;
+    const scriptProc = ctx.createScriptProcessor(4096, 1, 1);
+    const recorded = [];
+
+    scriptProc.onaudioprocess = (e) => {
+      const buf = e.inputBuffer.getChannelData(0);
+      recorded.push(new Float32Array(buf));
+    };
+
+    src.connect(scriptProc);
+    scriptProc.connect(ctx.destination);
+
+    // Stop after MAX_DURATION
+    await new Promise(r => setTimeout(r, this.MAX_DURATION * 1000));
+
+    scriptProc.disconnect(); src.disconnect();
+    stream.getTracks().forEach(t => t.stop());
+
+    // Concatenate
+    const total = recorded.reduce((s, b) => s + b.length, 0);
+    const full = new Float32Array(total);
+    let offset = 0;
+    for (const chunk of recorded) { full.set(chunk, offset); offset += chunk.length; }
+
+    const processed = this.bitcrush(this.downsample(full, ctx.sampleRate));
+    track.sample = processed;
+    this.drawWaveform(track);
+    EventBus.emit('dpcm:recorded', { track });
+  },
+
+  downsample(samples, srcRate) {
+    const ratio = srcRate / this.TARGET_RATE;
+    const outLen = Math.floor(samples.length / ratio);
+    const out = new Float32Array(outLen);
+    for (let i = 0; i < outLen; i++) {
+      out[i] = samples[Math.floor(i * ratio)];
+    }
+    return out;
+  },
+
+  bitcrush(samples) {
+    const levels = Math.pow(2, this.BIT_DEPTH); // 16
+    const out = new Float32Array(samples.length);
+    for (let i = 0; i < samples.length; i++) {
+      out[i] = Math.round((samples[i] + 1) * (levels / 2)) / (levels / 2) - 1;
+    }
+    return out;
+  },
+
+  drawWaveform(track) {
+    const canvasId = 'waveform-' + track.id;
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !track.sample) return;
+    const ctx = canvas.getContext('2d');
+    const { width: W, height: H } = canvas;
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#9933cc';
+    ctx.beginPath();
+    const step = track.sample.length / W;
+    for (let x = 0; x < W; x++) {
+      const val = track.sample[Math.floor(x * step)];
+      const y = H / 2 - val * (H / 2 - 1);
+      x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+};
+
+EventBus.on('track:added', (track) => {
+  if (track.channelType === 'dpcm') {
+    // Create waveform canvas element (rendered by AV as an overlay)
+    const wc = document.createElement('canvas');
+    wc.id = 'waveform-' + track.id;
+    wc.width = 80; wc.height = 30;
+    wc.style.cssText = 'position:absolute;display:none;'; // positioned by AV
+    document.body.appendChild(wc);
+  }
+});
 
 // ============================================================
 // MODULE: Sequencer
