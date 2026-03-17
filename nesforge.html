@@ -496,7 +496,7 @@ html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text
       this.drawVelocity();
       const chordPanel = document.getElementById('chord-panel');
       chordPanel.style.display = track.channelType === 'chord' ? 'block' : 'none';
-      if (track.channelType === 'chord') ChordTool.renderPalette();
+      if (track.channelType === 'chord' && typeof ChordTool !== 'undefined') ChordTool.renderPalette();
     },
 
     resizeCanvases() {
@@ -722,7 +722,7 @@ html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text
         if (ap.track.channelType === 'chord') {
           // Open inline chord picker
           const pos = posToNote(mx, my);
-          ChordTool.openInlinePicker(pos.snappedStart, e.clientX, e.clientY);
+          if (typeof ChordTool !== 'undefined') ChordTool.openInlinePicker(pos.snappedStart, e.clientX, e.clientY);
           return;
         }
         const pos = posToNote(mx, my);
