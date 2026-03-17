@@ -961,7 +961,7 @@ AV.initEvents = function() {
       const pat = track.patterns.find(p => p.id === entry.patternId);
       if (!pat) continue;
       const bx = HEADER_WIDTH + entry.startBar * barW - scrollX;
-      const bw = pat.lengthBars * barW;
+      const bw = pat.lengthBars * barW - 2;
       if (mx >= bx && mx <= bx + bw) return { zone:'pattern', track, entry, pat, bar };
     }
     return { zone:'empty', track, bar };
@@ -984,7 +984,7 @@ AV.initEvents = function() {
       } else {
         // Plain click moves playhead
         ProjectState.playheadBar = Math.max(0, bar);
-        Sequencer._playStartBar = ProjectState.playheadBar;
+        if (typeof Sequencer !== 'undefined') Sequencer._playStartBar = ProjectState.playheadBar;
       }
       AV.draw();
       return;
@@ -998,6 +998,7 @@ AV.initEvents = function() {
     }
     if (hit.zone === 'pattern') {
       if (e.detail === 2) { // double-click
+        dragState = null;
         ProjectState.selectedTrackId = hit.track.id;
         ProjectState.selectedPatternId = hit.pat.id;
         PR.open(hit.track, hit.pat);
