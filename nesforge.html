@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NESForge</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>/* STYLES */</style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  'use strict';
+
+  // ============================================================
+  // MODULE: ProjectState
+  // ============================================================
+  function makeId() { return Math.random().toString(36).slice(2, 9); }
+
+  const ProjectState = {
+    bpm: 120,
+    timeSignature: [4, 4],
+    key: 'C',
+    scale: 'Major',
+    tracks: [],
+    loopStart: 0,
+    loopEnd: 4,
+    loopEnabled: true,
+    selectedTrackId: null,
+    selectedPatternId: null,
+    playheadBar: 0,
+    armedTrackId: null
+  };
+
+  function getSongLengthBars() {
+    let max = 4;
+    for (const track of ProjectState.tracks) {
+      for (const entry of track.arrangement) {
+        const pat = track.patterns.find(p => p.id === entry.patternId);
+        if (pat) max = Math.max(max, entry.startBar + pat.lengthBars);
+      }
+    }
+    return max;
+  }
+
+  function addTrack(channelType, name) {
+    const track = {
+      id: makeId(), name: name || channelType.toUpperCase(),
+      channelType,
+      volume: 80, pan: 0,
+      vibrato: 'off', delay: 'off', reverb: 'off',
+      muted: false, soloed: false,
+      sample: null,
+      patterns: [], arrangement: []
+    };
+    ProjectState.tracks.push(track);
+    EventBus.emit('track:added', track);
+    return track;
+  }
+
+  function addPattern(trackId, startBar = 0, lengthBars = 2) {
+    const track = ProjectState.tracks.find(t => t.id === trackId);
+    if (!track) return null;
+    const pat = { id: makeId(), name: 'Pat', lengthBars, notes: [] };
+    track.patterns.push(pat);
+    track.arrangement.push({ patternId: pat.id, startBar });
+    EventBus.emit('pattern:added', { track, pat });
+    return pat;
+  }
+
+  // ============================================================
+  // MODULE: EventBus
+  // ============================================================
+  const EventBus = {
+    _listeners: {},
+    on(event, fn) {
+      (this._listeners[event] = this._listeners[event] || []).push(fn);
+    },
+    off(event, fn) {
+      if (this._listeners[event])
+        this._listeners[event] = this._listeners[event].filter(f => f !== fn);
+    },
+    emit(event, data) {
+      (this._listeners[event] || []).forEach(fn => fn(data));
+    }
+  };
+
+  // ============================================================
+  // MODULE: AudioEngine
+  // ============================================================
+  let audioCtx = null;
+
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  const masterGain = { node: null };
+  function getMasterGain() {
+    const ctx = getAudioCtx();
+    if (!masterGain.node) {
+      masterGain.node = ctx.createGain();
+      masterGain.node.gain.value = 0.8;
+      masterGain.node.connect(ctx.destination);
+    }
+    return masterGain.node;
+  }
+
+  function barToSeconds(bars) {
+    const [beats] = ProjectState.timeSignature;
+    return bars * beats * (60 / ProjectState.bpm);
+  }
+
+  function midiToFreq(midi) {
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+
+  // Noise buffer (2s, mono, cached)
+  let _noiseBuffer = null;
+  function getNoiseBuffer() {
+    const ctx = getAudioCtx();
+    if (_noiseBuffer && _noiseBuffer.sampleRate === ctx.sampleRate) return _noiseBuffer;
+    const len = ctx.sampleRate * 2;
+    _noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = _noiseBuffer.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return _noiseBuffer;
+  }
+
+  // PeriodicWave cache
+  const _waveCache = {};
+  function getPulseWave(duty) {
+    const ctx = getAudioCtx();
+    const key = duty + '_' + ctx.sampleRate;
+    if (_waveCache[key]) return _waveCache[key];
+    const N = 256;
+    const real = new Float32Array(N);
+    const imag = new Float32Array(N);
+    for (let n = 1; n < N; n++) {
+      imag[n] = (2 / (n * Math.PI)) * Math.sin(n * Math.PI * duty);
+    }
+    _waveCache[key] = ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+    return _waveCache[key];
+  }
+
+  // Algorithmic reverb impulse response
+  function buildReverbImpulse(ctx, duration, decay, type) {
+    const len = ctx.sampleRate * duration;
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      }
+    }
+    return buf;
+  }
+
+  const REVERB_PRESETS = {
+    off:  null,
+    room: { duration: 0.8, decay: 3 },
+    hall: { duration: 2.5, decay: 2 }
+  };
+  const _reverbCache = {};
+
+  function getReverbNode(type) {
+    if (type === 'off') return null;
+    const ctx = getAudioCtx();
+    if (_reverbCache[type]) return _reverbCache[type];
+    const conv = ctx.createConvolver();
+    const p = REVERB_PRESETS[type];
+    conv.buffer = buildReverbImpulse(ctx, p.duration, p.decay);
+    _reverbCache[type] = conv;
+    return conv;
+  }
+
+  const VIBRATO_DEPTH = { off: 0, low: 10, med: 25, high: 50 };
+  const DELAY_TIME = { off: 0, short: 0.15, long: 0.3 };
+
+  // Build effect chain. Returns { inputNode, outputNode, stop() }
+  function buildEffectChain(track, velocityGain) {
+    const ctx = getAudioCtx();
+
+    const velGain = ctx.createGain();
+    velGain.gain.value = velocityGain;
+
+    const panner = ctx.createStereoPanner();
+    panner.pan.value = track.pan;
+
+    // vibratoLFO is connected per-oscillator in playPitchedNote (not here)
+    // so that each osc gets its own depth gain node targeting its detune param
+    const vibratoLFO = ctx.createOscillator();
+    vibratoLFO.frequency.value = 5;
+    vibratoLFO.start();
+
+    const chanGain = ctx.createGain();
+    chanGain.gain.value = track.volume / 100;
+
+    velGain.connect(panner);
+    panner.connect(chanGain);
+
+    // Delay
+    let delayOut = chanGain;
+    if (track.delay !== 'off') {
+      const delay = ctx.createDelay(1.0);
+      delay.delayTime.value = DELAY_TIME[track.delay];
+      const dryGain = ctx.createGain(); dryGain.gain.value = 0.7;
+      const wetGain = ctx.createGain(); wetGain.gain.value = 0.3;
+      chanGain.connect(dryGain);
+      chanGain.connect(delay);
+      delay.connect(wetGain);
+      const mixNode = ctx.createGain(); mixNode.gain.value = 1;
+      dryGain.connect(mixNode);
+      wetGain.connect(mixNode);
+      delayOut = mixNode;
+    }
+
+    // Reverb
+    let reverbOut = delayOut;
+    if (track.reverb !== 'off') {
+      const rev = getReverbNode(track.reverb);
+      const dryG = ctx.createGain(); dryG.gain.value = 0.6;
+      const wetG = ctx.createGain(); wetG.gain.value = 0.4;
+      delayOut.connect(dryG);
+      delayOut.connect(rev);
+      rev.connect(wetG);
+      const mix = ctx.createGain(); mix.gain.value = 1;
+      dryG.connect(mix); wetG.connect(mix);
+      reverbOut = mix;
+    }
+
+    reverbOut.connect(getMasterGain());
+
+    return {
+      inputNode: velGain,
+      vibratoLFO,
+      stop() { try { vibratoLFO.stop(); } catch(e) {} }
+    };
+  }
+
+  // Play a single pitched note. Returns a stop() function.
+  function playPitchedNote(track, pitch, startTime, durationSecs, extraOscillators) {
+    const ctx = getAudioCtx();
+    const freq = midiToFreq(pitch);
+    const velocity = 0.8; // normalized 0-1, caller can pass
+
+    const chain = buildEffectChain(track, velocity);
+
+    function makeOsc(f) {
+      const osc = ctx.createOscillator();
+      const envGain = ctx.createGain();
+
+      if (track.channelType === 'pulse50' || track.channelType === 'chord') {
+        osc.setPeriodicWave(getPulseWave(0.5));
+      } else if (track.channelType === 'pulse25') {
+        osc.setPeriodicWave(getPulseWave(0.25));
+      } else {
+        osc.type = 'triangle';
+      }
+
+      osc.frequency.value = f;
+      envGain.gain.setValueAtTime(0.001, startTime);
+      envGain.gain.linearRampToValueAtTime(1, startTime + 0.005);
+      envGain.gain.setValueAtTime(1, startTime + durationSecs - 0.01);
+      envGain.gain.linearRampToValueAtTime(0.001, startTime + durationSecs);
+
+      // Vibrato
+      if (track.vibrato !== 'off') {
+        const vDepth = ctx.createGain();
+        vDepth.gain.value = VIBRATO_DEPTH[track.vibrato];
+        chain.vibratoLFO.connect(vDepth);
+        vDepth.connect(osc.detune);
+      }
+
+      osc.connect(envGain);
+      envGain.connect(chain.inputNode);
+      osc.start(startTime);
+      osc.stop(startTime + durationSecs + 0.05);
+      return osc;
+    }
+
+    const oscs = [makeOsc(freq)];
+    if (extraOscillators) extraOscillators.forEach(f => oscs.push(makeOsc(f)));
+
+    return () => { oscs.forEach(o => { try { o.stop(); } catch(e) {} }); chain.stop(); };
+  }
+
+  // DRUM PITCH → PRESET mapping (GM-like)
+  const DRUM_MIDI = {
+    36: 'kick', 38: 'snare', 42: 'hihatC',
+    46: 'hihatO', 37: 'rim', 39: 'clap'
+  };
+
+  const DRUM_PRESETS = {
+    kick:   { filterType: 'lowpass',  filterFreq: 150,  filterQ: 1,   attack: 0.002, decay: 0.15, sustain: 0.001, release: 0.1,  duration: 0.3  },
+    snare:  { filterType: 'bandpass', filterFreq: 800,  filterQ: 0.5, attack: 0.001, decay: 0.08, sustain: 0.3,   release: 0.05, duration: 0.2  },
+    hihatC: { filterType: 'highpass', filterFreq: 8000, filterQ: 1,   attack: 0.001, decay: 0.04, sustain: 0.001, release: 0.02, duration: 0.05 },
+    hihatO: { filterType: 'highpass', filterFreq: 6000, filterQ: 0.8, attack: 0.001, decay: 0.12, sustain: 0.1,   release: 0.08, duration: 0.25 },
+    rim:    { filterType: 'bandpass', filterFreq: 1200, filterQ: 2,   attack: 0.001, decay: 0.05, sustain: 0.001, release: 0.03, duration: 0.1  },
+    clap:   { filterType: 'bandpass', filterFreq: 1500, filterQ: 0.7, attack: 0.001, decay: 0.06, sustain: 0.2,   release: 0.04, duration: 0.15 }
+  };
+
+  function playDrum(track, midiPitch, startTime, velocity = 0.8) {
+    const ctx = getAudioCtx();
+    const presetName = DRUM_MIDI[midiPitch];
+    if (!presetName) return;
+    const p = DRUM_PRESETS[presetName];
+
+    const src = ctx.createBufferSource();
+    src.buffer = getNoiseBuffer();
+    src.loop = true;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = p.filterType;
+    filter.frequency.value = p.filterFreq;
+    filter.Q.value = p.filterQ;
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.001, startTime);
+    env.gain.linearRampToValueAtTime(velocity, startTime + p.attack);
+    env.gain.exponentialRampToValueAtTime(p.sustain + 0.001, startTime + p.attack + p.decay);
+    env.gain.linearRampToValueAtTime(0.001, startTime + p.duration);
+
+    const chanGain = ctx.createGain();
+    chanGain.gain.value = track.volume / 100;
+    const panner = ctx.createStereoPanner();
+    panner.pan.value = track.pan;
+
+    src.connect(filter);
+    filter.connect(env);
+    env.connect(chanGain);
+    chanGain.connect(panner);
+    panner.connect(getMasterGain());
+
+    src.start(startTime);
+    src.stop(startTime + p.duration + 0.05);
+  }
+
+  function playDPCM(track, pitch, startTime, durationSecs) {
+    if (!track.sample) return;
+    const ctx = getAudioCtx();
+    const buf = ctx.createBuffer(1, track.sample.length, 8000);
+    buf.getChannelData(0).set(track.sample);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = Math.pow(2, (pitch - 60) / 12);
+    const chanGain = ctx.createGain();
+    chanGain.gain.value = track.volume / 100;
+    const panner = ctx.createStereoPanner();
+    panner.pan.value = track.pan;
+    src.connect(chanGain);
+    chanGain.connect(panner);
+    panner.connect(getMasterGain());
+    src.start(startTime);
+    src.stop(startTime + durationSecs + 0.05);
+  }
+
+  // Universal note dispatcher — used by Sequencer
+  function playNote(track, note, startTime) {
+    const dur = barToSeconds(note.duration);
+    const vel = (note.velocity || 100) / 127;
+    if (track.muted) return;
+    const soloActive = ProjectState.tracks.some(t => t.soloed);
+    if (soloActive && !track.soloed) return;
+
+    if (track.channelType === 'noise') {
+      playDrum(track, note.pitch, startTime, vel);
+    } else if (track.channelType === 'dpcm') {
+      playDPCM(track, note.pitch, startTime, dur);
+    } else if (track.channelType === 'chord') {
+      // Each chord tone is a separate note object with its own pitch;
+      // the Sequencer schedules them individually as single oscillators.
+      // This is correct — chord tones share a chordId for UI grouping only.
+      playPitchedNote(track, note.pitch, startTime, dur);
+    } else {
+      playPitchedNote(track, note.pitch, startTime, dur);
+    }
+  }
+
+  </script>
+</body>
+</html>
