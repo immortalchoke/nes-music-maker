@@ -41,6 +41,58 @@ input[type=number], select {
 }
 #chord-panel { border-top: var(--border); padding: 4px; background: var(--bg2);
   flex-wrap: wrap; display: none; max-height: 80px; overflow-y: auto; }
+
+/* Scanlines */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(0,0,0,0.18) 2px,
+    rgba(0,0,0,0.18) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Pixel borders on all panels */
+#topbar, #arrangement-panel, #pianoroll-panel, #chord-panel, #velocity-canvas {
+  border-color: var(--gray);
+  image-rendering: pixelated;
+}
+
+/* Input / Select styling */
+input, select {
+  background: var(--bg); color: var(--text);
+  border: 1px solid var(--gray); outline: none;
+  font-family: 'Press Start 2P', monospace; font-size: 7px;
+}
+input:focus, select:focus { border-color: var(--hi); }
+
+/* Transport button states */
+#btn-play:hover  { color: var(--hi2); }
+#btn-stop:hover  { color: #ff4444; }
+#btn-rec         { color: var(--gray); }
+#btn-rec.armed   { color: var(--accent); animation: blink 0.8s step-end infinite; }
+@keyframes blink  { 50% { opacity: 0.3; } }
+
+/* Transport buttons — square and centered */
+#btn-play, #btn-stop, #btn-rec { width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center; }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 6px; height: 6px; background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--gray); }
+
+/* Dithered border pattern for panels */
+#arrangement-panel { background: var(--bg);
+  background-image: repeating-linear-gradient(
+    45deg, transparent, transparent 2px,
+    rgba(255,255,255,0.01) 2px, rgba(255,255,255,0.01) 4px
+  );
+}
   </style>
 </head>
 <body>
@@ -822,6 +874,37 @@ input[type=number], select {
   };
 
 // ============================================================
+// UTILITY: drawKnob
+// ============================================================
+function drawKnob(ctx, cx, cy, r, value, color) {
+  // value: 0.0 to 1.0
+  const startAngle = Math.PI * 0.75;
+  const endAngle = Math.PI * 2.25;
+  const angle = startAngle + value * (endAngle - startAngle);
+
+  // Background arc
+  ctx.strokeStyle = '#222240';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, startAngle, endAngle);
+  ctx.stroke();
+
+  // Value arc
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, startAngle, angle);
+  ctx.stroke();
+
+  // Indicator dot (pixelated: use rect)
+  const ix = cx + (r - 2) * Math.cos(angle);
+  const iy = cy + (r - 2) * Math.sin(angle);
+  ctx.fillStyle = color;
+  ctx.fillRect(Math.round(ix) - 1, Math.round(iy) - 1, 2, 2);
+
+  ctx.lineWidth = 1;
+}
+
+// ============================================================
 // MODULE: ArrangementView
 // ============================================================
 const AV = {
@@ -930,6 +1013,10 @@ const AV = {
         ctx.fillText('REC', 42, y + 26);
       }
 
+      // Volume and pan knobs
+      drawKnob(ctx, 60, y + 12, 8, track.volume / 100, '#00ccaa');
+      drawKnob(ctx, 80, y + 12, 8, (track.pan + 1) / 2, '#ff6600');
+
       // Timeline area
       ctx.fillStyle = '#0a0a14';
       ctx.fillRect(HEADER_WIDTH, y, W - HEADER_WIDTH, TRACK_HEIGHT);
@@ -956,6 +1043,20 @@ const AV = {
         ctx.fillStyle = color;
         ctx.font = '5px "Press Start 2P"';
         ctx.fillText(pat.name, bx + 3, y + 13);
+      }
+
+      // Task 24: DPCM waveform canvas overlay
+      if (track.channelType === 'dpcm') {
+        const wc = document.getElementById('waveform-' + track.id);
+        if (wc) {
+          wc.style.display = 'block';
+          wc.style.position = 'absolute';
+          const panelRect = document.getElementById('arrangement-panel').getBoundingClientRect();
+          wc.style.left = (panelRect.left + 42) + 'px';
+          wc.style.top  = (panelRect.top + RULER_HEIGHT + i * TRACK_HEIGHT + 4) + 'px';
+          wc.style.pointerEvents = 'none';
+          DPCMSampler.drawWaveform(track);
+        }
       }
     });
   }
@@ -1025,6 +1126,35 @@ AV.initEvents = function() {
           }
           return;
         }
+      }
+      // Task 22: Volume knob drag (x 52-68, y+4 to y+20)
+      if (hit.zone === 'header') {
+        const { RULER_HEIGHT, TRACK_HEIGHT } = this;
+        const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT;
+        if (mx >= 52 && mx <= 68 && my >= ty+4 && my <= ty+20) {
+          const onMove = (ev) => {
+            track.volume = Math.max(0, Math.min(100, track.volume - (ev.movementY)));
+            AV.draw();
+          };
+          const onUp = () => { document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); };
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+          return;
+        }
+        // Task 22: Pan knob drag (x 72-88, y+4 to y+20)
+        if (mx >= 72 && mx <= 88 && my >= ty+4 && my <= ty+20) {
+          const onMove = (ev) => {
+            track.pan = Math.max(-1, Math.min(1, track.pan + ev.movementX * 0.02));
+            AV.draw();
+          };
+          const onUp = () => { document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); };
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+          return;
+        }
+        // Task 23: Track settings panel (default header click)
+        showTrackSettings(track, e.clientX, e.clientY);
+        return;
       }
     }
     if (hit.zone === 'mute') { hit.track.muted = !hit.track.muted; AV.draw(); return; }
@@ -1125,6 +1255,41 @@ function showContextMenu(x, y, items) {
   setTimeout(() => document.addEventListener('click', () => el.remove(), { once: true }), 0);
 }
 
+// ============================================================
+// UTILITY: showTrackSettings
+// ============================================================
+function showTrackSettings(track, x, y) {
+  let el = document.getElementById('track-settings');
+  if (el) el.remove();
+  el = document.createElement('div');
+  el.id = 'track-settings';
+  el.style.cssText = `position:fixed;left:${x}px;top:${y}px;background:#111128;
+    border:1px solid #334;z-index:500;padding:8px;min-width:160px;`;
+
+  const row = (label, id, opts, val, onChange) => {
+    const d = document.createElement('div');
+    d.style.cssText = 'margin-bottom:6px;font:5px "Press Start 2P";color:#8888aa;';
+    d.innerHTML = `${label}: <select id="${id}" style="font-size:5px;">${opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>`;
+    d.querySelector('select').onchange = e => onChange(e.target.value);
+    return d;
+  };
+
+  el.appendChild(row('VIB', 'set-vib', ['off','low','med','high'], track.vibrato,
+    v => { track.vibrato = v; }));
+  el.appendChild(row('DLY', 'set-dly', ['off','short','long'], track.delay,
+    v => { track.delay = v; }));
+  el.appendChild(row('REV', 'set-rev', ['off','room','hall'], track.reverb,
+    v => { track.reverb = v; }));
+
+  const close = document.createElement('button');
+  close.className = 'nes-btn'; close.textContent = 'X';
+  close.style.marginTop = '4px';
+  close.onclick = () => el.remove();
+  el.appendChild(close);
+  document.body.appendChild(el);
+  setTimeout(() => document.addEventListener('click', () => el.remove(), { once: true }), 50);
+}
+
 function buildTopBar() {
   const tb = document.getElementById('transport');
   tb.innerHTML = `
@@ -1200,6 +1365,14 @@ function buildTopBar() {
   document.getElementById('btn-load').onclick = () => document.getElementById('load-input').click();
   document.getElementById('load-input').onchange = e => { if (typeof ExportEngine !== 'undefined') ExportEngine.loadProject(e.target.files[0]); };
   document.getElementById('btn-export').onclick = () => { if (typeof ExportEngine !== 'undefined') ExportEngine.showModal(); };
+
+  // Task 21: Pixel art SVG icons for transport buttons
+  document.getElementById('btn-play').innerHTML =
+    `<svg width="10" height="10"><polygon points="2,1 9,5 2,9" fill="currentColor"/></svg>`;
+  document.getElementById('btn-stop').innerHTML =
+    `<svg width="10" height="10"><rect x="2" y="2" width="6" height="6" fill="currentColor"/></svg>`;
+  document.getElementById('btn-rec').innerHTML =
+    `<svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg>`;
 }
 
 // ============================================================
@@ -1526,8 +1699,8 @@ function wireTransport() {
     const t = ProjectState.tracks.find(t => t.id === ProjectState.selectedTrackId);
     if (!t || t.channelType !== 'dpcm') return;
     ProjectState.armedTrackId = ProjectState.armedTrackId === t.id ? null : t.id;
-    document.getElementById('btn-rec').style.color =
-      ProjectState.armedTrackId ? '#cc2200' : '';
+    const recBtn = document.getElementById('btn-rec');
+    recBtn.classList.toggle('armed', !!ProjectState.armedTrackId);
   };
 }
 
@@ -1780,13 +1953,13 @@ const ExportEngine = {
 };
 
   window.addEventListener('DOMContentLoaded', () => {
-    PR.initEvents();
-    AV.resize();
-    AV.draw();
-    window.addEventListener('resize', () => { AV.resize(); AV.draw(); });
-    AV.initEvents();
     buildTopBar();
     wireTransport();
+    AV.resize();
+    AV.draw();
+    AV.initEvents();
+    PR.initEvents();
+    window.addEventListener('resize', () => { AV.resize(); AV.draw(); PR.resizeCanvases && PR.resizeCanvases(); });
   });
 
   </script>
