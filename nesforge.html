@@ -1170,10 +1170,10 @@ function buildTopBar() {
     AV.resize(); AV.draw();
   };
 
-  document.getElementById('btn-save').onclick = () => ExportEngine.saveProject();
+  document.getElementById('btn-save').onclick = () => { if (typeof ExportEngine !== 'undefined') ExportEngine.saveProject(); };
   document.getElementById('btn-load').onclick = () => document.getElementById('load-input').click();
-  document.getElementById('load-input').onchange = e => ExportEngine.loadProject(e.target.files[0]);
-  document.getElementById('btn-export').onclick = () => ExportEngine.showModal();
+  document.getElementById('load-input').onchange = e => { if (typeof ExportEngine !== 'undefined') ExportEngine.loadProject(e.target.files[0]); };
+  document.getElementById('btn-export').onclick = () => { if (typeof ExportEngine !== 'undefined') ExportEngine.showModal(); };
 }
 
 // ============================================================
