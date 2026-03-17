@@ -26,6 +26,18 @@ html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text
   flex-direction: column; }
 #pianoroll-canvas { flex: 1; display: block; }
 #velocity-canvas { height: 60px; display: block; border-top: var(--border); }
+.nes-btn {
+  background: var(--bg2); color: var(--hi); border: var(--border);
+  font-family: 'Press Start 2P', monospace; font-size: 7px;
+  padding: 4px 6px; cursor: pointer; image-rendering: pixelated;
+}
+.nes-btn:hover { background: var(--bg3); border-color: var(--hi); }
+.nes-btn:active { background: var(--gray2); }
+label { display: flex; align-items: center; gap: 4px; font-size: 6px; color: var(--text2); }
+input[type=number], select {
+  background: var(--bg2); color: var(--text); border: var(--border);
+  font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 2px 4px;
+}
   </style>
 </head>
 <body>
@@ -1087,12 +1099,203 @@ function showContextMenu(x, y, items) {
   setTimeout(() => document.addEventListener('click', () => el.remove(), { once: true }), 0);
 }
 
+function buildTopBar() {
+  const tb = document.getElementById('transport');
+  tb.innerHTML = `
+    <button class="nes-btn" id="btn-play">&#9654;</button>
+    <button class="nes-btn" id="btn-stop">&#9632;</button>
+    <button class="nes-btn" id="btn-rec">&#9679;</button>
+    <button class="nes-btn" id="btn-loop">LOOP</button>
+  `;
+
+  const gc = document.getElementById('global-controls');
+  gc.innerHTML = `
+    <label>BPM<input type="number" id="bpm-input" min="40" max="300" value="120" style="width:48px"></label>
+    <label>TIME
+      <select id="ts-num">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option${n===4?' selected':''}>${n}</option>`).join('')}</select>
+      /
+      <select id="ts-den">${[2,4,8,16].map(n=>`<option${n===4?' selected':''}>${n}</option>`).join('')}</select>
+    </label>
+    <label>KEY<select id="key-sel">${['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'].map(k=>`<option>${k}</option>`).join('')}</select></label>
+    <label>SCALE<select id="scale-sel">${Object.keys(Scales.SCALES).map(s=>`<option>${s}</option>`).join('')}</select></label>
+    <button class="nes-btn" id="btn-add-track">+TRK</button>
+    <button class="nes-btn" id="btn-export">EXP</button>
+    <button class="nes-btn" id="btn-save">SAVE</button>
+    <input type="file" id="load-input" accept=".json" style="display:none">
+    <button class="nes-btn" id="btn-load">LOAD</button>
+  `;
+
+  // Wire controls
+  document.getElementById('bpm-input').oninput = e => {
+    ProjectState.bpm = +e.target.value;
+    Sequencer.updateTiming();
+  };
+  document.getElementById('bpm-input').addEventListener('wheel', e => {
+    e.preventDefault();
+    const inp = document.getElementById('bpm-input');
+    const val = Math.min(300, Math.max(40, ProjectState.bpm + (e.deltaY < 0 ? 1 : -1)));
+    ProjectState.bpm = val; inp.value = val;
+    Sequencer.updateTiming();
+  }, { passive: false });
+
+  document.getElementById('ts-num').onchange = e => {
+    ProjectState.timeSignature[0] = +e.target.value; AV.draw();
+  };
+  document.getElementById('ts-den').onchange = e => {
+    ProjectState.timeSignature[1] = +e.target.value; AV.draw();
+  };
+  document.getElementById('key-sel').onchange = e => {
+    ProjectState.key = e.target.value;
+    if (PR.activePattern) PR.draw();
+    if (PR.activePattern?.track.channelType === 'chord') ChordTool.renderPalette();
+  };
+  document.getElementById('scale-sel').onchange = e => {
+    ProjectState.scale = e.target.value;
+    if (PR.activePattern) PR.draw();
+    if (PR.activePattern?.track.channelType === 'chord') ChordTool.renderPalette();
+  };
+
+  document.getElementById('btn-loop').onclick = () => {
+    ProjectState.loopEnabled = !ProjectState.loopEnabled;
+    document.getElementById('btn-loop').style.color = ProjectState.loopEnabled ? '#00ccaa' : '';
+    AV.draw();
+  };
+
+  document.getElementById('btn-add-track').onclick = () => {
+    const types = ['pulse50','pulse25','triangle','noise','dpcm','chord'];
+    const names = ['PULSE50','PULSE25','TRIANGLE','NOISE','DPCM','CHORD'];
+    const idx = prompt('Track type (0=PULSE50 1=PULSE25 2=TRIANGLE 3=NOISE 4=DPCM 5=CHORD):', '0');
+    if (idx === null) return;
+    const t = addTrack(types[+idx] || 'pulse50', names[+idx] || 'TRACK');
+    AV.resize(); AV.draw();
+  };
+
+  document.getElementById('btn-save').onclick = () => ExportEngine.saveProject();
+  document.getElementById('btn-load').onclick = () => document.getElementById('load-input').click();
+  document.getElementById('load-input').onchange = e => ExportEngine.loadProject(e.target.files[0]);
+  document.getElementById('btn-export').onclick = () => ExportEngine.showModal();
+}
+
+// ============================================================
+// MODULE: Sequencer
+// ============================================================
+const Sequencer = {
+  _timer: null,
+  _playing: false,
+  _playStartTime: 0,       // audioCtx.currentTime when play pressed
+  _playStartBar: 0,        // ProjectState.playheadBar when play pressed
+  _scheduledUpToTime: 0,
+  LOOK_AHEAD: 0.15,        // seconds
+  TICK_MS: 25,
+
+  play() {
+    if (this._playing) return;
+    getAudioCtx().resume();
+    this._playing = true;
+    this._playStartBar = ProjectState.loopEnabled ? ProjectState.loopStart : ProjectState.playheadBar;
+    this._playStartTime = getAudioCtx().currentTime + 0.05;
+    this._scheduledUpToTime = this._playStartTime;
+    this._timer = setInterval(() => this._tick(), this.TICK_MS);
+    this._raf();
+  },
+
+  stop() {
+    this._playing = false;
+    if (this._timer) { clearInterval(this._timer); this._timer = null; }
+    ProjectState.playheadBar = ProjectState.loopEnabled ? ProjectState.loopStart : this._playStartBar;
+    AV.draw();
+    if (PR.activePattern) PR.draw();
+  },
+
+  updateTiming() { /* BPM change: timing adjusts automatically since we recompute each tick */ },
+
+  _barToAbsTime(bar) {
+    return this._playStartTime + barToSeconds(bar - this._playStartBar);
+  },
+
+  _tick() {
+    const ctx = getAudioCtx();
+    const scheduleUntil = ctx.currentTime + this.LOOK_AHEAD;
+
+    for (const track of ProjectState.tracks) {
+      for (const entry of track.arrangement) {
+        const pat = track.patterns.find(p => p.id === entry.patternId);
+        if (!pat) continue;
+        const patStartTime = this._barToAbsTime(entry.startBar);
+        const patEndTime = this._barToAbsTime(entry.startBar + pat.lengthBars);
+
+        // Loop handling: also schedule wrapped instance
+        const instancesToSchedule = [{ offset: 0 }];
+        if (ProjectState.loopEnabled) {
+          const loopDur = barToSeconds(ProjectState.loopEnd - ProjectState.loopStart);
+          if (loopDur > 0) {
+            for (let rep = 1; rep <= 8; rep++) {
+              instancesToSchedule.push({ offset: loopDur * rep });
+            }
+          }
+        }
+
+        for (const { offset } of instancesToSchedule) {
+          const pst = patStartTime + offset;
+          const pet = patEndTime + offset;
+          if (pst > scheduleUntil) break;
+          if (pet < this._scheduledUpToTime) continue;
+
+          for (const note of pat.notes) {
+            const noteAbsTime = pst + barToSeconds(note.start);
+            if (noteAbsTime < this._scheduledUpToTime) continue;
+            if (noteAbsTime > scheduleUntil) continue;
+            playNote(track, note, noteAbsTime);
+          }
+        }
+      }
+    }
+
+    this._scheduledUpToTime = scheduleUntil;
+  },
+
+  _raf() {
+    if (!this._playing) return;
+    const ctx = getAudioCtx();
+    const elapsed = ctx.currentTime - this._playStartTime;
+    const secsPerBar = barToSeconds(1);
+    let bar = this._playStartBar + elapsed / secsPerBar;
+
+    if (ProjectState.loopEnabled) {
+      const loopLen = ProjectState.loopEnd - ProjectState.loopStart;
+      if (loopLen > 0 && bar >= ProjectState.loopEnd) {
+        bar = ProjectState.loopStart + ((bar - ProjectState.loopStart) % loopLen);
+      }
+    }
+
+    ProjectState.playheadBar = bar;
+    AV.draw();
+    if (PR.activePattern) PR.draw();
+    requestAnimationFrame(() => this._raf());
+  }
+};
+
+// Wire transport buttons (after buildTopBar is called)
+function wireTransport() {
+  document.getElementById('btn-play').onclick = () => Sequencer.play();
+  document.getElementById('btn-stop').onclick = () => Sequencer.stop();
+  document.getElementById('btn-rec').onclick = () => {
+    const t = ProjectState.tracks.find(t => t.id === ProjectState.selectedTrackId);
+    if (!t || t.channelType !== 'dpcm') return;
+    ProjectState.armedTrackId = ProjectState.armedTrackId === t.id ? null : t.id;
+    document.getElementById('btn-rec').style.color =
+      ProjectState.armedTrackId ? '#cc2200' : '';
+  };
+}
+
   window.addEventListener('DOMContentLoaded', () => {
     PR.initEvents();
     AV.resize();
     AV.draw();
     window.addEventListener('resize', () => { AV.resize(); AV.draw(); });
     AV.initEvents();
+    buildTopBar();
+    wireTransport();
   });
 
   </script>
