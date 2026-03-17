@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>NESForge</title>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>/* STYLES */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -1529,6 +1530,254 @@ function wireTransport() {
       ProjectState.armedTrackId ? '#cc2200' : '';
   };
 }
+
+// ============================================================
+// MODULE: ExportEngine
+// ============================================================
+const ExportEngine = {
+
+  async renderOffline() {
+    const songBars = getSongLengthBars();
+    const durationSecs = barToSeconds(songBars) + 0.5; // pad
+    const sampleRate = 44100;
+    const offCtx = new OfflineAudioContext(2, Math.ceil(sampleRate * durationSecs), sampleRate);
+
+    // Swap audioCtx temporarily
+    const realCtx = audioCtx;
+    audioCtx = offCtx;
+    masterGain.node = null;
+    _reverbCache['room'] = null; _reverbCache['hall'] = null;
+
+    // Schedule all notes
+    for (const track of ProjectState.tracks) {
+      for (const entry of track.arrangement) {
+        const pat = track.patterns.find(p => p.id === entry.patternId);
+        if (!pat) continue;
+        const patStart = barToSeconds(entry.startBar);
+        for (const note of pat.notes) {
+          const t = patStart + barToSeconds(note.start);
+          if (t < durationSecs) playNote(track, note, t);
+        }
+      }
+    }
+
+    const rendered = await offCtx.startRendering();
+
+    // Restore real context. Clear reverb cache — offline ConvolverNodes cannot be
+    // reused in a different AudioContext and would throw NotSupportedError.
+    audioCtx = realCtx;
+    masterGain.node = null;
+    for (const k in _reverbCache) delete _reverbCache[k];
+
+    return rendered;
+  },
+
+  encodeWAV(audioBuffer) {
+    const numCh = audioBuffer.numberOfChannels;
+    const sr = audioBuffer.sampleRate;
+    const bps = 16;
+    const blockAlign = numCh * (bps / 8);
+    const dataLen = audioBuffer.length * blockAlign;
+    const buf = new ArrayBuffer(44 + dataLen);
+    const v = new DataView(buf);
+    const ws = (off, s) => { for (let i=0;i<s.length;i++) v.setUint8(off+i, s.charCodeAt(i)); };
+    ws(0,'RIFF'); v.setUint32(4, 36+dataLen, true);
+    ws(8,'WAVE'); ws(12,'fmt ');
+    v.setUint32(16,16,true); v.setUint16(20,1,true);
+    v.setUint16(22,numCh,true); v.setUint32(24,sr,true);
+    v.setUint32(28,sr*blockAlign,true);
+    v.setUint16(32,blockAlign,true); v.setUint16(34,bps,true);
+    ws(36,'data'); v.setUint32(40,dataLen,true);
+    let off = 44;
+    for (let i=0;i<audioBuffer.length;i++) {
+      for (let ch=0;ch<numCh;ch++) {
+        const s = Math.max(-1, Math.min(1, audioBuffer.getChannelData(ch)[i]));
+        v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        off += 2;
+      }
+    }
+    return buf;
+  },
+
+  downloadBlob(data, filename, mime) {
+    const blob = new Blob([data], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  },
+
+  async exportWAV() {
+    const btn = document.getElementById('exp-wav');
+    if (btn) btn.textContent = 'RENDERING...';
+    try {
+      const buf = await this.renderOffline();
+      const wav = this.encodeWAV(buf);
+      this.downloadBlob(wav, 'nesforge-export.wav', 'audio/wav');
+    } catch(e) {
+      alert('WAV export failed: ' + e.message);
+    } finally {
+      if (btn) btn.textContent = 'EXPORT WAV';
+    }
+  },
+
+  // --- MIDI Binary Encoding ---
+  encodeVarLen(v) {
+    const out = [];
+    out.push(v & 0x7F);
+    v >>= 7;
+    while (v > 0) { out.push((v & 0x7F) | 0x80); v >>= 7; }
+    return out.reverse();
+  },
+
+  buildMIDITrack(notes, bpm, ticksPerBeat) {
+    const usecsPerBeat = Math.round(60000000 / bpm);
+    const events = [];
+
+    // Tempo meta event at time 0
+    events.push({ tick: 0, bytes: [0xFF, 0x51, 0x03,
+      (usecsPerBeat >> 16) & 0xFF, (usecsPerBeat >> 8) & 0xFF, usecsPerBeat & 0xFF] });
+
+    // Convert notes to on/off events
+    const noteEvents = [];
+    for (const note of notes) {
+      const startTick = Math.round(note.start * ProjectState.timeSignature[0] * ticksPerBeat);
+      const durTick = Math.round(note.duration * ProjectState.timeSignature[0] * ticksPerBeat);
+      noteEvents.push({ tick: startTick, bytes: [0x90, note.pitch, note.velocity || 100] });
+      noteEvents.push({ tick: startTick + durTick, bytes: [0x80, note.pitch, 0] });
+    }
+    noteEvents.sort((a,b) => a.tick - b.tick);
+    events.push(...noteEvents);
+    events.push({ tick: events.reduce((m,e) => Math.max(m,e.tick), 0) + ticksPerBeat,
+      bytes: [0xFF, 0x2F, 0x00] }); // end of track
+
+    // Build bytes with delta times
+    let lastTick = 0;
+    const bytes = [];
+    for (const ev of events) {
+      const delta = ev.tick - lastTick;
+      lastTick = ev.tick;
+      bytes.push(...this.encodeVarLen(delta));
+      bytes.push(...ev.bytes);
+    }
+
+    // MTrk chunk
+    const header = [0x4D,0x54,0x72,0x6B]; // MTrk
+    const lenBytes = [(bytes.length>>24)&0xFF,(bytes.length>>16)&0xFF,(bytes.length>>8)&0xFF,bytes.length&0xFF];
+    return [...header, ...lenBytes, ...bytes];
+  },
+
+  buildMIDIFile(trackDataArrays) {
+    const ticksPerBeat = 480;
+    const nTracks = trackDataArrays.length;
+    // MThd header
+    const header = [
+      0x4D,0x54,0x68,0x64, // MThd
+      0,0,0,6,             // chunk length
+      0,1,                 // format 1
+      (nTracks>>8)&0xFF, nTracks&0xFF,
+      (ticksPerBeat>>8)&0xFF, ticksPerBeat&0xFF
+    ];
+    const all = [...header];
+    for (const td of trackDataArrays) all.push(...td);
+    return new Uint8Array(all).buffer;
+  },
+
+  exportMIDICombined() {
+    const ticksPerBeat = 480;
+    const trackData = ProjectState.tracks.map(track => {
+      const allNotes = [];
+      for (const entry of track.arrangement) {
+        const pat = track.patterns.find(p => p.id === entry.patternId);
+        if (!pat) continue;
+        for (const note of pat.notes) {
+          // note.start and entry.startBar are both in bars — just add them directly
+          allNotes.push({ ...note, start: note.start + entry.startBar });
+        }
+      }
+      return this.buildMIDITrack(allNotes, ProjectState.bpm, ticksPerBeat);
+    });
+    // Add tempo track as first track
+    const tempoTrack = this.buildMIDITrack([], ProjectState.bpm, ticksPerBeat);
+    const midi = this.buildMIDIFile([tempoTrack, ...trackData]);
+    this.downloadBlob(midi, 'nesforge-combined.mid', 'audio/midi');
+  },
+
+  async exportMIDIStems() {
+    const ticksPerBeat = 480;
+    const zip = new JSZip();
+    for (const track of ProjectState.tracks) {
+      const allNotes = [];
+      for (const entry of track.arrangement) {
+        const pat = track.patterns.find(p => p.id === entry.patternId);
+        if (!pat) continue;
+        for (const note of pat.notes) {
+          // note.start and entry.startBar are both in bars — just add them directly
+          allNotes.push({ ...note, start: note.start + entry.startBar });
+        }
+      }
+      const trackData = this.buildMIDITrack(allNotes, ProjectState.bpm, ticksPerBeat);
+      const tempoTrack = this.buildMIDITrack([], ProjectState.bpm, ticksPerBeat);
+      const midi = this.buildMIDIFile([tempoTrack, trackData]);
+      zip.file(track.name.replace(/[^a-zA-Z0-9]/g,'_') + '.mid', midi);
+    }
+    const blob = await zip.generateAsync({ type: 'blob' });
+    this.downloadBlob(blob, 'nesforge-stems.zip', 'application/zip');
+  },
+
+  saveProject() {
+    const state = JSON.parse(JSON.stringify(ProjectState));
+    // Serialize Float32Arrays as base64
+    for (const track of state.tracks) {
+      if (track.sample) {
+        const bytes = new Uint8Array(track.sample.buffer);
+        let b64 = '';
+        for (let i = 0; i < bytes.length; i++) b64 += String.fromCharCode(bytes[i]);
+        track.sample = { _base64: btoa(b64) };
+      }
+    }
+    this.downloadBlob(JSON.stringify(state, null, 2), 'nesforge-project.json', 'application/json');
+  },
+
+  loadProject(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const state = JSON.parse(e.target.result);
+      for (const track of state.tracks) {
+        if (track.sample && track.sample._base64) {
+          const bin = atob(track.sample._base64);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          track.sample = new Float32Array(bytes.buffer);
+        }
+      }
+      Object.assign(ProjectState, state);
+      AV.resize(); AV.draw();
+      if (PR.activePattern) PR.draw();
+      EventBus.emit('project:loaded');
+    };
+    reader.readAsText(file);
+  },
+
+  showModal() {
+    let modal = document.getElementById('export-modal');
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+      <div style="background:#111128;border:1px solid #334;padding:16px;min-width:240px;">
+        <div style="font:8px 'Press Start 2P';color:#00ccaa;margin-bottom:12px;">EXPORT</div>
+        <button class="nes-btn" id="exp-wav" style="display:block;width:100%;margin-bottom:6px;">EXPORT WAV</button>
+        <button class="nes-btn" id="exp-midi" style="display:block;width:100%;margin-bottom:6px;">EXPORT MIDI</button>
+        <button class="nes-btn" id="exp-stems" style="display:block;width:100%;margin-bottom:12px;">EXPORT STEMS</button>
+        <button class="nes-btn" onclick="document.getElementById('export-modal').style.display='none'">CLOSE</button>
+      </div>`;
+    modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.7);' +
+      'align-items:center;justify-content:center;z-index:2000;';
+    document.getElementById('exp-wav').onclick = () => ExportEngine.exportWAV();
+    document.getElementById('exp-midi').onclick = () => ExportEngine.exportMIDICombined();
+    document.getElementById('exp-stems').onclick = () => ExportEngine.exportMIDIStems();
+  }
+};
 
   window.addEventListener('DOMContentLoaded', () => {
     PR.initEvents();
