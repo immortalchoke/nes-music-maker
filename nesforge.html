@@ -530,6 +530,7 @@ input:focus, select:focus { border-color: var(--hi); }
   const PR = {
     KEY_WIDTH: 56,
     ROW_HEIGHT: 16,
+    RULER_HEIGHT: 20,
     BEAT_WIDTH: 80,       // pixels per beat
     VELOCITY_HEIGHT: 90,
     NOTE_COLORS: {
@@ -705,6 +706,57 @@ input:focus, select:focus { border-color: var(--hi); }
         }
       }
 
+      // PR Ruler (drawn as overlay so it covers scrolled content)
+      {
+        const RH = this.RULER_HEIGHT;
+        const patStartBar = ap ? (ap.track.arrangement.find(e => e.patternId === ap.pattern.id)?.startBar || 0) : 0;
+        ctx.fillStyle = '#111128';
+        ctx.fillRect(0, 0, W, RH);
+        ctx.strokeStyle = '#334';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, RH - 0.5); ctx.lineTo(W, RH - 0.5); ctx.stroke();
+        if (ap) {
+          const barW = this.barWidth();
+          const sixteenth = this.sixteenthWidth();
+          const totalSixteenths = ap.pattern.lengthBars * ProjectState.timeSignature[0] * 4;
+          for (let s = 0; s <= totalSixteenths; s++) {
+            const x = KEY_WIDTH + s * sixteenth - scrollX;
+            if (x < KEY_WIDTH || x > W) continue;
+            const isBar = s % (ProjectState.timeSignature[0] * 4) === 0;
+            const isBeat = s % 4 === 0;
+            if (isBar || isBeat) {
+              ctx.strokeStyle = isBar ? '#8888aa' : '#334';
+              ctx.beginPath(); ctx.moveTo(x, isBar ? 2 : RH - 5); ctx.lineTo(x, RH - 1); ctx.stroke();
+            }
+            if (isBar) {
+              ctx.fillStyle = '#8888aa';
+              ctx.font = '5px "Press Start 2P"';
+              ctx.fillText(s / (ProjectState.timeSignature[0] * 4) + 1, x + 2, 9);
+            }
+          }
+          // Loop region
+          if (ProjectState.loopEnabled) {
+            const lx1 = KEY_WIDTH + (ProjectState.loopStart - patStartBar) * barW - scrollX;
+            const lx2 = KEY_WIDTH + (ProjectState.loopEnd   - patStartBar) * barW - scrollX;
+            if (lx2 > KEY_WIDTH && lx1 < W) {
+              const rx = Math.max(KEY_WIDTH, lx1), rw = Math.min(W, lx2) - rx;
+              ctx.fillStyle = 'rgba(0,204,170,0.2)'; ctx.fillRect(rx, 0, rw, RH - 1);
+              ctx.strokeStyle = '#00ccaa'; ctx.lineWidth = 1;
+              if (lx1 >= KEY_WIDTH) { ctx.beginPath(); ctx.moveTo(lx1, 0); ctx.lineTo(lx1, RH - 1); ctx.stroke(); }
+              if (lx2 <= W)         { ctx.beginPath(); ctx.moveTo(lx2, 0); ctx.lineTo(lx2, RH - 1); ctx.stroke(); }
+            }
+          }
+          // Playhead cap
+          const rel = ProjectState.playheadBar - patStartBar;
+          const px = KEY_WIDTH + rel * barW - scrollX;
+          if (px >= KEY_WIDTH && px <= W) {
+            ctx.strokeStyle = '#ffff00'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, RH - 1); ctx.stroke();
+            ctx.lineWidth = 1;
+          }
+        }
+      }
+
       // Marquee selection overlay
       if (this._dragState?.type === 'marquee') {
         const { startX, startY, currentX, currentY } = this._dragState;
@@ -851,6 +903,24 @@ input:focus, select:focus { border-color: var(--hi); }
       const rect = canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
+
+      // Ruler interaction
+      if (my < this.RULER_HEIGHT) {
+        const patStartBar = ap.track.arrangement.find(en => en.patternId === ap.pattern.id)?.startBar || 0;
+        const bar = patStartBar + (mx - this.KEY_WIDTH + this.scrollX) / this.barWidth();
+        if (e.shiftKey) {
+          ProjectState.loopStart = Math.max(0, Math.floor(bar));
+          ProjectState.loopEnd = ProjectState.loopStart + 1;
+          dragState = { type: 'pr-loop', patStartBar };
+        } else {
+          ProjectState.playheadBar = Math.max(0, bar);
+          if (typeof Sequencer !== 'undefined') Sequencer._playStartBar = ProjectState.playheadBar;
+          dragState = { type: 'pr-playhead', patStartBar };
+        }
+        this.draw(); AV.draw();
+        return;
+      }
+
       if (mx < this.KEY_WIDTH) return;
 
       const hit = hitTestNote(mx, my);
@@ -888,6 +958,20 @@ input:focus, select:focus { border-color: var(--hi); }
       const rect = canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
+
+      if (dragState.type === 'pr-playhead') {
+        const bar = dragState.patStartBar + (mx - this.KEY_WIDTH + this.scrollX) / this.barWidth();
+        ProjectState.playheadBar = Math.max(0, bar);
+        if (typeof Sequencer !== 'undefined') Sequencer._playStartBar = ProjectState.playheadBar;
+        this.draw(); AV.draw();
+        return;
+      }
+      if (dragState.type === 'pr-loop') {
+        const bar = dragState.patStartBar + (mx - this.KEY_WIDTH + this.scrollX) / this.barWidth();
+        ProjectState.loopEnd = Math.max(ProjectState.loopStart + 1, Math.ceil(bar));
+        this.draw(); AV.draw();
+        return;
+      }
 
       if (dragState.type === 'resize') {
         const sixteenth = this.sixteenthWidth() / this.barWidth();
@@ -1389,7 +1473,9 @@ AV.initEvents = function() {
       const bar = (mx - this.HEADER_WIDTH + this.scrollX) / barW;
       ProjectState.playheadBar = Math.max(0, bar);
       if (typeof Sequencer !== 'undefined') Sequencer._playStartBar = ProjectState.playheadBar;
-      AV.draw(); return;
+      AV.draw();
+      if (PR.activePattern) PR.draw();
+      return;
     }
     if (loopDrag) {
       const barW = this.barWidth();
