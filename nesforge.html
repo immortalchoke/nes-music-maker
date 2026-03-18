@@ -1887,7 +1887,7 @@ const Sequencer = {
   stop() {
     this._playing = false;
     if (this._timer) { clearInterval(this._timer); this._timer = null; }
-    ProjectState.playheadBar = ProjectState.loopEnabled ? ProjectState.loopStart : this._playStartBar;
+    if (ProjectState.loopEnabled) ProjectState.playheadBar = ProjectState.loopStart;
     AV.draw();
     if (PR.activePattern) PR.draw();
   },
