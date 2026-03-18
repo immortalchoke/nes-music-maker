@@ -2095,10 +2095,13 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      if (e.shiftKey) {
-        PR.scrollX = Math.max(0, PR.scrollX + e.deltaY);
+      const ap = PR.activePattern;
+      const maxScrollX = ap ? Math.max(0, ap.pattern.lengthBars * PR.barWidth() - canvas.width + PR.KEY_WIDTH) : 0;
+      const maxScrollY = Math.max(0, 128 * PR.ROW_HEIGHT - canvas.height);
+      if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        PR.scrollX = Math.max(0, Math.min(maxScrollX, PR.scrollX + (e.deltaX || e.deltaY)));
       } else {
-        PR.scrollY = Math.max(0, Math.min(128 * PR.ROW_HEIGHT - canvas.height, PR.scrollY + e.deltaY));
+        PR.scrollY = Math.max(0, Math.min(maxScrollY, PR.scrollY + e.deltaY));
       }
       PR.draw();
     }, { passive: false });
