@@ -537,12 +537,18 @@ input:focus, select:focus { border-color: var(--hi); }
       triangle: '#00ccaa', noise: '#33aa66',
       dpcm: '#9933cc', chord: '#ff9900'
     },
+    SELECTED_NOTE_COLORS: {
+      pulse50: '#ff6644', pulse25: '#ff9955',
+      triangle: '#44ffdd', noise: '#55dd88',
+      dpcm: '#cc66ff', chord: '#ffcc44'
+    },
     DRUM_ROWS: [46, 42, 39, 37, 38, 36], // top to bottom: hihatO, hihatC, clap, rim, snare, kick
     DRUM_NAMES: { 46:'HH OPEN', 42:'HH CLSD', 39:'CLAP', 37:'RIM', 38:'SNARE', 36:'KICK' },
     NOTE_NAMES: ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],
     scrollX: 0,
     scrollY: 480, // start near middle C
     activePattern: null, // { track, pattern }
+    _dragState: null,
 
     getCanvas() { return document.getElementById('pianoroll-canvas'); },
     getVelCanvas() { return document.getElementById('velocity-canvas'); },
@@ -659,16 +665,22 @@ input:focus, select:focus { border-color: var(--hi); }
 
       // Notes
       if (ap) {
-        const color = this.NOTE_COLORS[ap.track.channelType] || '#cc3300';
+        const normalColor = this.NOTE_COLORS[ap.track.channelType] || '#cc3300';
+        const selectedColor = this.SELECTED_NOTE_COLORS[ap.track.channelType] || '#ff6644';
         for (const note of ap.pattern.notes) {
           const rowIdx = isNoise ? rows.indexOf(note.pitch) : (127 - note.pitch);
           if (rowIdx < 0) continue;
           const y = rowIdx * ROW_HEIGHT - scrollY;
           const x = KEY_WIDTH + note.start * this.barWidth() - scrollX;
           const w = note.duration * this.barWidth() - 1;
-          const velBright = 0.4 + 0.6 * (note.velocity / 127);
-          ctx.globalAlpha = velBright;
-          ctx.fillStyle = color;
+          if (note.selected) {
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = selectedColor;
+          } else {
+            const velBright = 0.4 + 0.6 * (note.velocity / 127);
+            ctx.globalAlpha = velBright;
+            ctx.fillStyle = normalColor;
+          }
           ctx.fillRect(x, y + 1, Math.max(w, 4), ROW_HEIGHT - 2);
           ctx.globalAlpha = 1;
           // Chord label
@@ -690,6 +702,20 @@ input:focus, select:focus { border-color: var(--hi); }
           ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
           ctx.lineWidth = 1;
         }
+      }
+
+      // Marquee selection overlay
+      if (this._dragState?.type === 'marquee') {
+        const { startX, startY, currentX, currentY } = this._dragState;
+        const rx = Math.min(startX, currentX);
+        const ry = Math.min(startY, currentY);
+        const rw = Math.abs(currentX - startX);
+        const rh = Math.abs(currentY - startY);
+        ctx.fillStyle = 'rgba(0,204,170,0.15)';
+        ctx.fillRect(rx, ry, rw, rh);
+        ctx.strokeStyle = '#00ccaa';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(rx, ry, rw, rh);
       }
     },
 
