@@ -1168,6 +1168,25 @@ input:focus, select:focus { border-color: var(--hi); }
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
     });
+
+    canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const ap = this.activePattern;
+      if (!ap) return;
+      const hasSelection = ap.pattern.notes.some(n => n.selected);
+      const items = [];
+      if (hasSelection) items.push({ label: 'Copy  (⌘C)', action: _copySelected });
+      if (_clipboard)   items.push({ label: 'Paste  (⌘V)', action: _paste });
+      items.push({ label: 'Select All  (⌘A)', action: () => {
+        ap.pattern.notes.forEach(n => { n.selected = true; }); PR.draw();
+      }});
+      if (hasSelection) items.push({ label: 'Delete', action: () => {
+        History.push();
+        ap.pattern.notes = ap.pattern.notes.filter(n => !n.selected);
+        PR.draw(); PR.drawVelocity();
+      }});
+      showContextMenu(e.clientX, e.clientY, items);
+    });
   };
 
 // ============================================================
@@ -1652,12 +1671,12 @@ function showTrackSettings(track, x, y) {
 function buildTopBar() {
   const tb = document.getElementById('transport');
   tb.innerHTML = `
-    <button class="nes-btn" id="btn-undo" disabled>&#8592;Z</button>
-    <button class="nes-btn" id="btn-redo" disabled>Z&#8594;</button>
-    <button class="nes-btn" id="btn-play">&#9654;</button>
-    <button class="nes-btn" id="btn-stop">&#9632;</button>
-    <button class="nes-btn" id="btn-rec">&#9679;</button>
-    <button class="nes-btn" id="btn-loop">LOOP</button>
+    <button class="nes-btn" id="btn-undo" disabled title="Undo (⌘Z)">&#8592;Z</button>
+    <button class="nes-btn" id="btn-redo" disabled title="Redo (⌘⇧Z)">Z&#8594;</button>
+    <button class="nes-btn" id="btn-play" title="Play (Space)">&#9654;</button>
+    <button class="nes-btn" id="btn-stop" title="Stop (Space)">&#9632;</button>
+    <button class="nes-btn" id="btn-rec" title="Record DPCM sample (select DPCM track first)">&#9679;</button>
+    <button class="nes-btn" id="btn-loop" title="Toggle loop region">LOOP</button>
   `;
 
   const gc = document.getElementById('global-controls');
@@ -1670,12 +1689,12 @@ function buildTopBar() {
     </label>
     <label>KEY<select id="key-sel">${['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'].map(k=>`<option>${k}</option>`).join('')}</select></label>
     <label>SCALE<select id="scale-sel">${Object.keys(Scales.SCALES).map(s=>`<option>${s}</option>`).join('')}</select></label>
-    <button class="nes-btn" id="btn-add-track">+TRK</button>
-    <button class="nes-btn" id="btn-chord">CHORD</button>
-    <button class="nes-btn" id="btn-export">EXP</button>
-    <button class="nes-btn" id="btn-save">SAVE</button>
+    <button class="nes-btn" id="btn-add-track" title="Add a new track">+TRK</button>
+    <button class="nes-btn" id="btn-chord" title="Insert chord at playhead position">CHORD</button>
+    <button class="nes-btn" id="btn-export" title="Export audio (WAV / MIDI / stems)">EXP</button>
+    <button class="nes-btn" id="btn-save" title="Save project as JSON">SAVE</button>
     <input type="file" id="load-input" accept=".json" style="display:none">
-    <button class="nes-btn" id="btn-load">LOAD</button>
+    <button class="nes-btn" id="btn-load" title="Load project from JSON">LOAD</button>
   `;
 
   // Wire controls
@@ -2124,6 +2143,43 @@ const Sequencer = {
   }
 };
 
+// ============================================================
+// Clipboard (copy/paste for piano roll notes)
+// ============================================================
+let _clipboard = null; // array of note objects with start relative to earliest note
+
+function _copySelected() {
+  const ap = PR.activePattern;
+  if (!ap) return;
+  const selected = ap.pattern.notes.filter(n => n.selected);
+  if (!selected.length) return;
+  const minStart = Math.min(...selected.map(n => n.start));
+  _clipboard = JSON.parse(JSON.stringify(selected)).map(n => {
+    n.start -= minStart;
+    delete n.chordId;    // pasted notes are always independent
+    delete n.chordLabel;
+    delete n.selected;
+    return n;
+  });
+}
+
+function _paste() {
+  const ap = PR.activePattern;
+  if (!ap || !_clipboard) return;
+  History.push();
+  const entry = ap.track.arrangement.find(en => en.patternId === ap.pattern.id);
+  const patStartBar = entry ? entry.startBar : 0;
+  const relBar = ProjectState.playheadBar - patStartBar;
+  const sixteenth = PR.sixteenthWidth() / PR.barWidth();
+  const snapped = Math.max(0, Math.min(ap.pattern.lengthBars - sixteenth,
+    Math.floor(relBar / sixteenth) * sixteenth));
+  ap.pattern.notes.forEach(n => { n.selected = false; });
+  for (const note of _clipboard) {
+    ap.pattern.notes.push({ ...note, start: snapped + note.start, selected: true });
+  }
+  PR.draw(); PR.drawVelocity();
+}
+
 // Wire transport buttons (after buildTopBar is called)
 function wireTransport() {
   document.getElementById('btn-undo').onclick = () => History.undo();
@@ -2136,6 +2192,18 @@ function wireTransport() {
     if ((e.metaKey || e.ctrlKey) && e.code === 'KeyZ') {
       e.preventDefault();
       if (e.shiftKey) History.redo(); else History.undo();
+      return;
+    }
+    if ((e.metaKey || e.ctrlKey) && e.code === 'KeyC') {
+      e.preventDefault(); _copySelected(); return;
+    }
+    if ((e.metaKey || e.ctrlKey) && e.code === 'KeyV') {
+      e.preventDefault(); _paste(); return;
+    }
+    if ((e.metaKey || e.ctrlKey) && e.code === 'KeyA') {
+      e.preventDefault();
+      const ap = PR.activePattern;
+      if (ap) { ap.pattern.notes.forEach(n => { n.selected = true; }); PR.draw(); }
       return;
     }
     if (e.code === 'Space') {
