@@ -1187,8 +1187,8 @@ AV.initEvents = function() {
     if (mx < HEADER_WIDTH) {
       // M button: x 4-18, y+18 to y+28
       const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT;
-      if (mx >= 4 && mx <= 18 && my >= ty+18 && my <= ty+28) return { zone:'mute', track };
-      if (mx >= 22 && mx <= 36 && my >= ty+18 && my <= ty+28) return { zone:'solo', track };
+      if (mx >= 8 && mx <= 28 && my >= ty+38 && my <= ty+52) return { zone:'mute', track };
+      if (mx >= 34 && mx <= 54 && my >= ty+38 && my <= ty+52) return { zone:'solo', track };
       return { zone: 'header', track, trackIdx };
     }
     const bar = Math.floor((mx - HEADER_WIDTH + scrollX) / barW);
@@ -1230,7 +1230,7 @@ AV.initEvents = function() {
       if (track.channelType === 'dpcm') {
         const { RULER_HEIGHT, TRACK_HEIGHT } = this;
         const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT;
-        if (mx >= 40 && mx <= 64 && my >= ty+18 && my <= ty+28) {
+        if (mx >= 60 && mx <= 96 && my >= ty+56 && my <= ty+70) {
           if (ProjectState.armedTrackId === track.id) {
             DPCMSampler.record(track);
           }
@@ -1241,9 +1241,14 @@ AV.initEvents = function() {
       if (hit.zone === 'header') {
         const { RULER_HEIGHT, TRACK_HEIGHT } = this;
         const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT;
-        if (mx >= 52 && mx <= 68 && my >= ty+4 && my <= ty+20) {
+        if (mx >= 64 && mx <= 144 && my >= ty+10 && my <= ty+22) {
+          // Direct x-position to volume mapping
+          track.volume = Math.max(0, Math.min(100, Math.round((mx - 64) / 0.8)));
+          AV.draw();
           const onMove = (ev) => {
-            track.volume = Math.max(0, Math.min(100, track.volume - (ev.movementY)));
+            const rect = canvas.getBoundingClientRect();
+            const cmx = ev.clientX - rect.left;
+            track.volume = Math.max(0, Math.min(100, Math.round((cmx - 64) / 0.8)));
             AV.draw();
           };
           const onUp = () => { document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); };
@@ -1251,8 +1256,8 @@ AV.initEvents = function() {
           document.addEventListener('mouseup', onUp);
           return;
         }
-        // Task 22: Pan knob drag (x 72-88, y+4 to y+20)
-        if (mx >= 72 && mx <= 88 && my >= ty+4 && my <= ty+20) {
+        // Pan knob drag
+        if (mx >= 150 && mx <= 174 && my >= ty+8 && my <= ty+32) {
           const onMove = (ev) => {
             track.pan = Math.max(-1, Math.min(1, track.pan + ev.movementX * 0.02));
             AV.draw();
