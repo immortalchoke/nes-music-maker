@@ -26,7 +26,7 @@ html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text
 #pianoroll-panel { height: 480px; border-top: var(--border); display: flex;
   flex-direction: column; }
 #pianoroll-canvas { flex: 1; display: block; }
-#velocity-canvas { height: 60px; display: block; border-top: var(--border); }
+#velocity-canvas { height: 90px; display: block; border-top: var(--border); }
 .nes-btn {
   background: var(--bg2); color: var(--hi); border: var(--border);
   font-family: 'Press Start 2P', monospace; font-size: 7px;
@@ -549,6 +549,7 @@ input:focus, select:focus { border-color: var(--hi); }
     scrollY: 480, // start near middle C
     activePattern: null, // { track, pattern }
     _dragState: null,
+    _onMouseUp: null,
 
     getCanvas() { return document.getElementById('pianoroll-canvas'); },
     getVelCanvas() { return document.getElementById('velocity-canvas'); },
@@ -856,6 +857,7 @@ input:focus, select:focus { border-color: var(--hi); }
       if (hit) {
         const { note, x, w } = hit;
         if (mx > x + w - 6) {
+          // Resize does not clear selection; selected notes remain highlighted while resizing.
           dragState = { type: 'resize', note, startX: mx, origDur: note.duration };
         } else {
           const wasSelected = !!note.selected;
@@ -971,6 +973,8 @@ input:focus, select:focus { border-color: var(--hi); }
       this._dragState = null;
       if (this.activePattern) { this.draw(); this.drawVelocity(); }
     };
+    if (PR._onMouseUp) document.removeEventListener('mouseup', PR._onMouseUp);
+    PR._onMouseUp = onCanvasMouseUp;
     document.addEventListener('mouseup', onCanvasMouseUp);
 
     canvas.addEventListener('wheel', (e) => {
@@ -1390,7 +1394,7 @@ AV.initEvents = function() {
     if (dragState.isAlt && !dragState.cloned) {
       // Duplicate pattern on first move
       const newPat = { id: makeId(), name: dragState.pat.name, lengthBars: dragState.pat.lengthBars,
-        notes: JSON.parse(JSON.stringify(dragState.pat.notes)) };
+        notes: (() => { const clonedNotes = JSON.parse(JSON.stringify(dragState.pat.notes)); for (const n of clonedNotes) delete n.selected; return clonedNotes; })() };
       dragState.track.patterns.push(newPat);
       const newEntry = { patternId: newPat.id, startBar: dragState.origBar };
       dragState.track.arrangement.push(newEntry);
@@ -2180,6 +2184,10 @@ const ExportEngine = {
         track.sample = { _base64: btoa(b64) };
       }
     }
+    for (const track of state.tracks)
+      for (const pat of track.patterns)
+        for (const note of pat.notes)
+          delete note.selected;
     this.downloadBlob(JSON.stringify(state, null, 2), 'nesforge-project.json', 'application/json');
   },
 
