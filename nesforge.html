@@ -1185,7 +1185,7 @@ AV.initEvents = function() {
     if (trackIdx < 0 || trackIdx >= ProjectState.tracks.length) return null;
     const track = ProjectState.tracks[trackIdx];
     if (mx < HEADER_WIDTH) {
-      // M button: x 4-18, y+18 to y+28
+      // M button: x 8-28, y+38 to y+52
       const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT;
       if (mx >= 8 && mx <= 28 && my >= ty+38 && my <= ty+52) return { zone:'mute', track };
       if (mx >= 34 && mx <= 54 && my >= ty+38 && my <= ty+52) return { zone:'solo', track };
@@ -1237,7 +1237,7 @@ AV.initEvents = function() {
           return;
         }
       }
-      // Task 22: Volume knob drag (x 52-68, y+4 to y+20)
+      // Volume bar slider drag (x 64-144, y+10 to y+22)
       if (hit.zone === 'header') {
         const { RULER_HEIGHT, TRACK_HEIGHT } = this;
         const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT;
@@ -1267,7 +1267,7 @@ AV.initEvents = function() {
           document.addEventListener('mouseup', onUp);
           return;
         }
-        // Task 23: Track settings panel (default header click)
+        // Default header click: open track settings
         showTrackSettings(track, e.clientX, e.clientY);
         return;
       }
