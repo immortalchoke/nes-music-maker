@@ -528,10 +528,10 @@ input:focus, select:focus { border-color: var(--hi); }
   // MODULE: PianoRoll
   // ============================================================
   const PR = {
-    KEY_WIDTH: 32,
-    ROW_HEIGHT: 8,
-    BEAT_WIDTH: 40,       // pixels per beat
-    VELOCITY_HEIGHT: 60,
+    KEY_WIDTH: 56,
+    ROW_HEIGHT: 16,
+    BEAT_WIDTH: 80,       // pixels per beat
+    VELOCITY_HEIGHT: 90,
     NOTE_COLORS: {
       pulse50: '#cc3300', pulse25: '#ff6600',
       triangle: '#00ccaa', noise: '#33aa66',
@@ -982,10 +982,10 @@ function drawKnob(ctx, cx, cy, r, value, color) {
 // MODULE: ArrangementView
 // ============================================================
 const AV = {
-  HEADER_WIDTH: 160,
-  TRACK_HEIGHT: 48,
-  BEAT_WIDTH: 20,
-  RULER_HEIGHT: 20,
+  HEADER_WIDTH: 240,
+  TRACK_HEIGHT: 96,
+  BEAT_WIDTH: 40,
+  RULER_HEIGHT: 36,
   scrollX: 0,
   NOTE_COLORS: PR.NOTE_COLORS,
 
