@@ -1640,29 +1640,64 @@ function showTrackSettings(track, x, y) {
   if (el) el.remove();
   el = document.createElement('div');
   el.id = 'track-settings';
-  el.style.cssText = `position:fixed;left:${x}px;top:${y}px;background:#111128;
-    border:1px solid #334;z-index:500;padding:8px;min-width:160px;`;
+  el.style.cssText = `
+    position:fixed; left:${x}px; top:${y}px;
+    background:#111128; border:1px solid #334;
+    z-index:500; padding:14px 16px 12px; min-width:210px;
+    box-shadow:0 4px 24px rgba(0,0,0,0.7);
+  `;
 
-  const row = (label, id, opts, val, onChange) => {
+  // Title
+  const title = document.createElement('div');
+  title.style.cssText = `
+    font:7px "Press Start 2P"; color:#00ccaa;
+    margin-bottom:12px; padding-bottom:8px;
+    border-bottom:1px solid #334; letter-spacing:1px;
+  `;
+  title.textContent = track.name;
+  el.appendChild(title);
+
+  const selStyle = `
+    background:#0a0a1a; color:#ccccee;
+    border:1px solid #334; outline:none;
+    font:7px "Press Start 2P"; padding:5px 8px;
+    width:100%; margin-top:4px; cursor:pointer;
+    appearance:none; -webkit-appearance:none;
+  `;
+
+  const row = (label, opts, val, onChange) => {
     const d = document.createElement('div');
-    d.style.cssText = 'margin-bottom:6px;font:5px "Press Start 2P";color:#8888aa;';
-    d.innerHTML = `${label}: <select id="${id}" style="font-size:5px;">${opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>`;
-    d.querySelector('select').onchange = e => onChange(e.target.value);
+    d.style.cssText = 'margin-bottom:10px;';
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'font:6px "Press Start 2P"; color:#8888aa; margin-bottom:2px;';
+    lbl.textContent = label;
+    const sel = document.createElement('select');
+    sel.style.cssText = selStyle;
+    opts.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o; opt.textContent = o.toUpperCase();
+      if (o === val) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.onchange = e => onChange(e.target.value);
+    d.appendChild(lbl); d.appendChild(sel);
     return d;
   };
 
-  el.appendChild(row('VIB', 'set-vib', ['off','low','med','high'], track.vibrato,
+  el.appendChild(row('VIBRATO', ['off','low','med','high'], track.vibrato,
     v => { track.vibrato = v; }));
-  el.appendChild(row('DLY', 'set-dly', ['off','short','long'], track.delay,
+  el.appendChild(row('DELAY', ['off','short','long'], track.delay,
     v => { track.delay = v; }));
-  el.appendChild(row('REV', 'set-rev', ['off','room','hall'], track.reverb,
+  el.appendChild(row('REVERB', ['off','room','hall'], track.reverb,
     v => { track.reverb = v; }));
 
   const close = document.createElement('button');
-  close.className = 'nes-btn'; close.textContent = 'X';
-  close.style.marginTop = '4px';
+  close.className = 'nes-btn';
+  close.textContent = 'CLOSE';
+  close.style.cssText = 'margin-top:4px; width:100%;';
   close.onclick = () => el.remove();
   el.appendChild(close);
+
   document.body.appendChild(el);
   el.addEventListener('mousedown', e => e.stopPropagation());
   setTimeout(() => document.addEventListener('mousedown', () => el.remove(), { once: true }), 100);
