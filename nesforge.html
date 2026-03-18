@@ -1598,6 +1598,10 @@ function buildTopBar() {
     document.getElementById('ci-insert').onclick = () => {
       const ap = PR.activePattern;
       if (!ap) { alert('Open a pattern in the piano roll first.'); return; }
+      if (ap.track.channelType !== 'chord') {
+        alert('CHORD insert requires a chord track to be open in the piano roll.');
+        return;
+      }
       const root = document.getElementById('ci-root').value;
       const type = document.getElementById('ci-type').value;
       const rootMIDI = Scales.NOTE_ORDER.indexOf(root) + 60;
@@ -1607,7 +1611,7 @@ function buildTopBar() {
       const startBar = entry ? entry.startBar : 0;
       const relBar = ProjectState.playheadBar - startBar;
       const sixteenth = PR.sixteenthWidth() / PR.barWidth();
-      const snappedRelBar = Math.max(0, Math.floor(relBar / sixteenth) * sixteenth);
+      const snappedRelBar = Math.max(0, Math.min(ap.pattern.lengthBars - sixteenth, Math.floor(relBar / sixteenth) * sixteenth));
       const label = root + type;
       ChordTool._insertChord(chordNotes, snappedRelBar, label);
       el.remove();
