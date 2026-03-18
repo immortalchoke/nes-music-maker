@@ -2309,7 +2309,12 @@ const AV = {
       ctx.strokeStyle = 'rgba(255,105,115,0.3)';
       ctx.beginPath(); ctx.moveTo(px, y); ctx.lineTo(px, y + TRACK_HEIGHT); ctx.stroke();
 
-      // Pattern blocks
+      // Pattern blocks — clipped to timeline area so blocks slide under the header
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(HEADER_WIDTH, y, W - HEADER_WIDTH, TRACK_HEIGHT);
+      ctx.clip();
+
       const color = this.NOTE_COLORS[track.channelType] || '#ff6973';
       const isPitched = ['pulse50','pulse25','triangle','chord'].includes(track.channelType) && !isDrumChannel(track.channelType);
       for (const entry of track.arrangement) {
@@ -2392,6 +2397,7 @@ const AV = {
           ctx.globalAlpha = 1; ctx.restore();
         }
       }
+      ctx.restore(); // end pattern blocks clip
 
       // Task 24: DPCM waveform canvas overlay
       if (track.channelType === 'dpcm') {
