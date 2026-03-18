@@ -1066,32 +1066,43 @@ const AV = {
       // Track name
       ctx.fillStyle = track.muted ? '#444' : '#ccccdd';
       ctx.font = '6px "Press Start 2P"';
-      ctx.fillText(track.name.slice(0, 10), 4, y + 13);
+      ctx.fillText(track.name.slice(0, 10), 8, y + 24);
 
-      // M / S buttons (simple text buttons)
+      // M / S buttons
       ctx.fillStyle = track.muted ? '#cc2200' : '#334';
-      ctx.fillRect(4, y + 18, 14, 10);
+      ctx.fillRect(8, y + 38, 20, 14);
       ctx.fillStyle = '#fff';
       ctx.font = '5px "Press Start 2P"';
-      ctx.fillText('M', 7, y + 26);
+      ctx.fillText('M', 14, y + 49);
 
       ctx.fillStyle = track.soloed ? '#ff9900' : '#334';
-      ctx.fillRect(22, y + 18, 14, 10);
+      ctx.fillRect(34, y + 38, 20, 14);
       ctx.fillStyle = '#fff';
-      ctx.fillText('S', 25, y + 26);
+      ctx.fillText('S', 40, y + 49);
 
       if (track.channelType === 'dpcm') {
         const isArmed = ProjectState.armedTrackId === track.id;
         ctx.fillStyle = isArmed ? '#cc2200' : '#334';
-        ctx.fillRect(40, y + 18, 24, 10);
+        ctx.fillRect(60, y + 56, 36, 14);
         ctx.fillStyle = '#fff';
         ctx.font = '5px "Press Start 2P"';
-        ctx.fillText('REC', 42, y + 26);
+        ctx.fillText('REC', 66, y + 67);
       }
 
-      // Volume and pan knobs
-      drawKnob(ctx, 60, y + 12, 8, track.volume / 100, '#00ccaa');
-      drawKnob(ctx, 80, y + 12, 8, (track.pan + 1) / 2, '#ff6600');
+      // Volume bar slider
+      ctx.fillStyle = '#8888aa';
+      ctx.font = '5px "Press Start 2P"';
+      ctx.fillText('VOL', 64, y + 8);
+      ctx.fillStyle = '#222240';
+      ctx.fillRect(64, y + 10, 80, 12);
+      ctx.fillStyle = '#00ccaa';
+      ctx.fillRect(64, y + 10, track.volume * 0.8, 12);
+
+      // Pan knob + label
+      ctx.fillStyle = '#8888aa';
+      ctx.font = '5px "Press Start 2P"';
+      ctx.fillText('PAN', 150, y + 8);
+      drawKnob(ctx, 162, y + 20, 12, (track.pan + 1) / 2, '#ff6600');
 
       // Timeline area
       ctx.fillStyle = '#0a0a14';
@@ -1119,6 +1130,29 @@ const AV = {
         ctx.fillStyle = color;
         ctx.font = '5px "Press Start 2P"';
         ctx.fillText(pat.name, bx + 3, y + 13);
+
+        // Miniature note preview dots
+        const blockY = y + 2;
+        const blockH = TRACK_HEIGHT - 4;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(bx, blockY, bw, blockH);
+        ctx.clip();
+        ctx.globalAlpha = 0.8;
+        ctx.fillStyle = color;
+        const isPitched = ['pulse50','pulse25','triangle','chord'].includes(track.channelType);
+        for (const note of pat.notes) {
+          const nx = bx + (note.start / pat.lengthBars) * bw;
+          if (isPitched) {
+            const ny = blockY + blockH - 4 - ((note.pitch / 127) * (blockH - 8));
+            ctx.fillRect(nx, ny, 2, 2);
+          } else {
+            // DPCM / noise: centered tick
+            ctx.fillRect(nx, blockY + blockH / 2 - 1, 2, 2);
+          }
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
       }
 
       // Task 24: DPCM waveform canvas overlay
@@ -1128,7 +1162,7 @@ const AV = {
           wc.style.display = 'block';
           wc.style.position = 'absolute';
           const panelRect = document.getElementById('arrangement-panel').getBoundingClientRect();
-          wc.style.left = (panelRect.left + 42) + 'px';
+          wc.style.left = (panelRect.left + 64) + 'px';
           wc.style.top  = (panelRect.top + RULER_HEIGHT + i * TRACK_HEIGHT + 4) + 'px';
           wc.style.pointerEvents = 'none';
           DPCMSampler.drawWaveform(track);
