@@ -702,7 +702,6 @@ body.mobile-mode #mobile-app { display: flex !important; }
   function getAudioCtx() {
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      getPCM7Buffers(); // begin pre-baking PCM7 buffers eagerly
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
@@ -4123,18 +4122,23 @@ const ExportEngine = {
       });
 
       // Play button
-      document.getElementById('mob-play-btn').addEventListener('click', async () => {
-        if (typeof Sequencer === 'undefined') return;
-        // Ensure AudioContext is running — required on iOS every time
-        const ctx = getAudioCtx();
-        if (ctx.state === 'suspended') await ctx.resume();
-        if (Sequencer._playing) {
-          Sequencer.stop();
-          document.getElementById('mob-play-btn').textContent = '▶';
+      document.getElementById('mob-play-btn').addEventListener('click', function() {
+        var ctx = getAudioCtx();
+        function doPlay() {
+          if (typeof Sequencer === 'undefined') return;
+          if (Sequencer._playing) {
+            Sequencer.stop();
+            document.getElementById('mob-play-btn').textContent = '▶';
+          } else {
+            Sequencer.play();
+            document.getElementById('mob-play-btn').textContent = '⏹';
+            MobileUI._startRaf();
+          }
+        }
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(doPlay);
         } else {
-          Sequencer.play();
-          document.getElementById('mob-play-btn').textContent = '⏹';
-          this._startRaf();
+          doPlay();
         }
       });
 
@@ -4475,6 +4479,8 @@ const ExportEngine = {
         let didLongPress = false;
 
         btn.addEventListener('pointerdown', (e) => {
+          var _sc = getAudioCtx();
+          if (_sc.state === 'suspended') _sc.resume();
           didLongPress = false;
           pressTimer = setTimeout(() => {
             didLongPress = true;
@@ -4718,28 +4724,45 @@ const ExportEngine = {
       });
     }
 
-    // iOS AudioContext unlock — must create + resume inside a touch gesture
-    function unlockAudioOnMobile() {
-      if (!('ontouchstart' in window)) return; // desktop only, skip
-      const unlock = () => {
-        // Create context if not yet created
-        const ctx = getAudioCtx();
-        // Force resume — iOS suspends context until user gesture
-        if (ctx.state === 'suspended') {
-          ctx.resume().then(() => {
-            // Play a silent buffer to fully unlock Web Audio on iOS
-            const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
-            const src = ctx.createBufferSource();
+    // iOS Web Audio unlock — must happen inside a real user gesture
+    (function() {
+      var _audioUnlocked = false;
+      function _unlockAudio() {
+        if (_audioUnlocked) return;
+        // Create context if it doesn't exist yet
+        var ctx = getAudioCtx();
+        function _afterResume() {
+          _audioUnlocked = true;
+          // Play a silent buffer — required to fully unlock on iOS Safari
+          try {
+            var buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+            var src = ctx.createBufferSource();
             src.buffer = buf;
             src.connect(ctx.destination);
             src.start(0);
-          });
+          } catch(e) {}
+          // NOW safe to bake PCM7 buffers
+          getPCM7Buffers();
+          // Remove listeners — only need to unlock once
+          document.removeEventListener('touchstart', _unlockAudio, true);
+          document.removeEventListener('touchend',   _unlockAudio, true);
+          document.removeEventListener('click',      _unlockAudio, true);
         }
-        document.removeEventListener('touchend', unlock);
-      };
-      document.addEventListener('touchend', unlock, { passive: true });
-    }
-    unlockAudioOnMobile();
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(_afterResume).catch(function() {
+            // resume() rejected — try again on next gesture
+            _audioUnlocked = false;
+          });
+        } else {
+          _afterResume();
+        }
+      }
+      // Listen on touchstart AND touchend AND click for maximum compatibility
+      // useCapture:true catches the event before anything else can swallow it
+      document.addEventListener('touchstart', _unlockAudio, true);
+      document.addEventListener('touchend',   _unlockAudio, true);
+      document.addEventListener('click',      _unlockAudio, true);
+    })();
   });
 
   </script>
