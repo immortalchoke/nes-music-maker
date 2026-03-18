@@ -3656,7 +3656,8 @@ const ExportEngine = {
   async renderOffline() {
     const songBars = getSongLengthBars();
     const durationSecs = barToSeconds(songBars) + 0.5; // pad
-    const sampleRate = 44100;
+    // Use real context sample rate — iOS defaults to 48000, not 44100
+    const sampleRate = getAudioCtx().sampleRate;
     const offCtx = new OfflineAudioContext(2, Math.ceil(sampleRate * durationSecs), sampleRate);
 
     // Swap audioCtx temporarily
@@ -4680,25 +4681,53 @@ const ExportEngine = {
       this._toastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
     },
 
+    _hideToast() {
+      const t = document.getElementById('mob-toast');
+      if (t) t.classList.remove('show');
+    },
+
     async _shareAudio() {
       this._showToast('RENDERING...');
       try {
         const buf = await ExportEngine.renderOffline();
         const wavData = ExportEngine.encodeWAV(buf);
-        const wavBlob = new Blob([wavData], { type: 'audio/wav' });
         const fileName = 'nesforge-' + Date.now() + '.wav';
-        const file = new File([wavBlob], fileName, { type: 'audio/wav' });
 
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: 'NESForge Export' });
-        } else {
-          // Fallback to download
-          ExportEngine.downloadBlob(wavData, fileName, 'audio/wav');
-          this._showToast('SHARE NOT SUPPORTED — FILE DOWNLOADED');
+        // Dismiss rendering toast before opening share sheet
+        this._hideToast();
+
+        // Try Web Share API (requires HTTPS — will fail on file://)
+        let shared = false;
+        if (window.location.protocol === 'https:' &&
+            navigator.canShare &&
+            typeof navigator.share === 'function') {
+          try {
+            const wavBlob = new Blob([wavData], { type: 'audio/wav' });
+            const file = new File([wavBlob], fileName, { type: 'audio/wav' });
+            if (navigator.canShare({ files: [file] })) {
+              await navigator.share({ files: [file], title: 'NESForge Track' });
+              shared = true;
+            }
+          } catch(shareErr) {
+            if (shareErr.name === 'AbortError') return; // user cancelled — do nothing
+            // Any other error: fall through to download
+          }
         }
+
+        if (!shared) {
+          // Fall back to download + explain why
+          ExportEngine.downloadBlob(wavData, fileName, 'audio/wav');
+          if (window.location.protocol !== 'https:') {
+            this._showToast('OPEN VIA HTTPS TO SHARE DIRECTLY');
+          } else {
+            this._showToast('SAVED — CHECK YOUR DOWNLOADS');
+          }
+        }
+
       } catch (err) {
-        if (err && err.name === 'AbortError') return; // user cancelled share sheet
-        this._showToast('ERROR: ' + (err.message || 'UNKNOWN'));
+        if (err && err.name === 'AbortError') return;
+        this._showToast('ERROR: ' + (err && err.message ? err.message.substring(0, 30) : 'RENDER FAILED'));
+        console.error('Share audio error:', err);
       }
     }
   };
