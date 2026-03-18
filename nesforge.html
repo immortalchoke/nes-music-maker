@@ -1602,10 +1602,6 @@ function buildTopBar() {
     document.getElementById('ci-insert').onclick = () => {
       const ap = PR.activePattern;
       if (!ap) { alert('Open a pattern in the piano roll first.'); return; }
-      if (ap.track.channelType !== 'chord') {
-        alert('CHORD insert requires a chord track to be open in the piano roll.');
-        return;
-      }
       const root = document.getElementById('ci-root').value;
       const type = document.getElementById('ci-type').value;
       const rootMIDI = Scales.NOTE_ORDER.indexOf(root) + 60;
@@ -1709,7 +1705,6 @@ const ChordTool = {
   pasteAtPlayhead(chordNotes, label) {
     const ap = PR.activePattern;
     if (!ap) return;
-    if (ap.track.channelType !== 'chord') return;
     const entry = ap.track.arrangement.find(e => e.patternId === ap.pattern.id);
     const relBar = ProjectState.playheadBar - (entry ? entry.startBar : 0);
     const sixteenth = PR.sixteenthWidth() / PR.barWidth();
@@ -1969,6 +1964,13 @@ const Sequencer = {
 function wireTransport() {
   document.getElementById('btn-play').onclick = () => Sequencer.play();
   document.getElementById('btn-stop').onclick = () => Sequencer.stop();
+  document.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space') return;
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    e.preventDefault();
+    if (Sequencer._playing) Sequencer.stop(); else Sequencer.play();
+  });
   document.getElementById('btn-rec').onclick = () => {
     const t = ProjectState.tracks.find(t => t.id === ProjectState.selectedTrackId);
     if (!t || t.channelType !== 'dpcm') return;
