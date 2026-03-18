@@ -2068,9 +2068,8 @@ function wireTransport() {
     } else if (e.code === 'Delete' || e.code === 'Backspace') {
       const ap = PR.activePattern;
       if (!ap) return;
-      const hasSelection = ap.pattern.notes.some(n => n.selected);
-      if (!hasSelection) return;
       e.preventDefault();
+      if (!ap.pattern.notes.some(n => n.selected)) return;
       ap.pattern.notes = ap.pattern.notes.filter(n => !n.selected);
       PR.draw(); PR.drawVelocity();
     }
