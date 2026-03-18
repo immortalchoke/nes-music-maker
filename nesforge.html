@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta charset="UTF-8">
   <title>NESForge</title>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -4041,7 +4042,12 @@ const ExportEngine = {
     _swipeStartY: null,
 
     isMobile() {
-      return window.innerWidth < 768;
+      // visualViewport is more reliable than innerWidth on mobile browsers
+      // Falls back to innerWidth if visualViewport not available
+      const w = window.visualViewport
+        ? window.visualViewport.width
+        : window.innerWidth;
+      return w < 768;
     },
 
     checkLayout() {
@@ -4098,8 +4104,11 @@ const ExportEngine = {
       });
 
       // Play button
-      document.getElementById('mob-play-btn').addEventListener('click', () => {
+      document.getElementById('mob-play-btn').addEventListener('click', async () => {
         if (typeof Sequencer === 'undefined') return;
+        // Ensure AudioContext is running — required on iOS every time
+        const ctx = getAudioCtx();
+        if (ctx.state === 'suspended') await ctx.resume();
         if (Sequencer._playing) {
           Sequencer.stop();
           document.getElementById('mob-play-btn').textContent = '▶';
@@ -4681,6 +4690,35 @@ const ExportEngine = {
       MobileUI.checkLayout();
       if (!MobileUI.isMobile()) { AV.resize(); AV.draw(); PR.resizeCanvases && PR.resizeCanvases(); }
     });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        MobileUI.checkLayout();
+        if (!MobileUI.isMobile()) { AV.resize(); AV.draw(); PR.resizeCanvases && PR.resizeCanvases(); }
+      });
+    }
+
+    // iOS AudioContext unlock — must create + resume inside a touch gesture
+    function unlockAudioOnMobile() {
+      if (!('ontouchstart' in window)) return; // desktop only, skip
+      const unlock = () => {
+        // Create context if not yet created
+        const ctx = getAudioCtx();
+        // Force resume — iOS suspends context until user gesture
+        if (ctx.state === 'suspended') {
+          ctx.resume().then(() => {
+            // Play a silent buffer to fully unlock Web Audio on iOS
+            const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            src.connect(ctx.destination);
+            src.start(0);
+          });
+        }
+        document.removeEventListener('touchend', unlock);
+      };
+      document.addEventListener('touchend', unlock, { passive: true });
+    }
+    unlockAudioOnMobile();
   });
 
   </script>
