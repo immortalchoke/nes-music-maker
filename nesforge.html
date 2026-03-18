@@ -1367,7 +1367,7 @@ function showContextMenu(x, y, items) {
     el.appendChild(btn);
   });
   document.body.appendChild(el);
-  setTimeout(() => document.addEventListener('click', () => el.remove(), { once: true }), 0);
+  setTimeout(() => document.addEventListener('mousedown', () => el.remove(), { once: true }), 100);
 }
 
 // ============================================================
@@ -1402,7 +1402,7 @@ function showTrackSettings(track, x, y) {
   close.onclick = () => el.remove();
   el.appendChild(close);
   document.body.appendChild(el);
-  setTimeout(() => document.addEventListener('click', () => el.remove(), { once: true }), 50);
+  setTimeout(() => document.addEventListener('mousedown', () => el.remove(), { once: true }), 100);
 }
 
 function buildTopBar() {
@@ -1588,7 +1588,7 @@ const ChordTool = {
     });
 
     document.body.appendChild(el);
-    setTimeout(() => document.addEventListener('click', () => el.remove(), { once: true }), 50);
+    setTimeout(() => document.addEventListener('mousedown', () => el.remove(), { once: true }), 100);
   },
 
   renderPalette() {
