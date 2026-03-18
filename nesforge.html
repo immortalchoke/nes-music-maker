@@ -21,10 +21,16 @@ html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text
 #topbar { height: 72px; background: var(--bg2); border-bottom: var(--border);
   display: flex; align-items: center; padding: 0 16px; gap: 24px; flex-shrink: 0; }
 #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-#arrangement-panel { flex: 1; overflow: hidden; min-height: 200px; }
+#arrangement-panel { flex: 1 1 0; overflow: hidden; min-height: 60px; }
+#panel-divider {
+  height: 6px; flex-shrink: 0; cursor: ns-resize;
+  background: #1a1a35; border-top: 1px solid #334; border-bottom: 1px solid #334;
+  display: none;
+}
+#panel-divider:hover, #panel-divider.dragging { background: #00ccaa44; }
 #arrangement-canvas { display: block; }
-#pianoroll-panel { height: 480px; border-top: var(--border); display: flex;
-  flex-direction: column; }
+#pianoroll-panel { height: 480px; min-height: 150px; border-top: var(--border); display: flex;
+  flex-direction: column; flex-shrink: 0; }
 #pianoroll-canvas { flex: 1; display: block; }
 #velocity-canvas { height: 90px; display: block; border-top: var(--border); }
 .nes-btn {
@@ -105,6 +111,7 @@ input:focus, select:focus { border-color: var(--hi); }
     <div id="arrangement-panel">
       <canvas id="arrangement-canvas"></canvas>
     </div>
+    <div id="panel-divider"></div>
     <div id="pianoroll-panel" style="display:none;">
       <canvas id="pianoroll-canvas"></canvas>
       <canvas id="velocity-canvas"></canvas>
@@ -564,6 +571,8 @@ input:focus, select:focus { border-color: var(--hi); }
         PR.activePattern = null;
         const panel = document.getElementById('pianoroll-panel');
         if (panel) panel.style.display = 'none';
+        const div = document.getElementById('panel-divider');
+        if (div) div.style.display = 'none';
       }
       AV.draw();
     },
@@ -619,6 +628,7 @@ input:focus, select:focus { border-color: var(--hi); }
       this.activePattern = { track, pattern };
       const panel = document.getElementById('pianoroll-panel');
       panel.style.display = 'flex';
+      document.getElementById('panel-divider').style.display = 'block';
       this.resizeCanvases();
       this.draw();
       this.drawVelocity();
@@ -1229,6 +1239,7 @@ const AV = {
   BEAT_WIDTH: 40,
   RULER_HEIGHT: 36,
   scrollX: 0,
+  scrollY: 0,
   NOTE_COLORS: PR.NOTE_COLORS,
 
   getCanvas() { return document.getElementById('arrangement-canvas'); },
@@ -1292,12 +1303,12 @@ const AV = {
   },
 
   _drawTracks(ctx, W, H) {
-    const { HEADER_WIDTH, TRACK_HEIGHT, RULER_HEIGHT, scrollX } = this;
+    const { HEADER_WIDTH, TRACK_HEIGHT, RULER_HEIGHT, scrollX, scrollY } = this;
     const barW = this.barWidth();
 
     ProjectState.tracks.forEach((track, i) => {
-      const y = RULER_HEIGHT + i * TRACK_HEIGHT;
-      if (y > H) return;
+      const y = RULER_HEIGHT + i * TRACK_HEIGHT - scrollY;
+      if (y + TRACK_HEIGHT < RULER_HEIGHT || y > H) return;
 
       // Header
       ctx.fillStyle = track.muted ? '#1a1a2a' : '#111128';
@@ -1401,11 +1412,12 @@ const AV = {
       if (track.channelType === 'dpcm') {
         const wc = document.getElementById('waveform-' + track.id);
         if (wc) {
-          wc.style.display = 'block';
-          wc.style.position = 'absolute';
           const panelRect = document.getElementById('arrangement-panel').getBoundingClientRect();
+          const wcY = panelRect.top + y + 4;
+          wc.style.display = (wcY < panelRect.top + RULER_HEIGHT || wcY > panelRect.bottom) ? 'none' : 'block';
+          wc.style.position = 'absolute';
           wc.style.left = (panelRect.left + 64) + 'px';
-          wc.style.top  = (panelRect.top + RULER_HEIGHT + i * TRACK_HEIGHT + 4) + 'px';
+          wc.style.top  = wcY + 'px';
           wc.style.pointerEvents = 'none';
           DPCMSampler.drawWaveform(track);
         }
@@ -1421,15 +1433,14 @@ AV.initEvents = function() {
   let playheadDrag = false;
 
   const getHit = (mx, my) => {
-    const { HEADER_WIDTH, TRACK_HEIGHT, RULER_HEIGHT, scrollX } = this;
+    const { HEADER_WIDTH, TRACK_HEIGHT, RULER_HEIGHT, scrollX, scrollY } = this;
     const barW = this.barWidth();
     if (my < RULER_HEIGHT) return { zone: 'ruler' };
-    const trackIdx = Math.floor((my - RULER_HEIGHT) / TRACK_HEIGHT);
+    const trackIdx = Math.floor((my - RULER_HEIGHT + scrollY) / TRACK_HEIGHT);
     if (trackIdx < 0 || trackIdx >= ProjectState.tracks.length) return null;
     const track = ProjectState.tracks[trackIdx];
     if (mx < HEADER_WIDTH) {
-      // M button: x 8-28, y+38 to y+52
-      const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT;
+      const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT - scrollY;
       if (mx >= 8 && mx <= 28 && my >= ty+38 && my <= ty+52) return { zone:'mute', track };
       if (mx >= 34 && mx <= 54 && my >= ty+38 && my <= ty+52) return { zone:'solo', track };
       return { zone: 'header', track, trackIdx };
@@ -1455,6 +1466,17 @@ AV.initEvents = function() {
       const { HEADER_WIDTH, scrollX } = this;
       const barW = this.barWidth();
       const bar = (mx - HEADER_WIDTH + scrollX) / barW;
+      if (!e.shiftKey && ProjectState.loopEnabled) {
+        const lx1 = HEADER_WIDTH + ProjectState.loopStart * barW - scrollX;
+        const lx2 = HEADER_WIDTH + ProjectState.loopEnd * barW - scrollX;
+        if (mx >= lx1 && mx <= lx2) {
+          ProjectState.loopEnabled = false;
+          const btn = document.getElementById('btn-loop');
+          if (btn) btn.style.color = '';
+          AV.draw(); if (PR.activePattern) PR.draw();
+          return;
+        }
+      }
       if (e.shiftKey) {
         // Shift+click sets loop region start
         ProjectState.loopStart = Math.max(0, Math.floor(bar));
@@ -1472,8 +1494,8 @@ AV.initEvents = function() {
       const track = hit.track;
       const trackIdx = ProjectState.tracks.indexOf(track);
       if (track.channelType === 'dpcm') {
-        const { RULER_HEIGHT, TRACK_HEIGHT } = this;
-        const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT;
+        const { RULER_HEIGHT, TRACK_HEIGHT, scrollY } = this;
+        const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT - scrollY;
         if (mx >= 60 && mx <= 96 && my >= ty+56 && my <= ty+70) {
           if (ProjectState.armedTrackId === track.id) {
             DPCMSampler.record(track);
@@ -1483,8 +1505,8 @@ AV.initEvents = function() {
       }
       // Volume bar slider drag (x 64-144, y+10 to y+22)
       if (hit.zone === 'header') {
-        const { RULER_HEIGHT, TRACK_HEIGHT } = this;
-        const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT;
+        const { RULER_HEIGHT, TRACK_HEIGHT, scrollY } = this;
+        const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT - scrollY;
         if (mx >= 64 && mx <= 144 && my >= ty+10 && my <= ty+22) {
           // Direct x-position to volume mapping
           track.volume = Math.max(0, Math.min(100, Math.round((mx - 64) / 0.8)));
@@ -1584,6 +1606,17 @@ AV.initEvents = function() {
     }
     dragState = null; loopDrag = false; playheadDrag = false;
   });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const maxScrollY = Math.max(0, ProjectState.tracks.length * this.TRACK_HEIGHT - canvas.height + this.RULER_HEIGHT);
+    if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      this.scrollX = Math.max(0, this.scrollX + (e.deltaX || e.deltaY));
+    } else {
+      this.scrollY = Math.max(0, Math.min(maxScrollY, this.scrollY + e.deltaY));
+    }
+    this.draw();
+  }, { passive: false });
 
   canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
@@ -2216,6 +2249,36 @@ function _paste() {
 }
 
 // Wire transport buttons (after buildTopBar is called)
+function wireDivider() {
+  const divider = document.getElementById('panel-divider');
+  const avPanel = document.getElementById('arrangement-panel');
+  const prPanel = document.getElementById('pianoroll-panel');
+  divider.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    divider.classList.add('dragging');
+    const startY = e.clientY;
+    const startAvH = avPanel.getBoundingClientRect().height;
+    const startPrH = prPanel.getBoundingClientRect().height;
+    const onMove = (ev) => {
+      const delta = ev.clientY - startY;
+      const newAvH = Math.max(60, startAvH + delta);
+      const newPrH = Math.max(150, startPrH - delta);
+      avPanel.style.flex = 'none';
+      avPanel.style.height = newAvH + 'px';
+      prPanel.style.height = newPrH + 'px';
+      AV.resize(); AV.draw();
+      PR.resizeCanvases(); PR.draw(); PR.drawVelocity();
+    };
+    const onUp = () => {
+      divider.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
 function wireTransport() {
   document.getElementById('btn-undo').onclick = () => History.undo();
   document.getElementById('btn-redo').onclick = () => History.redo();
@@ -2559,6 +2622,7 @@ const ExportEngine = {
   window.addEventListener('DOMContentLoaded', () => {
     buildTopBar();
     wireTransport();
+    wireDivider();
     createDemoState();
     AV.resize();
     AV.draw();
