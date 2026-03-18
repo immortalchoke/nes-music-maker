@@ -2060,11 +2060,20 @@ function wireTransport() {
   document.getElementById('btn-play').onclick = () => Sequencer.play();
   document.getElementById('btn-stop').onclick = () => Sequencer.stop();
   document.addEventListener('keydown', (e) => {
-    if (e.code !== 'Space') return;
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    e.preventDefault();
-    if (Sequencer._playing) Sequencer.stop(); else Sequencer.play();
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (Sequencer._playing) Sequencer.stop(); else Sequencer.play();
+    } else if (e.code === 'Delete' || e.code === 'Backspace') {
+      const ap = PR.activePattern;
+      if (!ap) return;
+      const hasSelection = ap.pattern.notes.some(n => n.selected);
+      if (!hasSelection) return;
+      e.preventDefault();
+      ap.pattern.notes = ap.pattern.notes.filter(n => !n.selected);
+      PR.draw(); PR.drawVelocity();
+    }
   });
   document.getElementById('btn-rec').onclick = () => {
     const t = ProjectState.tracks.find(t => t.id === ProjectState.selectedTrackId);
