@@ -525,6 +525,57 @@ input:focus, select:focus { border-color: var(--hi); }
   };
 
   // ============================================================
+  // MODULE: History (undo/redo)
+  // ============================================================
+  const History = {
+    _undo: [],
+    _redo: [],
+    push() {
+      this._undo.push(JSON.stringify(ProjectState));
+      if (this._undo.length > 50) this._undo.shift();
+      this._redo.length = 0;
+      this._updateButtons();
+    },
+    _pushSnapshot(snapshot) {
+      this._undo.push(snapshot);
+      if (this._undo.length > 50) this._undo.shift();
+      this._redo.length = 0;
+      this._updateButtons();
+    },
+    undo() {
+      if (!this._undo.length) return;
+      this._redo.push(JSON.stringify(ProjectState));
+      this._restore(JSON.parse(this._undo.pop()));
+      this._updateButtons();
+    },
+    redo() {
+      if (!this._redo.length) return;
+      this._undo.push(JSON.stringify(ProjectState));
+      this._restore(JSON.parse(this._redo.pop()));
+      this._updateButtons();
+    },
+    _restore(state) {
+      Object.assign(ProjectState, state);
+      const track = ProjectState.tracks.find(t => t.id === ProjectState.selectedTrackId);
+      const pattern = track?.patterns.find(p => p.id === ProjectState.selectedPatternId);
+      if (track && pattern) {
+        PR.open(track, pattern);
+      } else {
+        PR.activePattern = null;
+        const panel = document.getElementById('pianoroll-panel');
+        if (panel) panel.style.display = 'none';
+      }
+      AV.draw();
+    },
+    _updateButtons() {
+      const u = document.getElementById('btn-undo');
+      const r = document.getElementById('btn-redo');
+      if (u) u.disabled = !this._undo.length;
+      if (r) r.disabled = !this._redo.length;
+    }
+  };
+
+  // ============================================================
   // MODULE: PianoRoll
   // ============================================================
   const PR = {
@@ -859,6 +910,7 @@ input:focus, select:focus { border-color: var(--hi); }
       // Avoid duplicate at same cell
       const exists = ap.pattern.notes.find(n => n.pitch === p && n.start === snappedStart);
       if (exists) return null;
+      History.push();
       const note = { pitch: p, start: snappedStart, duration: sixteenth, velocity: 100 };
       ap.pattern.notes.push(note);
       previewNote(ap.track, p, sixteenth);
@@ -876,12 +928,8 @@ input:focus, select:focus { border-color: var(--hi); }
 
       const hit = hitTestNote(mx, my);
       if (hit) {
-        const note = hit.note;
-        if (note.chordId) {
-          ap.pattern.notes = ap.pattern.notes.filter(n => n.chordId !== note.chordId);
-        } else {
-          ap.pattern.notes = ap.pattern.notes.filter(n => n !== note);
-        }
+        History.push();
+        ap.pattern.notes = ap.pattern.notes.filter(n => n !== hit.note);
         this.draw(); this.drawVelocity();
       } else {
         if (ap.track.channelType === 'chord') {
@@ -926,22 +974,26 @@ input:focus, select:focus { border-color: var(--hi); }
       const hit = hitTestNote(mx, my);
       if (hit) {
         const { note, x, w } = hit;
+        const snapshot = JSON.stringify(ProjectState);
         if (mx > x + w - 6) {
           // Resize does not clear selection; selected notes remain highlighted while resizing.
-          dragState = { type: 'resize', note, startX: mx, origDur: note.duration };
+          dragState = { type: 'resize', note, startX: mx, origDur: note.duration, snapshot };
         } else {
           const wasSelected = !!note.selected;
           if (!wasSelected) {
             ap.pattern.notes.forEach(n => { n.selected = false; });
           }
+          note.selected = true;
           dragState = {
             type: 'move', note,
             startX: mx, startY: my,
             origPitch: note.pitch, origStart: note.start,
             lastPitch: note.pitch, lastStart: note.start,
             hasMoved: false,
-            movingSelection: wasSelected
+            movingSelection: wasSelected,
+            snapshot
           };
+          this.draw();
         }
       } else {
         ap.pattern.notes.forEach(n => { n.selected = false; });
@@ -1027,9 +1079,13 @@ input:focus, select:focus { border-color: var(--hi); }
     const onCanvasMouseUp = (e) => {
       if (!dragState) return;
       if (dragState.type === 'move' && !dragState.hasMoved) {
-        // Single click on note body → preview note
+        // Single click on note body → preview note (selection already set on mousedown)
         const ap = this.activePattern;
         if (ap) previewNote(ap.track, dragState.note.pitch, dragState.note.duration);
+      } else if (dragState.type === 'move' && dragState.hasMoved) {
+        History._pushSnapshot(dragState.snapshot);
+      } else if (dragState.type === 'resize' && dragState.note.duration !== dragState.origDur) {
+        History._pushSnapshot(dragState.snapshot);
       } else if (dragState.type === 'marquee') {
         const ap = this.activePattern;
         if (ap) {
@@ -1444,6 +1500,7 @@ AV.initEvents = function() {
     if (hit.zone === 'mute') { hit.track.muted = !hit.track.muted; AV.draw(); return; }
     if (hit.zone === 'solo') { hit.track.soloed = !hit.track.soloed; AV.draw(); return; }
     if (hit.zone === 'empty') {
+      History.push();
       const pat = addPattern(hit.track.id, Math.max(0, hit.bar), 2);
       AV.draw();
       return;
@@ -1460,7 +1517,8 @@ AV.initEvents = function() {
       dragState = {
         entry: hit.entry, track: hit.track, pat: hit.pat,
         startX: mx, origBar: hit.entry.startBar,
-        isAlt: e.altKey
+        isAlt: e.altKey,
+        snapshot: JSON.stringify(ProjectState)
       };
     }
   });
@@ -1501,7 +1559,12 @@ AV.initEvents = function() {
     AV.draw();
   });
 
-  canvas.addEventListener('mouseup', () => { dragState = null; loopDrag = false; playheadDrag = false; });
+  canvas.addEventListener('mouseup', () => {
+    if (dragState?.snapshot && (dragState.cloned || dragState.entry?.startBar !== dragState.origBar)) {
+      History._pushSnapshot(dragState.snapshot);
+    }
+    dragState = null; loopDrag = false; playheadDrag = false;
+  });
 
   canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
@@ -1520,6 +1583,7 @@ AV.initEvents = function() {
           if (n) { hit.pat.name = n; AV.draw(); }
         }},
         { label: 'Delete', action: () => {
+          History.push();
           hit.track.arrangement = hit.track.arrangement.filter(en => en !== hit.entry);
           AV.draw();
         }}
@@ -1588,6 +1652,8 @@ function showTrackSettings(track, x, y) {
 function buildTopBar() {
   const tb = document.getElementById('transport');
   tb.innerHTML = `
+    <button class="nes-btn" id="btn-undo" disabled>&#8592;Z</button>
+    <button class="nes-btn" id="btn-redo" disabled>Z&#8594;</button>
     <button class="nes-btn" id="btn-play">&#9654;</button>
     <button class="nes-btn" id="btn-stop">&#9632;</button>
     <button class="nes-btn" id="btn-rec">&#9679;</button>
@@ -1708,6 +1774,7 @@ function buildTopBar() {
       const sixteenth = PR.sixteenthWidth() / PR.barWidth();
       const snappedRelBar = Math.max(0, Math.min(ap.pattern.lengthBars - sixteenth, Math.floor(relBar / sixteenth) * sixteenth));
       const label = root + type;
+      History.push();
       ChordTool._insertChord(chordNotes, snappedRelBar, label);
       el.remove();
     };
@@ -1804,6 +1871,7 @@ const ChordTool = {
     const relBar = ProjectState.playheadBar - (entry ? entry.startBar : 0);
     const sixteenth = PR.sixteenthWidth() / PR.barWidth();
     const snapped = Math.max(0, Math.min(ap.pattern.lengthBars - sixteenth, Math.floor(relBar / sixteenth) * sixteenth));
+    History.push();
     this._insertChord(chordNotes, snapped, label);
   },
 
@@ -1828,6 +1896,7 @@ const ChordTool = {
         btn.style.margin = '2px';
         btn.textContent = ch[type].name;
         btn.onclick = () => {
+          History.push();
           this._insertChord(ch[type].notes, startBar, ch[type].name);
           el.remove();
         };
@@ -2057,11 +2126,18 @@ const Sequencer = {
 
 // Wire transport buttons (after buildTopBar is called)
 function wireTransport() {
+  document.getElementById('btn-undo').onclick = () => History.undo();
+  document.getElementById('btn-redo').onclick = () => History.redo();
   document.getElementById('btn-play').onclick = () => Sequencer.play();
   document.getElementById('btn-stop').onclick = () => Sequencer.stop();
   document.addEventListener('keydown', (e) => {
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if ((e.metaKey || e.ctrlKey) && e.code === 'KeyZ') {
+      e.preventDefault();
+      if (e.shiftKey) History.redo(); else History.undo();
+      return;
+    }
     if (e.code === 'Space') {
       e.preventDefault();
       if (Sequencer._playing) Sequencer.stop(); else Sequencer.play();
@@ -2070,6 +2146,7 @@ function wireTransport() {
       if (!ap) return;
       e.preventDefault();
       if (!ap.pattern.notes.some(n => n.selected)) return;
+      History.push();
       ap.pattern.notes = ap.pattern.notes.filter(n => !n.selected);
       PR.draw(); PR.drawVelocity();
     }
