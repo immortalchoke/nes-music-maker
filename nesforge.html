@@ -1958,9 +1958,41 @@ const ExportEngine = {
   }
 };
 
+  function createDemoState() {
+    // LEAD — Pulse50, C major melody
+    const lead = addTrack('pulse50', 'LEAD');
+    const leadPat = addPattern(lead.id, 0, 2);
+    // C5 E5 G5 E5 | F5 E5 D5 C5 (quarter notes)
+    [[72,0],[76,0.25],[79,0.5],[76,0.75],[77,1],[76,1.25],[74,1.5],[72,1.75]]
+      .forEach(([pitch, start]) => leadPat.notes.push({ pitch, start, duration: 0.25, velocity: 100 }));
+
+    // BASS — Triangle, root-fifth pattern
+    const bass = addTrack('triangle', 'BASS');
+    const bassPat = addPattern(bass.id, 0, 2);
+    [[48,0],[55,0.5],[53,1],[55,1.5]]
+      .forEach(([pitch, start]) => bassPat.notes.push({ pitch, start, duration: 0.5, velocity: 90 }));
+
+    // DRUMS — Noise, kick+snare+hihat
+    const drums = addTrack('noise', 'DRUMS');
+    const drumPat = addPattern(drums.id, 0, 2);
+    for (let bar = 0; bar < 2; bar++) {
+      for (let e = 0; e < 8; e++) {
+        const t = bar + e * 0.125;
+        drumPat.notes.push({ pitch: 42, start: t, duration: 0.1, velocity: 80 });  // hihat every 8th
+        if (e % 4 === 0) drumPat.notes.push({ pitch: 36, start: t, duration: 0.1, velocity: 110 }); // kick 1,3
+        if (e % 4 === 2) drumPat.notes.push({ pitch: 38, start: t, duration: 0.1, velocity: 100 }); // snare 2,4
+      }
+    }
+
+    ProjectState.loopStart = 0;
+    ProjectState.loopEnd = 2;
+    ProjectState.loopEnabled = true;
+  }
+
   window.addEventListener('DOMContentLoaded', () => {
     buildTopBar();
     wireTransport();
+    createDemoState();
     AV.resize();
     AV.draw();
     AV.initEvents();
