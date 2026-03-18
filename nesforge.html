@@ -723,7 +723,12 @@ input:focus, select:focus { border-color: var(--hi); }
   PR.initEvents = function() {
     const canvas = this.getCanvas();
     if (!canvas) return;
-    let dragState = null; // { type: 'resize'|'velocity', note, startX, startY, origDur, origVel }
+    let dragState = null;
+    // dragState types:
+    //   { type: 'resize', note, startX, origDur }
+    //   { type: 'move', note, startX, startY, origPitch, origStart, lastPitch, lastStart, hasMoved }
+    //   { type: 'paint', lastPitch, lastStart }
+    //   { type: 'velocity', note, startY, origVel }
 
     const posToNote = (mx, my) => {
       const ap = this.activePattern;
@@ -758,6 +763,29 @@ input:focus, select:focus { border-color: var(--hi); }
       return null;
     };
 
+    const previewNote = (track, pitch, duration) => {
+      if (track.channelType === 'noise') return; // drums don't need preview
+      const ctx = getAudioCtx();
+      const fakeNote = { pitch, start: 0, duration, velocity: 100 };
+      playNote(track, fakeNote, ctx.currentTime + 0.01);
+    };
+
+    const placeNote = (ap, pitch, snappedStart) => {
+      const sixteenth = this.sixteenthWidth() / this.barWidth();
+      let p = pitch;
+      if (ap.track.channelType !== 'noise' && ProjectState.scale !== 'Chromatic') {
+        p = Scales.snapToScale(p, ProjectState.key, ProjectState.scale);
+      }
+      if (p < 0 || p > 127) return null;
+      // Avoid duplicate at same cell
+      const exists = ap.pattern.notes.find(n => n.pitch === p && n.start === snappedStart);
+      if (exists) return null;
+      const note = { pitch: p, start: snappedStart, duration: sixteenth, velocity: 100 };
+      ap.pattern.notes.push(note);
+      previewNote(ap.track, p, sixteenth);
+      return note;
+    };
+
     canvas.addEventListener('mousedown', (e) => {
       const ap = this.activePattern;
       if (!ap) return;
@@ -769,11 +797,92 @@ input:focus, select:focus { border-color: var(--hi); }
       const hit = hitTestNote(mx, my);
       if (hit) {
         const { note, x, w } = hit;
-        // Near right edge → resize
         if (mx > x + w - 6) {
+          // Right edge → resize
           dragState = { type: 'resize', note, startX: mx, origDur: note.duration };
         } else {
-          // Click existing note: handle chordId group deletion
+          // Note body → start potential move (distinguish from click-to-delete on mouseup)
+          dragState = {
+            type: 'move', note,
+            startX: mx, startY: my,
+            origPitch: note.pitch, origStart: note.start,
+            lastPitch: note.pitch, lastStart: note.start,
+            hasMoved: false
+          };
+        }
+      } else {
+        if (ap.track.channelType === 'chord') {
+          const pos = posToNote(mx, my);
+          if (typeof ChordTool !== 'undefined') ChordTool.openInlinePicker(pos.snappedStart, e.clientX, e.clientY);
+          return;
+        }
+        // Empty cell → paint mode
+        const pos = posToNote(mx, my);
+        if (!pos) return;
+        placeNote(ap, pos.pitch, pos.snappedStart);
+        dragState = { type: 'paint', lastPitch: pos.pitch, lastStart: pos.snappedStart };
+        this.draw(); this.drawVelocity();
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!dragState) return;
+      const ap = this.activePattern;
+      if (!ap) return;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      if (dragState.type === 'resize') {
+        const sixteenth = this.sixteenthWidth() / this.barWidth();
+        const deltaBars = (mx - dragState.startX) / this.barWidth();
+        const newDur = Math.max(sixteenth, Math.round((dragState.origDur + deltaBars) / sixteenth) * sixteenth);
+        dragState.note.duration = newDur;
+        this.draw();
+
+      } else if (dragState.type === 'move') {
+        const dx = mx - dragState.startX;
+        const dy = my - dragState.startY;
+        if (!dragState.hasMoved && Math.sqrt(dx*dx + dy*dy) < 4) return;
+        dragState.hasMoved = true;
+
+        const pos = posToNote(mx, my);
+        if (!pos) return;
+        const sixteenth = this.sixteenthWidth() / this.barWidth();
+        const newStart = Math.max(0, pos.snappedStart);
+        const isNoise = ap.track.channelType === 'noise';
+        const newPitch = isNoise
+          ? (this.DRUM_ROWS.includes(pos.pitch) ? pos.pitch : dragState.lastPitch)
+          : Math.max(0, Math.min(127, pos.pitch));
+
+        if (newPitch !== dragState.lastPitch || newStart !== dragState.lastStart) {
+          const pitchChanged = newPitch !== dragState.lastPitch;
+          dragState.note.pitch = newPitch;
+          dragState.note.start = newStart;
+          dragState.lastPitch = newPitch;
+          dragState.lastStart = newStart;
+          if (pitchChanged) previewNote(ap.track, newPitch, dragState.note.duration);
+          this.draw(); this.drawVelocity();
+        }
+
+      } else if (dragState.type === 'paint') {
+        const pos = posToNote(mx, my);
+        if (!pos) return;
+        if (pos.pitch !== dragState.lastPitch || pos.snappedStart !== dragState.lastStart) {
+          placeNote(ap, pos.pitch, pos.snappedStart);
+          dragState.lastPitch = pos.pitch;
+          dragState.lastStart = pos.snappedStart;
+          this.draw(); this.drawVelocity();
+        }
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      if (dragState && dragState.type === 'move' && !dragState.hasMoved) {
+        // No movement → delete
+        const ap = this.activePattern;
+        if (ap) {
+          const note = dragState.note;
           if (note.chordId) {
             ap.pattern.notes = ap.pattern.notes.filter(n => n.chordId !== note.chordId);
           } else {
@@ -781,40 +890,9 @@ input:focus, select:focus { border-color: var(--hi); }
           }
           this.draw(); this.drawVelocity();
         }
-      } else {
-        if (ap.track.channelType === 'chord') {
-          // Open inline chord picker
-          const pos = posToNote(mx, my);
-          if (typeof ChordTool !== 'undefined') ChordTool.openInlinePicker(pos.snappedStart, e.clientX, e.clientY);
-          return;
-        }
-        const pos = posToNote(mx, my);
-        if (pos.pitch < 0 || pos.pitch > 127) return;
-        const sixteenth = this.sixteenthWidth() / this.barWidth();
-        let pitch = pos.pitch;
-        if (ProjectState.scale !== 'Chromatic') {
-          pitch = Scales.snapToScale(pitch, ProjectState.key, ProjectState.scale);
-        }
-        const note = { pitch, start: pos.snappedStart, duration: sixteenth, velocity: 100 };
-        ap.pattern.notes.push(note);
-        this.draw(); this.drawVelocity();
       }
+      dragState = null;
     });
-
-    canvas.addEventListener('mousemove', (e) => {
-      if (!dragState) return;
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      if (dragState.type === 'resize') {
-        const sixteenth = this.sixteenthWidth() / this.barWidth();
-        const deltaBars = (mx - dragState.startX) / this.barWidth();
-        const newDur = Math.max(sixteenth, Math.round((dragState.origDur + deltaBars) / sixteenth) * sixteenth);
-        dragState.note.duration = newDur;
-        this.draw();
-      }
-    });
-
-    canvas.addEventListener('mouseup', () => { dragState = null; });
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
