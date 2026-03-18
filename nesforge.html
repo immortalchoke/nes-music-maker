@@ -1259,6 +1259,7 @@ AV.initEvents = function() {
   const canvas = this.getCanvas();
   let dragState = null;
   let loopDrag = false;
+  let playheadDrag = false;
 
   const getHit = (mx, my) => {
     const { HEADER_WIDTH, TRACK_HEIGHT, RULER_HEIGHT, scrollX } = this;
@@ -1300,9 +1301,10 @@ AV.initEvents = function() {
         ProjectState.loopStart = Math.max(0, Math.floor(bar));
         loopDrag = true;
       } else {
-        // Plain click moves playhead
+        // Plain click/drag moves playhead
         ProjectState.playheadBar = Math.max(0, bar);
         if (typeof Sequencer !== 'undefined') Sequencer._playStartBar = ProjectState.playheadBar;
+        playheadDrag = true;
       }
       AV.draw();
       return;
@@ -1382,6 +1384,13 @@ AV.initEvents = function() {
   canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
+    if (playheadDrag) {
+      const barW = this.barWidth();
+      const bar = (mx - this.HEADER_WIDTH + this.scrollX) / barW;
+      ProjectState.playheadBar = Math.max(0, bar);
+      if (typeof Sequencer !== 'undefined') Sequencer._playStartBar = ProjectState.playheadBar;
+      AV.draw(); return;
+    }
     if (loopDrag) {
       const barW = this.barWidth();
       const bar = (mx - this.HEADER_WIDTH + this.scrollX) / barW;
@@ -1406,7 +1415,7 @@ AV.initEvents = function() {
     AV.draw();
   });
 
-  canvas.addEventListener('mouseup', () => { dragState = null; loopDrag = false; });
+  canvas.addEventListener('mouseup', () => { dragState = null; loopDrag = false; playheadDrag = false; });
 
   canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
