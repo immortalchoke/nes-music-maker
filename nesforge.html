@@ -1506,6 +1506,7 @@ function buildTopBar() {
     <label>KEY<select id="key-sel">${['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'].map(k=>`<option>${k}</option>`).join('')}</select></label>
     <label>SCALE<select id="scale-sel">${Object.keys(Scales.SCALES).map(s=>`<option>${s}</option>`).join('')}</select></label>
     <button class="nes-btn" id="btn-add-track">+TRK</button>
+    <button class="nes-btn" id="btn-chord">CHORD</button>
     <button class="nes-btn" id="btn-export">EXP</button>
     <button class="nes-btn" id="btn-save">SAVE</button>
     <input type="file" id="load-input" accept=".json" style="display:none">
@@ -1546,6 +1547,73 @@ function buildTopBar() {
     ProjectState.loopEnabled = !ProjectState.loopEnabled;
     document.getElementById('btn-loop').style.color = ProjectState.loopEnabled ? '#00ccaa' : '';
     AV.draw();
+  };
+
+  document.getElementById('btn-chord').onclick = (e) => {
+    const CHORD_INTERVALS = {
+      maj:  { 3: [0,4,7],     4: [0,4,7,12]  },
+      min:  { 3: [0,3,7],     4: [0,3,7,12]  },
+      dim:  { 3: [0,3,6],     4: [0,3,6,9]   },
+      aug:  { 3: [0,4,8],     4: [0,4,8,12]  },
+      maj7: { 3: [0,4,7],     4: [0,4,7,11]  },
+      min7: { 3: [0,3,7],     4: [0,3,7,10]  },
+      dom7: { 3: [0,4,7],     4: [0,4,7,10]  },
+    };
+    const roots = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+    const types = ['maj','min','dim','aug','maj7','min7','dom7'];
+
+    let el = document.getElementById('chord-insert-popup');
+    if (el) { el.remove(); return; }
+    el = document.createElement('div');
+    el.id = 'chord-insert-popup';
+    el.style.cssText = `position:fixed;left:${e.clientX}px;top:${e.clientY + 8}px;
+      background:#111128;border:1px solid #334;z-index:1000;padding:8px;
+      font:5px "Press Start 2P";color:#ccccdd;min-width:180px;`;
+
+    let numNotes = 3;
+
+    el.innerHTML = `
+      <div style="margin-bottom:6px;">
+        <span style="color:#8888aa;">ROOT</span>
+        <select id="ci-root" style="font-size:5px;margin-left:4px;">${roots.map(r=>`<option>${r}</option>`).join('')}</select>
+      </div>
+      <div style="margin-bottom:6px;">
+        <span style="color:#8888aa;">TYPE</span>
+        <select id="ci-type" style="font-size:5px;margin-left:4px;">${types.map(t=>`<option>${t}</option>`).join('')}</select>
+      </div>
+      <div style="margin-bottom:8px;">
+        <span style="color:#8888aa;">NOTES</span>
+        <button id="ci-toggle" class="nes-btn" style="margin-left:4px;">3</button>
+      </div>
+      <button id="ci-insert" class="nes-btn" style="width:100%;">INSERT</button>
+    `;
+    document.body.appendChild(el);
+    el.addEventListener('mousedown', e => e.stopPropagation());
+
+    document.getElementById('ci-toggle').onclick = () => {
+      numNotes = numNotes === 3 ? 4 : 3;
+      document.getElementById('ci-toggle').textContent = numNotes;
+    };
+
+    document.getElementById('ci-insert').onclick = () => {
+      const ap = PR.activePattern;
+      if (!ap) { alert('Open a pattern in the piano roll first.'); return; }
+      const root = document.getElementById('ci-root').value;
+      const type = document.getElementById('ci-type').value;
+      const rootMIDI = Scales.NOTE_ORDER.indexOf(root) + 60;
+      const intervals = CHORD_INTERVALS[type][numNotes];
+      const chordNotes = intervals.map(i => rootMIDI + i);
+      const entry = ap.track.arrangement.find(en => en.patternId === ap.pattern.id);
+      const startBar = entry ? entry.startBar : 0;
+      const relBar = ProjectState.playheadBar - startBar;
+      const sixteenth = PR.sixteenthWidth() / PR.barWidth();
+      const snappedRelBar = Math.round(relBar / sixteenth) * sixteenth;
+      const label = root + type;
+      ChordTool._insertChord(chordNotes, snappedRelBar, label);
+      el.remove();
+    };
+
+    setTimeout(() => document.addEventListener('mousedown', () => el.remove(), { once: true }), 100);
   };
 
   document.getElementById('btn-add-track').onclick = () => {
