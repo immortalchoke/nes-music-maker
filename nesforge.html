@@ -1367,6 +1367,7 @@ function showContextMenu(x, y, items) {
     el.appendChild(btn);
   });
   document.body.appendChild(el);
+  el.addEventListener('mousedown', e => e.stopPropagation());
   setTimeout(() => document.addEventListener('mousedown', () => el.remove(), { once: true }), 100);
 }
 
@@ -1402,6 +1403,7 @@ function showTrackSettings(track, x, y) {
   close.onclick = () => el.remove();
   el.appendChild(close);
   document.body.appendChild(el);
+  el.addEventListener('mousedown', e => e.stopPropagation());
   setTimeout(() => document.addEventListener('mousedown', () => el.remove(), { once: true }), 100);
 }
 
@@ -1588,6 +1590,7 @@ const ChordTool = {
     });
 
     document.body.appendChild(el);
+    el.addEventListener('mousedown', e => e.stopPropagation());
     setTimeout(() => document.addEventListener('mousedown', () => el.remove(), { once: true }), 100);
   },
 
