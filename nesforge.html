@@ -1032,14 +1032,16 @@ const AV = {
       ctx.fillText(b + 1, x + 2, 13);
     }
 
-    // Loop region
-    const lx1 = HEADER_WIDTH + ProjectState.loopStart * barW - scrollX;
-    const lx2 = HEADER_WIDTH + ProjectState.loopEnd * barW - scrollX;
-    ctx.fillStyle = 'rgba(255,220,0,0.15)';
-    ctx.fillRect(lx1, 0, lx2 - lx1, RULER_HEIGHT);
-    ctx.strokeStyle = '#ffdd00';
-    ctx.beginPath(); ctx.moveTo(lx1,0); ctx.lineTo(lx1,RULER_HEIGHT); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(lx2,0); ctx.lineTo(lx2,RULER_HEIGHT); ctx.stroke();
+    // Loop region (only when loop is enabled)
+    if (ProjectState.loopEnabled) {
+      const lx1 = HEADER_WIDTH + ProjectState.loopStart * barW - scrollX;
+      const lx2 = HEADER_WIDTH + ProjectState.loopEnd * barW - scrollX;
+      ctx.fillStyle = 'rgba(255,220,0,0.15)';
+      ctx.fillRect(lx1, 0, lx2 - lx1, RULER_HEIGHT);
+      ctx.strokeStyle = '#ffdd00';
+      ctx.beginPath(); ctx.moveTo(lx1,0); ctx.lineTo(lx1,RULER_HEIGHT); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lx2,0); ctx.lineTo(lx2,RULER_HEIGHT); ctx.stroke();
+    }
 
     // Playhead
     const px = HEADER_WIDTH + ProjectState.playheadBar * barW - scrollX;
