@@ -833,7 +833,7 @@ input:focus, select:focus { border-color: var(--hi); }
       } else {
         if (ap.track.channelType === 'chord') {
           const pos = posToNote(mx, my);
-          if (typeof ChordTool !== 'undefined') ChordTool.openInlinePicker(pos.snappedStart, e.clientX, e.clientY);
+          if (pos && typeof ChordTool !== 'undefined') ChordTool.openInlinePicker(pos.snappedStart, e.clientX, e.clientY);
           return;
         }
         const pos = posToNote(mx, my);
@@ -934,37 +934,35 @@ input:focus, select:focus { border-color: var(--hi); }
       } else if (dragState.type === 'marquee') {
         dragState.currentX = mx;
         dragState.currentY = my;
-        this._dragState = dragState;
         this.draw();
       }
     });
 
-    canvas.addEventListener('mouseup', (e) => {
-      if (dragState) {
-        if (dragState.type === 'move' && !dragState.hasMoved) {
-          // Single click on note body → preview note
-          const ap = this.activePattern;
-          if (ap) previewNote(ap.track, dragState.note.pitch, dragState.note.duration);
-        } else if (dragState.type === 'marquee') {
-          const ap = this.activePattern;
-          if (ap) {
-            const { startX, startY, currentX, currentY } = dragState;
-            const rectLeft   = Math.min(startX, currentX);
-            const rectRight  = Math.max(startX, currentX);
-            const rectTop    = Math.min(startY, currentY);
-            const rectBottom = Math.max(startY, currentY);
-            const barW = this.barWidth();
-            const isNoise = ap.track.channelType === 'noise';
-            const rows = isNoise ? this.DRUM_ROWS : null;
-            for (const note of ap.pattern.notes) {
-              const rowIdx = isNoise ? rows.indexOf(note.pitch) : (127 - note.pitch);
-              const noteX = this.KEY_WIDTH + note.start * barW - this.scrollX;
-              const noteY = rowIdx * this.ROW_HEIGHT - this.scrollY;
-              const noteW = note.duration * barW;
-              if (noteX < rectRight && noteX + noteW > rectLeft &&
-                  noteY < rectBottom && noteY + this.ROW_HEIGHT > rectTop) {
-                note.selected = true;
-              }
+    const onCanvasMouseUp = (e) => {
+      if (!dragState) return;
+      if (dragState.type === 'move' && !dragState.hasMoved) {
+        // Single click on note body → preview note
+        const ap = this.activePattern;
+        if (ap) previewNote(ap.track, dragState.note.pitch, dragState.note.duration);
+      } else if (dragState.type === 'marquee') {
+        const ap = this.activePattern;
+        if (ap) {
+          const { startX, startY, currentX, currentY } = dragState;
+          const rectLeft   = Math.min(startX, currentX);
+          const rectRight  = Math.max(startX, currentX);
+          const rectTop    = Math.min(startY, currentY);
+          const rectBottom = Math.max(startY, currentY);
+          const barW = this.barWidth();
+          const isNoise = ap.track.channelType === 'noise';
+          const rows = isNoise ? this.DRUM_ROWS : null;
+          for (const note of ap.pattern.notes) {
+            const rowIdx = isNoise ? rows.indexOf(note.pitch) : (127 - note.pitch);
+            const noteX = this.KEY_WIDTH + note.start * barW - this.scrollX;
+            const noteY = rowIdx * this.ROW_HEIGHT - this.scrollY;
+            const noteW = note.duration * barW;
+            if (noteX < rectRight && noteX + noteW > rectLeft &&
+                noteY < rectBottom && noteY + this.ROW_HEIGHT > rectTop) {
+              note.selected = true;
             }
           }
         }
@@ -972,7 +970,8 @@ input:focus, select:focus { border-color: var(--hi); }
       dragState = null;
       this._dragState = null;
       if (this.activePattern) { this.draw(); this.drawVelocity(); }
-    });
+    };
+    document.addEventListener('mouseup', onCanvasMouseUp);
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
