@@ -1607,7 +1607,7 @@ function buildTopBar() {
       const startBar = entry ? entry.startBar : 0;
       const relBar = ProjectState.playheadBar - startBar;
       const sixteenth = PR.sixteenthWidth() / PR.barWidth();
-      const snappedRelBar = Math.round(relBar / sixteenth) * sixteenth;
+      const snappedRelBar = Math.max(0, Math.floor(relBar / sixteenth) * sixteenth);
       const label = root + type;
       ChordTool._insertChord(chordNotes, snappedRelBar, label);
       el.remove();
