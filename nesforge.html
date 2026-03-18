@@ -387,6 +387,8 @@ input:focus, select:focus { border-color: var(--hi); }
     const oscs = [makeOsc(freq)];
     if (extraOscillators) extraOscillators.forEach(f => oscs.push(makeOsc(f)));
 
+  // Schedule vibratoLFO to auto-stop so it doesn't leak when stop closure is discarded
+  try { chain.vibratoLFO.stop(startTime + durationSecs + 0.1); } catch(e) {}
     return () => { oscs.forEach(o => { try { o.stop(); } catch(e) {} }); chain.stop(); };
   }
 
@@ -716,12 +718,6 @@ input:focus, select:focus { border-color: var(--hi); }
     }
   };
 
-  // Temp test — remove in Phase 8
-  function testOpenPR() {
-    const t = addTrack('pulse50', 'TEST');
-    const p = addPattern(t.id, 0, 2);
-    PR.open(t, p);
-  }
 
   // Add inside PR object or after its definition:
   PR.initEvents = function() {
@@ -1926,6 +1922,16 @@ const ExportEngine = {
         }
       }
       Object.assign(ProjectState, state);
+      // Recreate waveform canvas elements for DPCM tracks (EventBus.on('track:added') is not fired during load)
+      for (const track of ProjectState.tracks) {
+        if (track.channelType === 'dpcm' && !document.getElementById('waveform-' + track.id)) {
+          const wc = document.createElement('canvas');
+          wc.id = 'waveform-' + track.id;
+          wc.width = 80; wc.height = 30;
+          wc.style.cssText = 'position:absolute;display:none;';
+          document.body.appendChild(wc);
+        }
+      }
       AV.resize(); AV.draw();
       if (PR.activePattern) PR.draw();
       EventBus.emit('project:loaded');
