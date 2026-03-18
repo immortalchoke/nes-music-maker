@@ -1705,10 +1705,11 @@ const ChordTool = {
   pasteAtPlayhead(chordNotes, label) {
     const ap = PR.activePattern;
     if (!ap) return;
+    if (ap.track.channelType !== 'chord') return;
     const entry = ap.track.arrangement.find(e => e.patternId === ap.pattern.id);
     const relBar = ProjectState.playheadBar - (entry ? entry.startBar : 0);
     const sixteenth = PR.sixteenthWidth() / PR.barWidth();
-    const snapped = Math.floor(relBar / sixteenth) * sixteenth;
+    const snapped = Math.max(0, Math.min(ap.pattern.lengthBars - sixteenth, Math.floor(relBar / sixteenth) * sixteenth));
     this._insertChord(chordNotes, snapped, label);
   },
 
