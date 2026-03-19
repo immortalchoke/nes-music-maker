@@ -610,6 +610,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       <button id="mob-next-bar" class="mob-btn" style="min-width:36px;height:36px;font-size:12px;">▶</button>
       <button id="mob-rem-bar" class="mob-btn danger" style="min-width:32px;height:36px;font-size:10px;">−</button>
       <button id="mob-add-bar" class="mob-btn" style="min-width:32px;height:36px;font-size:10px;">+</button>
+      <button id="mob-clear-track" class="mob-btn danger" style="min-width:32px;height:36px;font-size:14px;">🗑</button>
     </div>
     <div id="mob-playhead-bar"><div id="mob-playhead-fill"></div></div>
     <div id="mob-grid"></div>
@@ -4428,6 +4429,18 @@ const ExportEngine = {
         this._renderBarDots();
         this._renderGrid();
         this._showToast('BARS: ' + this.numBars);
+      });
+
+      // Clear track — removes all notes for the active track
+      document.getElementById('mob-clear-track').addEventListener('click', () => {
+        const track = ProjectState.tracks.find(t => t.id === this.activeTrackId);
+        if (!track) return;
+        const pat = this._getMobilePattern(track);
+        if (!pat.notes.length) return;
+        History.push();
+        pat.notes = [];
+        this._renderGrid();
+        this._showToast('CLEARED');
       });
 
       // Swipe on grid area
