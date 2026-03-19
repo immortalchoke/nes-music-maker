@@ -20,6 +20,13 @@ html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text
   font-family: 'Press Start 2P', monospace; font-size: 14px; overflow: hidden;
   letter-spacing: 0.05rem; max-width: 100vw; }
 #app { display: flex; flex-direction: column; height: 100vh; width: 100%; max-width: 100vw; }
+/* Landscape phone in desktop mode: allow vertical scroll so all panels are reachable */
+@media (max-height: 500px) and (pointer: coarse) {
+  html, body { overflow-y: auto; height: auto; }
+  #app { height: auto; min-height: 100vh; }
+  #main { overflow: visible; }
+  #arrangement-panel { overflow: visible; }
+}
 #topbar { height: 64px; background: var(--bg2); border-bottom: var(--border);
   display: flex; align-items: center; padding: 0 12px; gap: 6px; flex-shrink: 0; }
 .tb-group { display: flex; align-items: center; gap: 4px; }
