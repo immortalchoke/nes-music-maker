@@ -4194,14 +4194,18 @@ const Sequencer = {
     if (ctx.state === 'running') {
       _doStart();
     } else {
-      // Context not yet running (iOS unlocking) — defer until it transitions
+      // Context not yet running (iOS unlocking) — defer until it transitions.
       ctx.resume();
-      ctx.onstatechange = () => {
+      // Fallback: if statechange never fires (some iOS versions), force-start after 600ms.
+      var _fallback = setTimeout(() => { if (this._playing && !this._timer) _doStart(); }, 600);
+      var _onState = () => {
         if (ctx.state === 'running') {
-          ctx.onstatechange = null;
+          clearTimeout(_fallback);
+          ctx.removeEventListener('statechange', _onState);
           _doStart();
         }
       };
+      ctx.addEventListener('statechange', _onState);
     }
   },
 
@@ -5661,14 +5665,19 @@ const ExportEngine = {
           // Create context synchronously in gesture — this is what iOS requires
           if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
           var ctx = audioCtx;
-          // Resume synchronously (no .then — stay in gesture stack)
           ctx.resume();
-          // Play silent buffer synchronously — fully unlocks iOS Web Audio
-          var buf = ctx.createBuffer(1, 1, ctx.sampleRate);
-          var src = ctx.createBufferSource();
-          src.buffer = buf;
-          src.connect(ctx.destination);
-          src.start(0);
+          // Play a short audible beep — confirms unlock AND tests device audio.
+          // If you hear this, Web Audio is working. If not, device audio is blocked
+          // (silent switch, DuckDuckGo audio block, etc.).
+          var osc = ctx.createOscillator();
+          var g   = ctx.createGain();
+          osc.frequency.value = 523.25; // C5
+          g.gain.setValueAtTime(0.25, ctx.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+          osc.connect(g);
+          g.connect(ctx.destination);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.2);
           getMasterGain(); // warm up master gain while we're in the gesture
         } catch(e) {}
         if (overlay) overlay.style.display = 'none';
