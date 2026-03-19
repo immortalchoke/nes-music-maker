@@ -1977,7 +1977,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
       return { snappedStart, rowIdx, pitch };
     };
 
-    const hitTestNote = (mx, my) => {
+    // Expand hit area on touch devices so fingers can tap small notes
+    const _touchExpand = window.matchMedia('(pointer: coarse)').matches ? 10 : 0;
+
+    const hitTestNote = (mx, my, expand = 0) => {
       const ap = this.activePattern;
       if (!ap) return null;
       const isNoise = isDrumChannel(ap.track.channelType);
@@ -1988,7 +1991,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
         const y = rowIdx * this.ROW_HEIGHT - this.scrollY;
         const x = this.KEY_WIDTH + note.start * barW - this.scrollX;
         const w = note.duration * barW;
-        if (mx >= x && mx <= x + w && my >= y && my <= y + this.ROW_HEIGHT) {
+        if (mx >= x - expand && mx <= x + w + expand &&
+            my >= y - expand && my <= y + this.ROW_HEIGHT + expand) {
           return { note, x, w, y };
         }
       }
@@ -2020,16 +2024,11 @@ body.mobile-mode #mobile-app { display: flex !important; }
       return note;
     };
 
-    // dblclick: place note on empty cell, delete note/chord on existing note
-    canvas.addEventListener('dblclick', (e) => {
+    // Shared handler for both dblclick event and touch double-tap
+    const _onDblClick = (mx, my, clientX, clientY) => {
       const ap = this.activePattern;
-      if (!ap) return;
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      if (mx < this.KEY_WIDTH) return;
-
-      const hit = hitTestNote(mx, my);
+      if (!ap || mx < this.KEY_WIDTH) return;
+      const hit = hitTestNote(mx, my, _touchExpand);
       if (hit) {
         History.push();
         ap.pattern.notes = ap.pattern.notes.filter(n => n !== hit.note);
@@ -2038,32 +2037,39 @@ body.mobile-mode #mobile-app { display: flex !important; }
         const pos = posToNote(mx, my);
         if (!pos) return;
         if (ap.track.channelType === 'chord' || PR._chordMode) {
-          window._showChordInsertPopup(e.clientX, e.clientY, pos.pitch, pos.snappedStart);
+          window._showChordInsertPopup(clientX, clientY, pos.pitch, pos.snappedStart);
           return;
         }
         placeNote(ap, pos.pitch, pos.snappedStart);
         this.draw(); this.drawVelocity();
       }
+    };
+
+    canvas.addEventListener('dblclick', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      _onDblClick(e.clientX - rect.left, e.clientY - rect.top, e.clientX, e.clientY);
     });
 
-    // iOS Safari doesn't fire dblclick from double-tap — detect manually via touchend
+    // iOS Safari doesn't reliably fire dblclick from double-tap.
+    // Detect manually: two touchend events within 300ms and 30px.
+    // Call preventDefault() to suppress any native dblclick that might also fire.
     let _lastTap = null;
     canvas.addEventListener('touchend', (e) => {
-      if (e.changedTouches.length !== 1) return;
+      if (e.changedTouches.length !== 1) { _prTouch = null; return; }
+      _prTouch = null; // clear scroll state
       const t = e.changedTouches[0];
       const now = Date.now();
       if (_lastTap && now - _lastTap.time < 300 &&
           Math.abs(t.clientX - _lastTap.x) < 30 &&
           Math.abs(t.clientY - _lastTap.y) < 30) {
+        e.preventDefault(); // suppress native dblclick + follow-on mouse events
         _lastTap = null;
-        canvas.dispatchEvent(new MouseEvent('dblclick', {
-          bubbles: true, cancelable: true,
-          clientX: t.clientX, clientY: t.clientY
-        }));
+        const rect = canvas.getBoundingClientRect();
+        _onDblClick(t.clientX - rect.left, t.clientY - rect.top, t.clientX, t.clientY);
       } else {
         _lastTap = { time: now, x: t.clientX, y: t.clientY };
       }
-    }, { passive: true });
+    }, { passive: false });
 
     canvas.addEventListener('mousedown', (e) => {
       if (e.detail >= 2) return; // dblclick handled separately
@@ -2113,7 +2119,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
       if (mx < this.KEY_WIDTH) return;
 
-      const hit = hitTestNote(mx, my);
+      const hit = hitTestNote(mx, my, _touchExpand);
       if (hit) {
         const { note, x, w } = hit;
         const snapshot = JSON.stringify(ProjectState);
@@ -2175,7 +2181,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
         if (mx >= this.KEY_WIDTH) {
-          const hit = hitTestNote(mx, my);
+          const hit = hitTestNote(mx, my, _touchExpand);
           if (hit) {
             const { x, w } = hit;
             canvas.style.cursor = mx > x + w - 6 ? 'ew-resize' : (e.altKey ? 'copy' : 'grab');
@@ -2380,7 +2386,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       _prTouch.x = t.clientX; _prTouch.y = t.clientY;
       PR.draw();
     }, { passive: false });
-    canvas.addEventListener('touchend', () => { _prTouch = null; }, { passive: true });
+    // Note: touchend also clears _prTouch inside the double-tap handler above
 
     // Velocity canvas interaction
     const velCanvas = this.getVelCanvas();
