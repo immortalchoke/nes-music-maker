@@ -2340,6 +2340,28 @@ body.mobile-mode #mobile-app { display: flex !important; }
       PR.draw();
     }, { passive: false });
 
+    // Touch scroll for piano roll (mobile/tablet — no mouse wheel available)
+    let _prTouch = null;
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      _prTouch = { x: t.clientX, y: t.clientY, scrolling: false };
+    }, { passive: true });
+    canvas.addEventListener('touchmove', (e) => {
+      if (!_prTouch || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dx = t.clientX - _prTouch.x;
+      const dy = t.clientY - _prTouch.y;
+      if (!_prTouch.scrolling && Math.abs(dy) < 6 && Math.abs(dx) < 6) return;
+      if (!_prTouch.scrolling) _prTouch.scrolling = Math.abs(dy) >= Math.abs(dx);
+      if (!_prTouch.scrolling) return;
+      e.preventDefault();
+      PR.scrollY = Math.max(0, Math.min(128 * PR.ROW_HEIGHT - canvas.height, PR.scrollY - dy));
+      _prTouch.x = t.clientX; _prTouch.y = t.clientY;
+      PR.draw();
+    }, { passive: false });
+    canvas.addEventListener('touchend', () => { _prTouch = null; }, { passive: true });
+
     // Velocity canvas interaction
     const velCanvas = this.getVelCanvas();
     velCanvas.addEventListener('mousedown', (e) => {
@@ -3196,6 +3218,29 @@ AV.initEvents = function() {
     }
     this.draw();
   }, { passive: false });
+
+  // Touch scroll for arrangement view (mobile/tablet — no mouse wheel available)
+  let _avTouch = null;
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    _avTouch = { x: t.clientX, y: t.clientY, scrolling: false };
+  }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => {
+    if (!_avTouch || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dx = t.clientX - _avTouch.x;
+    const dy = t.clientY - _avTouch.y;
+    if (!_avTouch.scrolling && Math.abs(dy) < 6 && Math.abs(dx) < 6) return;
+    if (!_avTouch.scrolling) _avTouch.scrolling = Math.abs(dy) >= Math.abs(dx);
+    if (!_avTouch.scrolling) return;
+    e.preventDefault();
+    const maxSY = Math.max(0, ProjectState.tracks.length * AV.TRACK_HEIGHT - canvas.height + AV.RULER_HEIGHT);
+    AV.scrollY = Math.max(0, Math.min(maxSY, AV.scrollY - dy));
+    _avTouch.x = t.clientX; _avTouch.y = t.clientY;
+    AV.draw();
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => { _avTouch = null; }, { passive: true });
 
   canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
