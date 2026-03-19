@@ -18,8 +18,8 @@
 }
 html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text);
   font-family: 'Press Start 2P', monospace; font-size: 14px; overflow: hidden;
-  letter-spacing: 0.05rem; }
-#app { display: flex; flex-direction: column; height: 100vh; }
+  letter-spacing: 0.05rem; max-width: 100vw; }
+#app { display: flex; flex-direction: column; height: 100vh; width: 100%; max-width: 100vw; }
 #topbar { height: 64px; background: var(--bg2); border-bottom: var(--border);
   display: flex; align-items: center; padding: 0 12px; gap: 6px; flex-shrink: 0; }
 .tb-group { display: flex; align-items: center; gap: 4px; }
@@ -125,18 +125,19 @@ button, input, select, textarea { letter-spacing: 0.05rem; }
 /* ============================================================
    MOBILE UI — activates on screens < 768px
    ============================================================ */
-body.mobile-mode #app { display: none !important; }
+body.mobile-mode #app { display: none !important; width: 0 !important; height: 0 !important; overflow: hidden !important; position: absolute !important; }
 body.mobile-mode #mobile-app { display: flex !important; }
 
 #mobile-app {
   display: none;
   flex-direction: column;
+  align-items: stretch;
   width: 100%;
+  max-width: 100vw;
   position: relative;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
-  max-width: 100vw;
   overflow-x: hidden;
   background: var(--bg);
   font-family: 'Press Start 2P', monospace;
@@ -244,11 +245,14 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
 /* Grid area (keyboard + bar nav + playhead + grid) */
 #mob-grid-area {
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
   overflow-x: hidden;
   position: relative;
   touch-action: pan-y;
@@ -270,6 +274,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
   overflow-x: auto;
   overflow-y: hidden;
   flex-shrink: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   height: 48px;
   background: #1e1c30;
   border-top: 1px solid var(--bg3);
@@ -311,6 +319,9 @@ body.mobile-mode #mobile-app { display: flex !important; }
 .mob-piano-key.black-key:active { background: var(--accent); }
 .mob-piano-key.active-pitch.white-key { background: var(--hi); color: #1e1c30; }
 .mob-piano-key.active-pitch.black-key { background: var(--hi); }
+/* Key lights up when note is playing during sequencer playback */
+.mob-piano-key.key-active.white-key { background: #ffeecc; box-shadow: 0 0 6px var(--hi); }
+.mob-piano-key.key-active.black-key { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 
 /* Bar navigation */
 #mob-bar-nav {
@@ -366,18 +377,19 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
 /* Step grid */
 #mob-grid {
-  flex: 1;
+  flex: 1 1 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: minmax(44px, 1fr);
+  grid-auto-rows: 1fr;
   gap: 5px;
   padding: 8px;
   overflow: hidden;
   background: var(--bg);
   width: 100%;
+  max-width: 100%;
   min-width: 0;
+  min-height: 0;
   box-sizing: border-box;
-  align-content: stretch;
 }
 .mob-step {
   border-radius: 5px;
@@ -401,8 +413,17 @@ body.mobile-mode #mobile-app { display: flex !important; }
   border-color: transparent;
 }
 .mob-step.active-step {
-  outline: 2px solid var(--text);
-  outline-offset: -2px;
+  outline: 3px solid #ffffff;
+  outline-offset: -3px;
+  /* Bright flash visible on both empty and filled steps */
+  box-shadow: inset 0 0 0 3px #ffffff;
+}
+.mob-step.on.active-step {
+  /* Extra contrast for filled steps — bright white inset + lighten background */
+  filter: brightness(1.6);
+  outline: 3px solid #ffffff;
+  outline-offset: -3px;
+  box-shadow: inset 0 0 0 3px #ffffff, inset 0 0 12px rgba(255,255,255,0.4);
 }
 .mob-step-vel {
   font-family: 'Press Start 2P', monospace;
@@ -1009,10 +1030,9 @@ body.mobile-mode #mobile-app { display: flex !important; }
   // Velocity is applied in playPitchedNote via envGain, not here.
   function buildEffectChain(track) {
     const ctx = getAudioCtx();
-    // On iOS, context may still be suspended — nodes created on a
-    // suspended context produce silence. Resume synchronously.
-    if (ctx.state === 'suspended') {
-      ctx.resume(); // fire-and-forget — best effort
+    // On iOS, context may be 'suspended' or 'interrupted' — both produce silence.
+    if (ctx.state !== 'running') {
+      ctx.resume(); // fire-and-forget — best effort, gesture unlock handles the rest
     }
 
     const panner = ctx.createStereoPanner();
@@ -1099,6 +1119,33 @@ body.mobile-mode #mobile-app { display: flex !important; }
   }
 
   // Play a single pitched note. Returns a stop() function.
+  // Active pitch tracker — pitches currently sounding.
+  // Updated by playNote(); consumed by PR.draw() and MobileUI RAF.
+  const _activePitches = new Map(); // pitch → timeoutId
+
+  function _markPitchActive(pitch, durationSecs) {
+    // Cancel any existing timeout for this pitch
+    if (_activePitches.has(pitch)) clearTimeout(_activePitches.get(pitch));
+    const tid = setTimeout(() => {
+      _activePitches.delete(pitch);
+      _flashMobileKey(pitch, false);
+    }, Math.max(60, durationSecs * 1000));
+    _activePitches.set(pitch, tid);
+    _flashMobileKey(pitch, true);
+  }
+
+  function _flashMobileKey(pitch, on) {
+    const wrap = document.getElementById('mob-keyboard-wrap');
+    if (!wrap) return;
+    const btn = wrap.querySelector('[data-midi="' + pitch + '"]');
+    if (!btn) return;
+    if (on) {
+      btn.classList.add('key-active');
+    } else {
+      btn.classList.remove('key-active');
+    }
+  }
+
   function playPitchedNote(track, pitch, startTime, durationSecs, extraOscillators, velocity = 0.8) {
     const ctx = getAudioCtx();
     const freq = midiToFreq(pitch);
@@ -1259,38 +1306,136 @@ body.mobile-mode #mobile-app { display: flex !important; }
   }
 
   function playPCM7(track, midiPitch, startTime, velocity = 0.8) {
-    // Guard: if buffers not ready, wait and retry once
-    if (!_pcm7Buffers) {
-      getPCM7Buffers().then(() => {
-        var retryTime = getAudioCtx().currentTime + 0.05;
-        playPCM7(track, midiPitch, retryTime, velocity);
-      });
-      return;
-    }
-    const buf = _pcm7Buffers[midiPitch];
-    // Guard: if this specific buffer is undefined, force re-bake and retry
-    if (!buf) {
-      console.warn('PCM7 buffer missing for pitch', midiPitch, '— re-baking buffers');
-      _pcm7Buffers = null;
-      _pcm7Promise = null;
-      getPCM7Buffers().then(() => {
-        var retryTime = getAudioCtx().currentTime + 0.05;
-        playPCM7(track, midiPitch, retryTime, velocity);
-      });
-      return;
-    }
+    // Inline synthesis — no pre-baked buffers needed, works immediately on iOS.
+    // Each drum hit synthesized on demand using Web Audio nodes.
     const ctx = getAudioCtx();
-    const chanGain = ctx.createGain();
-    chanGain.gain.value = (track.volume / 100) * velocity;
-    const panner = ctx.createStereoPanner();
-    panner.pan.value = track.pan;
-    chanGain.connect(panner);
-    panner.connect(getMasterGain());
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(chanGain);
-    src.start(startTime);
-    src.stop(startTime + buf.duration + 0.01);
+    const vol = (track.volume / 100) * velocity;
+    const out = ctx.createGain();
+    out.gain.value = vol;
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = track.pan || 0;
+    out.connect(pan);
+    pan.connect(getMasterGain());
+    const t = startTime;
+
+    function noiseBuffer(dur) {
+      const len = Math.ceil(ctx.sampleRate * dur);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource();
+      src.buffer = buf; src.loop = false;
+      return src;
+    }
+
+    function osc(type, freq) {
+      const o = ctx.createOscillator();
+      o.type = type; o.frequency.value = freq;
+      return o;
+    }
+
+    function env(node, dest, peak, attack, hold, release) {
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(peak, t + attack);
+      g.gain.setValueAtTime(peak, t + attack + hold);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + attack + hold + release);
+      node.connect(g); g.connect(dest);
+      return g;
+    }
+
+    const DRUM = {
+      36: 'kick', 38: 'snare', 42: 'hihatC',
+      46: 'hihatO', 37: 'tom', 39: 'clap'
+    }[midiPitch];
+    if (!DRUM) return;
+
+    if (DRUM === 'kick') {
+      // Original Battletoads PCM7 kick spec — restored as inline synthesis
+      // Sine sweep 160→28Hz with exponential decay — the dramatic pitch drop
+      // is what makes it fat; exponential decay sounds punchier than linear
+      const o = osc('sine', 160);
+      o.frequency.setValueAtTime(160, t);
+      o.frequency.exponentialRampToValueAtTime(28, t + 0.18);
+      const og = ctx.createGain();
+      og.gain.setValueAtTime(1.0, t);
+      og.gain.exponentialRampToValueAtTime(0.0001, t + 0.27);
+      o.connect(og); og.connect(out);
+      o.start(t); o.stop(t + 0.28);
+      // Click transient: 8ms noise burst through 800Hz highpass — attack snap only
+      // Low gain (0.25) so it doesn't overpower the tone
+      const ns = noiseBuffer(0.008);
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 800;
+      const ng = ctx.createGain();
+      ng.gain.setValueAtTime(0.25, t);
+      ng.gain.linearRampToValueAtTime(0.0001, t + 0.018);
+      ns.connect(hp); hp.connect(ng); ng.connect(out);
+      ns.start(t); ns.stop(t + 0.02);
+
+    } else if (DRUM === 'snare') {
+      // Classic NES snare: sharp noise crack + tonal body
+      // Layer 1: bright noise crack — the "snap"
+      const ns1 = noiseBuffer(0.15);
+      const hp1 = ctx.createBiquadFilter();
+      hp1.type = 'highpass'; hp1.frequency.value = 1800; hp1.Q.value = 0.5;
+      const g1 = ctx.createGain();
+      g1.gain.setValueAtTime(1.0, t);
+      g1.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+      ns1.connect(hp1); hp1.connect(g1); g1.connect(out);
+      ns1.start(t); ns1.stop(t + 0.16);
+      // Layer 2: tonal body — sine 200→120Hz gives it weight vs hi-hat
+      const o = osc('sine', 200);
+      o.frequency.setValueAtTime(200, t);
+      o.frequency.exponentialRampToValueAtTime(120, t + 0.06);
+      const og = ctx.createGain();
+      og.gain.setValueAtTime(0.7, t);
+      og.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+      o.connect(og); og.connect(out);
+      o.start(t); o.stop(t + 0.09);
+
+    } else if (DRUM === 'hihatC') {
+      const ns = noiseBuffer(0.045);
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 7000; hp.Q.value = 1.2;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.6, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+      ns.connect(hp); hp.connect(g); g.connect(out);
+      ns.start(t); ns.stop(t + 0.05);
+
+    } else if (DRUM === 'hihatO') {
+      const ns = noiseBuffer(0.32);
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 6000; hp.Q.value = 1.2;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.6, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      ns.connect(hp); hp.connect(g); g.connect(out);
+      ns.start(t); ns.stop(t + 0.33);
+
+    } else if (DRUM === 'tom') {
+      const o = osc('sine', 160);
+      o.frequency.setValueAtTime(160, t);
+      o.frequency.exponentialRampToValueAtTime(60, t + 0.12);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.8, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+      o.connect(g); g.connect(out);
+      o.start(t); o.stop(t + 0.15);
+
+    } else if (DRUM === 'clap') {
+      [0, 0.010, 0.022].forEach(off => {
+        const ns = noiseBuffer(0.05);
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 2;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.8, t + off);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + off + 0.05);
+        ns.connect(bp); bp.connect(g); g.connect(out);
+        ns.start(t + off); ns.stop(t + off + 0.06);
+      });
+    }
   }
 
   function playDPCM(track, pitch, startTime, durationSecs) {
@@ -1319,6 +1464,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
     if (track.muted) return;
     const soloActive = ProjectState.tracks.some(t => t.soloed);
     if (soloActive && !track.soloed) return;
+
+    // Schedule keyboard light-up timed to when the note actually sounds
+    const delayMs = Math.max(0, (startTime - getAudioCtx().currentTime) * 1000);
+    setTimeout(() => _markPitchActive(note.pitch, barToSeconds(note.duration)), delayMs);
 
     if (track.channelType === 'noise') {
       playDrum(track, note.pitch, startTime, vel);
@@ -2095,13 +2244,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      const ap = PR.activePattern;
-      const maxScrollX = ap ? Math.max(0, ap.pattern.lengthBars * PR.barWidth() - canvas.width + PR.KEY_WIDTH) : 0;
-      const maxScrollY = Math.max(0, 128 * PR.ROW_HEIGHT - canvas.height);
-      if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-        PR.scrollX = Math.max(0, Math.min(maxScrollX, PR.scrollX + (e.deltaX || e.deltaY)));
+      if (e.shiftKey) {
+        PR.scrollX = Math.max(0, PR.scrollX + e.deltaY);
       } else {
-        PR.scrollY = Math.max(0, Math.min(maxScrollY, PR.scrollY + e.deltaY));
+        PR.scrollY = Math.max(0, Math.min(128 * PR.ROW_HEIGHT - canvas.height, PR.scrollY + e.deltaY));
       }
       PR.draw();
     }, { passive: false });
@@ -4103,12 +4249,21 @@ const ExportEngine = {
     checkLayout() {
       if (this.isMobile()) {
         document.body.classList.add('mobile-mode');
+        // Zero out desktop canvases — canvas pixel width attributes inflate
+        // document.scrollWidth on iOS even when the parent is display:none,
+        // causing 100% width on mobile children to resolve wider than viewport
+        ['arrangement-canvas','pianoroll-canvas','velocity-canvas'].forEach(id => {
+          const c = document.getElementById(id);
+          if (c) { c.width = 1; c.height = 1; }
+        });
         if (!this._initialized) this._init();
         this._syncFromProject();
         this._startRaf();
       } else {
         document.body.classList.remove('mobile-mode');
         this._stopRaf();
+        // Restore canvas dimensions for desktop
+        if (typeof AV !== 'undefined') { AV.resize(); AV.draw(); }
       }
     },
 
@@ -4167,8 +4322,9 @@ const ExportEngine = {
             MobileUI._startRaf();
           }
         }
-        if (ctx.state === 'suspended') {
-          ctx.resume().then(doPlay);
+        // Use !== 'running' to catch 'suspended' AND 'interrupted' (iOS Chrome)
+        if (ctx.state !== 'running') {
+          ctx.resume().then(doPlay).catch(function() { doPlay(); });
         } else {
           doPlay();
         }
@@ -4336,12 +4492,21 @@ const ExportEngine = {
         }
       });
 
-      // Defer first render until browser has computed layout
+      // Double rAF: first fires before paint, second fires after layout is committed
+      // Single rAF is not enough on iOS Safari/Chrome — grid has 0 width on first frame
       this._renderKeyboard();
       requestAnimationFrame(() => {
-        this._renderTracks();
-        this._renderBarDots();
-        this._renderGrid();
+        requestAnimationFrame(() => {
+          this._renderTracks();
+          this._renderBarDots();
+          this._renderGrid();
+          // Force grid reflow by reading offsetWidth then re-rendering
+          const grid = document.getElementById('mob-grid');
+          if (grid && grid.offsetWidth < 100) {
+            // Grid still hasn't expanded — try once more after a tick
+            setTimeout(() => { this._renderGrid(); }, 50);
+          }
+        });
       });
     },
 
@@ -4561,20 +4726,20 @@ const ExportEngine = {
         keys.push({ midi, pc, isBlack });
       }
 
-      // Render white keys first into a relative container, then overlay black
-      const whiteKeys = keys.filter(k => !k.isBlack);
-      const totalWidth = whiteKeys.length * 36;
-      wrap.style.minWidth = totalWidth + 'px';
+      // Do NOT set minWidth on wrap — it inflates parent layout and breaks grid width.
+      // The inner container is wider than the wrap; overflow-x:auto handles scrolling.
+      wrap.style.minWidth = '';
 
       // Use a flex row with relative positioning tricks
       // Simpler: render all as inline blocks with margin adjustments
       const container = document.createElement('div');
-      container.style.cssText = 'position:relative; display:flex; flex-direction:row; align-items:flex-end; height:48px; flex-shrink:0;';
+      container.style.cssText = 'position:relative; display:flex; flex-direction:row; align-items:flex-end; height:48px; flex-shrink:0; width:max-content;';
       wrap.appendChild(container);
 
       for (const key of keys) {
         const btn = document.createElement('button');
         btn.className = 'mob-piano-key ' + (key.isBlack ? 'black-key' : 'white-key');
+        btn.dataset.midi = key.midi;
         if (key.midi === this.currentPitch) btn.classList.add('active-pitch');
         if (!key.isBlack && key.pc === 0) {
           const label = document.createElement('span');
@@ -4797,7 +4962,7 @@ const ExportEngine = {
         var ctx = getAudioCtx();
         function _afterResume() {
           _audioUnlocked = true;
-          // Play silent buffer to fully unlock iOS Web Audio
+          // Play silent 1-sample buffer — required to fully unlock iOS Web Audio
           try {
             var silentBuf = ctx.createBuffer(1, 1, ctx.sampleRate);
             var silentSrc = ctx.createBufferSource();
@@ -4805,23 +4970,12 @@ const ExportEngine = {
             silentSrc.connect(ctx.destination);
             silentSrc.start(0);
           } catch(e) {}
-          // Force-reset PCM7 buffers so they re-bake now that context is confirmed
-          // running (previous bake may have used a suspended context and produced
-          // undefined buffers)
-          _pcm7Buffers = null;
-          _pcm7Promise = null;
-          getPCM7Buffers().then(function(b) {
-            var ok = b && b[36] && b[38] && b[42];
-            if (!ok) {
-              console.error('PCM7 bake failed after unlock — check AudioContext state');
-            }
-          });
           // Remove listeners — only need to unlock once
           document.removeEventListener('touchstart', _unlockAudio, true);
           document.removeEventListener('touchend',   _unlockAudio, true);
           document.removeEventListener('click',      _unlockAudio, true);
         }
-        if (ctx.state === 'suspended') {
+        if (ctx.state !== 'running') {
           ctx.resume().then(_afterResume).catch(function() {
             // resume() rejected — try again on next gesture
             _audioUnlocked = false;
