@@ -2059,15 +2059,24 @@ body.mobile-mode #mobile-app { display: flex !important; }
       _prTouch = null; // clear scroll state
       const t = e.changedTouches[0];
       const now = Date.now();
-      if (_lastTap && now - _lastTap.time < 300 &&
-          Math.abs(t.clientX - _lastTap.x) < 30 &&
-          Math.abs(t.clientY - _lastTap.y) < 30) {
+      if (_lastTap && now - _lastTap.time < 500 &&
+          Math.abs(t.clientX - _lastTap.x) < 44 &&
+          Math.abs(t.clientY - _lastTap.y) < 44) {
         e.preventDefault(); // suppress native dblclick + follow-on mouse events
         _lastTap = null;
         const rect = canvas.getBoundingClientRect();
         _onDblClick(t.clientX - rect.left, t.clientY - rect.top, t.clientX, t.clientY);
       } else {
         _lastTap = { time: now, x: t.clientX, y: t.clientY };
+        // Flash the row briefly so the user knows the first tap registered
+        const rect = canvas.getBoundingClientRect();
+        const mx = t.clientX - rect.left, my = t.clientY - rect.top;
+        if (mx >= this.KEY_WIDTH) {
+          const pos = posToNote(mx, my);
+          if (pos) {
+            _markPitchActive(pos.pitch, 0.08);
+          }
+        }
       }
     }, { passive: false });
 
