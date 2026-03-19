@@ -4117,6 +4117,7 @@ const ExportEngine = {
     const n = (pitch, start, dur, vel) => ({ pitch, start, duration: dur, velocity: vel });
     const SX = 0.0625; // 16th note
     const EI = 0.125;  // 8th note
+    const QT = 0.25;   // quarter note
 
     // MIDI constants — D harmonic minor: D E F G A Bb C# (raised 7th)
     const A1=33, D2=38, E2=40, A2=45,
@@ -4125,35 +4126,37 @@ const ExportEngine = {
           Cs5=73, D5=74, E5=76, F5=77;
 
     // ── Track 1: Lead (Pulse 25% · Fuzz Med · Vibrato Low) ──────────────────
-    // 4 bars of relentless 16th-note harmonic minor runs and dim7 arpeggios
+    // Yngwie-style: singable hook (QT/EI) + melodic runs, not a wall of 16ths
     const lead = addTrack('pulse25', 'Lead');
     lead.fuzz = 'med'; lead.vibrato = 'low';
     const leadPat = addPattern(lead.id, 0, 4);
 
     leadPat.notes.push(
-      // Bar 0: descend full D harmonic minor D5→D4, then dim7 arp (F-Ab-B-D) up, step back
-      n(D5,  0.0000, SX, 115), n(Cs5, 0.0625, SX, 110), n(Bb4, 0.1250, SX, 110), n(A4,  0.1875, SX, 110),
-      n(G4,  0.2500, SX, 110), n(F4,  0.3125, SX, 110), n(E4,  0.3750, SX, 110), n(D4,  0.4375, SX, 115),
-      n(F4,  0.5000, SX, 110), n(Ab4, 0.5625, SX, 110), n(B4,  0.6250, SX, 110), n(D5,  0.6875, SX, 115),
-      n(Cs5, 0.7500, SX, 110), n(A4,  0.8125, SX, 105), n(G4,  0.8750, SX, 105), n(F4,  0.9375, SX, 105),
+      // Bar 0: D5 hook (QT), quick descent C#→Bb→A, ascending run A→Bb→C#→D, land A4
+      n(D5,  0.0000, QT, 118),
+      n(Cs5, 0.2500, SX, 108), n(Bb4, 0.3125, SX, 103), n(A4,  0.3750, EI, 110),
+      n(G4,  0.5000, SX,  98), n(A4,  0.5625, SX,  98), n(Bb4, 0.6250, SX, 103), n(Cs5, 0.6875, SX, 108),
+      n(D5,  0.7500, EI, 115), n(A4,  0.8750, EI, 105),
 
-      // Bar 1: step up through scale, aug-2nd punch Bb→C# (harmonic minor signature), peak E5
-      n(E4,  1.0000, SX, 110), n(F4,  1.0625, SX, 110), n(G4,  1.1250, SX, 110), n(A4,  1.1875, SX, 115),
-      n(Bb4, 1.2500, SX, 115), n(A4,  1.3125, SX, 110), n(G4,  1.3750, SX, 110), n(A4,  1.4375, SX, 110),
-      n(Bb4, 1.5000, SX, 115), n(Cs5, 1.5625, SX, 120), n(D5,  1.6250, SX, 120), n(E5,  1.6875, SX, 125),
-      n(D5,  1.7500, SX, 120), n(Cs5, 1.8125, SX, 115), n(A4,  1.8750, SX, 110), n(G4,  1.9375, SX, 110),
+      // Bar 1: F4 contrast (lower register), E4/D4 bounce, rising to C#5 peak (QT held)
+      n(F4,  1.0000, QT, 110),
+      n(E4,  1.2500, SX,  98), n(D4,  1.3125, SX,  93), n(E4,  1.3750, EI,  98),
+      n(F4,  1.5000, SX,  98), n(G4,  1.5625, SX, 100), n(A4,  1.6250, SX, 105), n(Bb4, 1.6875, SX, 110),
+      n(Cs5, 1.7500, QT, 122),
 
-      // Bar 2: continuous climb to F5 peak, full descent back down
-      n(F4,  2.0000, SX, 110), n(G4,  2.0625, SX, 110), n(A4,  2.1250, SX, 110), n(Bb4, 2.1875, SX, 115),
-      n(Cs5, 2.2500, SX, 115), n(D5,  2.3125, SX, 115), n(E5,  2.3750, SX, 120), n(F5,  2.4375, SX, 125),
-      n(E5,  2.5000, SX, 120), n(D5,  2.5625, SX, 115), n(Cs5, 2.6250, SX, 115), n(Bb4, 2.6875, SX, 110),
-      n(A4,  2.7500, SX, 110), n(G4,  2.8125, SX, 105), n(F4,  2.8750, SX, 105), n(E4,  2.9375, SX, 105),
+      // Bar 2: sequenced 4-note turn figure × 4 — Yngwie "Far Beyond the Sun" style
+      // Turn 1 (A): A Bb A G  |  Turn 2 (Bb): Bb C# Bb A  [aug-2nd!]
+      // Turn 3 (C#): C# D C# Bb  |  Turn 4 (D): D E D C#
+      n(A4,  2.0000, SX, 105), n(Bb4, 2.0625, SX, 112), n(A4,  2.1250, SX, 105), n(G4,  2.1875, SX, 100),
+      n(Bb4, 2.2500, SX, 112), n(Cs5, 2.3125, SX, 120), n(Bb4, 2.3750, SX, 112), n(A4,  2.4375, SX, 105),
+      n(Cs5, 2.5000, SX, 120), n(D5,  2.5625, SX, 123), n(Cs5, 2.6250, SX, 118), n(Bb4, 2.6875, SX, 110),
+      n(D5,  2.7500, SX, 123), n(E5,  2.8125, SX, 127), n(D5,  2.8750, SX, 120), n(Cs5, 2.9375, SX, 115),
 
-      // Bar 3: ascend full harmonic minor D4→D5, descend, end on C#5 leading tone → loops to D5
-      n(D4,  3.0000, SX, 115), n(E4,  3.0625, SX, 110), n(F4,  3.1250, SX, 110), n(G4,  3.1875, SX, 110),
-      n(A4,  3.2500, SX, 115), n(Bb4, 3.3125, SX, 115), n(Cs5, 3.3750, SX, 120), n(D5,  3.4375, SX, 120),
-      n(Cs5, 3.5000, SX, 115), n(Bb4, 3.5625, SX, 110), n(A4,  3.6250, SX, 110), n(G4,  3.6875, SX, 105),
-      n(F4,  3.7500, SX, 105), n(G4,  3.8125, SX, 105), n(A4,  3.8750, SX, 110), n(Cs5, 3.9375, SX, 115)
+      // Bar 3: D5 hook returns (QT), same descent, ascending run + peak E5 → C#5 into loop
+      n(D5,  3.0000, QT, 118),
+      n(Cs5, 3.2500, SX, 108), n(Bb4, 3.3125, SX, 103), n(A4,  3.3750, EI, 110),
+      n(G4,  3.5000, SX,  98), n(A4,  3.5625, SX, 100), n(Bb4, 3.6250, SX, 108), n(Cs5, 3.6875, SX, 113),
+      n(D5,  3.7500, SX, 118), n(E5,  3.8125, SX, 127), n(D5,  3.8750, SX, 120), n(Cs5, 3.9375, SX, 115)
     );
 
     // ── Track 2: Harmony (Pulse 50% · Vibrato Low) — parallel diatonic 3rds ─
@@ -4163,29 +4166,29 @@ const ExportEngine = {
     const harmPat = addPattern(harm.id, 0, 4);
 
     harmPat.notes.push(
-      // Bar 0: 3rds below (scale + dim7 section stays as dim7 a 3rd lower)
-      n(Bb4, 0.0000, SX,  82), n(A4,  0.0625, SX,  78), n(G4,  0.1250, SX,  78), n(F4,  0.1875, SX,  78),
-      n(E4,  0.2500, SX,  78), n(D4,  0.3125, SX,  78), n(Cs4, 0.3750, SX,  78), n(Bb3, 0.4375, SX,  82),
-      n(D4,  0.5000, SX,  78), n(F4,  0.5625, SX,  78), n(Ab4, 0.6250, SX,  78), n(B4,  0.6875, SX,  82),
-      n(A4,  0.7500, SX,  78), n(F4,  0.8125, SX,  75), n(E4,  0.8750, SX,  75), n(D4,  0.9375, SX,  75),
+      // Bar 0: diatonic 3rds below lead (D harmonic minor), mirrors phrasing exactly
+      n(Bb4, 0.0000, QT,  85),
+      n(A4,  0.2500, SX,  78), n(G4,  0.3125, SX,  75), n(F4,  0.3750, EI,  78),
+      n(E4,  0.5000, SX,  72), n(F4,  0.5625, SX,  72), n(G4,  0.6250, SX,  75), n(A4,  0.6875, SX,  80),
+      n(Bb4, 0.7500, EI,  85), n(F4,  0.8750, EI,  78),
 
-      // Bar 1: mirrors the aug-2nd climb, peaks at C#5
-      n(Cs4, 1.0000, SX,  78), n(D4,  1.0625, SX,  78), n(E4,  1.1250, SX,  78), n(F4,  1.1875, SX,  82),
-      n(G4,  1.2500, SX,  82), n(F4,  1.3125, SX,  78), n(E4,  1.3750, SX,  78), n(F4,  1.4375, SX,  78),
-      n(G4,  1.5000, SX,  82), n(A4,  1.5625, SX,  88), n(Bb4, 1.6250, SX,  88), n(Cs5, 1.6875, SX,  92),
-      n(Bb4, 1.7500, SX,  88), n(A4,  1.8125, SX,  82), n(F4,  1.8750, SX,  78), n(E4,  1.9375, SX,  78),
+      // Bar 1: 3rds below (C4/Bb3 in the lower phrase add depth)
+      n(D4,  1.0000, QT,  80),
+      n(C4,  1.2500, SX,  70), n(Bb3, 1.3125, SX,  68), n(C4,  1.3750, EI,  70),
+      n(D4,  1.5000, SX,  72), n(E4,  1.5625, SX,  75), n(F4,  1.6250, SX,  78), n(G4,  1.6875, SX,  83),
+      n(A4,  1.7500, QT,  90),
 
-      // Bar 2: mirrors the F5 climb and descent, peaks at D5
-      n(D4,  2.0000, SX,  78), n(E4,  2.0625, SX,  78), n(F4,  2.1250, SX,  78), n(G4,  2.1875, SX,  82),
-      n(A4,  2.2500, SX,  82), n(Bb4, 2.3125, SX,  82), n(Cs5, 2.3750, SX,  88), n(D5,  2.4375, SX,  92),
-      n(Cs5, 2.5000, SX,  88), n(Bb4, 2.5625, SX,  82), n(A4,  2.6250, SX,  82), n(G4,  2.6875, SX,  78),
-      n(F4,  2.7500, SX,  78), n(E4,  2.8125, SX,  75), n(D4,  2.8750, SX,  75), n(Cs4, 2.9375, SX,  75),
+      // Bar 2: 3rds below each turn note — aug-2nd turn appears in both voices simultaneously
+      n(F4,  2.0000, SX,  78), n(G4,  2.0625, SX,  85), n(F4,  2.1250, SX,  78), n(E4,  2.1875, SX,  75),
+      n(G4,  2.2500, SX,  85), n(A4,  2.3125, SX,  90), n(G4,  2.3750, SX,  85), n(F4,  2.4375, SX,  78),
+      n(A4,  2.5000, SX,  90), n(Bb4, 2.5625, SX,  93), n(A4,  2.6250, SX,  88), n(G4,  2.6875, SX,  82),
+      n(Bb4, 2.7500, SX,  93), n(Cs5, 2.8125, SX,  97), n(Bb4, 2.8750, SX,  90), n(A4,  2.9375, SX,  85),
 
-      // Bar 3: mirrors the scale ascent/descent, ends on A4 (3rd below C#5)
-      n(Bb3, 3.0000, SX,  82), n(Cs4, 3.0625, SX,  78), n(D4,  3.1250, SX,  78), n(E4,  3.1875, SX,  78),
-      n(F4,  3.2500, SX,  82), n(G4,  3.3125, SX,  82), n(A4,  3.3750, SX,  88), n(Bb4, 3.4375, SX,  88),
-      n(A4,  3.5000, SX,  82), n(G4,  3.5625, SX,  78), n(F4,  3.6250, SX,  78), n(E4,  3.6875, SX,  75),
-      n(D4,  3.7500, SX,  75), n(E4,  3.8125, SX,  75), n(F4,  3.8750, SX,  78), n(A4,  3.9375, SX,  82)
+      // Bar 3: mirrors bar 0 hook return, ends on A4 (3rd below C#5 leading tone)
+      n(Bb4, 3.0000, QT,  85),
+      n(A4,  3.2500, SX,  78), n(G4,  3.3125, SX,  75), n(F4,  3.3750, EI,  78),
+      n(E4,  3.5000, SX,  72), n(F4,  3.5625, SX,  75), n(G4,  3.6250, SX,  80), n(A4,  3.6875, SX,  85),
+      n(Bb4, 3.7500, SX,  88), n(Cs5, 3.8125, SX,  93), n(Bb4, 3.8750, SX,  88), n(A4,  3.9375, SX,  83)
     );
 
     // ── Track 3: Bass (Triangle) — driving 8th-note root/fifth, i–V–i–V ─────
