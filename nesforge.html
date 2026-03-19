@@ -586,12 +586,16 @@ body.mobile-mode #mobile-app { display: flex !important; }
 </div>
 
 <!-- iOS audio unlock overlay — shown only on touch devices, removed on first tap -->
+<style>@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}</style>
 <div id="audio-unlock-overlay" style="display:none;position:fixed;inset:0;z-index:99999;
-  background:#1a1a2e;display:flex;flex-direction:column;align-items:center;
+  background:#1a1a2e;flex-direction:column;align-items:center;
   justify-content:center;gap:16px;touch-action:manipulation;">
   <div style="font:10px 'Press Start 2P',monospace;color:#00ccaa;letter-spacing:2px;">NESFORGE</div>
-  <div style="font:7px 'Press Start 2P',monospace;color:#ffeecc;animation:blink 1s step-start infinite;">TAP TO START</div>
-  <style>@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}</style>
+  <div id="auo-prompt" style="font:7px 'Press Start 2P',monospace;color:#ffeecc;animation:blink 1s step-start infinite;">TAP TO START</div>
+  <div id="auo-status" style="font:5px 'Press Start 2P',monospace;color:#8888aa;max-width:260px;text-align:center;line-height:1.8;"></div>
+  <div style="font:5px 'Press Start 2P',monospace;color:#555577;max-width:260px;text-align:center;line-height:1.8;">
+    Make sure volume is up &amp; mute switch is off
+  </div>
 </div>
 
 <!-- MOBILE APP -->
@@ -5651,36 +5655,64 @@ const ExportEngine = {
       });
     }
 
-    // iOS Web Audio unlock — the ONLY reliable method is to create the AudioContext
-    // AND play a buffer SYNCHRONOUSLY inside a real user gesture (no .then() chains).
-    // Show a tap-to-start overlay on touch devices; dismiss it with a synchronous unlock.
+    // iOS Web Audio unlock — must create AudioContext AND play audio SYNCHRONOUSLY
+    // inside a real user gesture. Show overlay on touch devices only.
     (function() {
-      var overlay = document.getElementById('audio-unlock-overlay');
+      var overlay  = document.getElementById('audio-unlock-overlay');
+      var statusEl = document.getElementById('auo-status');
+      var promptEl = document.getElementById('auo-prompt');
       var _unlocked = false;
+
+      function _setStatus(msg, color) {
+        if (statusEl) { statusEl.textContent = msg; statusEl.style.color = color || '#8888aa'; }
+      }
 
       function _syncUnlock() {
         if (_unlocked) return;
         _unlocked = true;
+        _setStatus('Unlocking audio...', '#ffeecc');
+        if (promptEl) promptEl.style.animationName = 'none';
+
         try {
-          // Create context synchronously in gesture — this is what iOS requires
           if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          var ctx = audioCtx;
-          ctx.resume();
-          // Play a short audible beep — confirms unlock AND tests device audio.
-          // If you hear this, Web Audio is working. If not, device audio is blocked
-          // (silent switch, DuckDuckGo audio block, etc.).
-          var osc = ctx.createOscillator();
-          var g   = ctx.createGain();
+          audioCtx.resume();
+
+          // Play audible beep — confirms audio unlock AND tests device audio output
+          var osc = audioCtx.createOscillator();
+          var g   = audioCtx.createGain();
           osc.frequency.value = 523.25; // C5
-          g.gain.setValueAtTime(0.25, ctx.currentTime);
-          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+          g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
           osc.connect(g);
-          g.connect(ctx.destination);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.2);
-          getMasterGain(); // warm up master gain while we're in the gesture
-        } catch(e) {}
-        if (overlay) overlay.style.display = 'none';
+          g.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.25);
+          getMasterGain();
+
+          _setStatus('state: ' + audioCtx.state, '#aaaacc');
+
+          // Watch for context to actually run
+          var _watch = setInterval(function() {
+            if (!audioCtx) { clearInterval(_watch); return; }
+            _setStatus('state: ' + audioCtx.state + ' | t=' + audioCtx.currentTime.toFixed(3), '#aaaacc');
+            if (audioCtx.state === 'running') {
+              clearInterval(_watch);
+              _setStatus('AUDIO OK', '#00ccaa');
+              setTimeout(function() {
+                if (overlay) overlay.style.display = 'none';
+              }, 400);
+            }
+          }, 100);
+
+          // Dismiss anyway after 3s even if state never updates
+          setTimeout(function() {
+            clearInterval(_watch);
+            if (overlay) overlay.style.display = 'none';
+          }, 3000);
+
+        } catch(e) {
+          _setStatus('Error: ' + e.message, '#ff4444');
+        }
       }
 
       // Show overlay only on touch devices
@@ -5693,10 +5725,10 @@ const ExportEngine = {
         overlay.addEventListener('click', _syncUnlock);
       }
 
-      // Also re-unlock on every gesture in case iOS suspends after interruption (calls, bg)
+      // Re-unlock on every gesture in case iOS suspends after interruption
       function _relock() {
         if (!audioCtx) return;
-        if (audioCtx.state === 'suspended') {
+        if (audioCtx.state !== 'running') {
           audioCtx.resume();
           try {
             var buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
