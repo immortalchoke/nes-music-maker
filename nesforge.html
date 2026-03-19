@@ -585,6 +585,15 @@ body.mobile-mode #mobile-app { display: flex !important; }
   <div id="export-modal" style="display:none;"></div>
 </div>
 
+<!-- iOS audio unlock overlay — shown only on touch devices, removed on first tap -->
+<div id="audio-unlock-overlay" style="display:none;position:fixed;inset:0;z-index:99999;
+  background:#1a1a2e;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:16px;touch-action:manipulation;">
+  <div style="font:10px 'Press Start 2P',monospace;color:#00ccaa;letter-spacing:2px;">NESFORGE</div>
+  <div style="font:7px 'Press Start 2P',monospace;color:#ffeecc;animation:blink 1s step-start infinite;">TAP TO START</div>
+  <style>@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}</style>
+</div>
+
 <!-- MOBILE APP -->
 <div id="mobile-app">
 
@@ -4181,17 +4190,15 @@ const Sequencer = {
 
   play() {
     if (this._playing) return;
-    ensureAudioCtxRunning().then(ctx => {
-      if (this._playing) return; // guard against double-fire
-      this._playing = true;
-      this._playStartBar = ProjectState.loopEnabled ? ProjectState.loopStart : ProjectState.playheadBar;
-      // Read currentTime AFTER resume resolves so it's never frozen
-      this._playStartTime = ctx.currentTime + 0.1;
-      this._scheduledUpToTime = this._playStartTime;
-      this._timer = setInterval(() => this._tick(), this.TICK_MS);
-      this._raf();
-      this._updatePlayBtn(true);
-    });
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    this._playing = true;
+    this._playStartBar = ProjectState.loopEnabled ? ProjectState.loopStart : ProjectState.playheadBar;
+    this._playStartTime = ctx.currentTime + 0.1;
+    this._scheduledUpToTime = this._playStartTime;
+    this._timer = setInterval(() => this._tick(), this.TICK_MS);
+    this._raf();
+    this._updatePlayBtn(true);
   },
 
   stop() {
@@ -5636,41 +5643,58 @@ const ExportEngine = {
       });
     }
 
-    // iOS Web Audio unlock — must happen inside a real user gesture.
-    // Listeners are kept alive permanently so re-lock after interruption (calls, bg) is handled.
+    // iOS Web Audio unlock — the ONLY reliable method is to create the AudioContext
+    // AND play a buffer SYNCHRONOUSLY inside a real user gesture (no .then() chains).
+    // Show a tap-to-start overlay on touch devices; dismiss it with a synchronous unlock.
     (function() {
-      var _unlocking = false;
-      function _unlockAudio() {
-        if (_unlocking) return;
-        var ctx = getAudioCtx();
-        // Already running — just warm up master gain and return
-        if (ctx.state === 'running') {
-          try { getMasterGain(); } catch(e) {}
-          return;
-        }
-        _unlocking = true;
-        ctx.resume().then(function() {
-          _unlocking = false;
-          // Play silent 1-sample buffer — required to fully unlock iOS Web Audio
-          try {
-            var silentBuf = ctx.createBuffer(1, 1, ctx.sampleRate);
-            var silentSrc = ctx.createBufferSource();
-            silentSrc.buffer = silentBuf;
-            silentSrc.connect(ctx.destination);
-            silentSrc.start(0);
-          } catch(e) {}
-          // Pre-warm master gain node while context is confirmed running
-          try { getMasterGain(); } catch(e) {}
-        }).catch(function() {
-          // resume() rejected — allow retry on next gesture
-          _unlocking = false;
-        });
+      var overlay = document.getElementById('audio-unlock-overlay');
+      var _unlocked = false;
+
+      function _syncUnlock() {
+        if (_unlocked) return;
+        _unlocked = true;
+        try {
+          // Create context synchronously in gesture — this is what iOS requires
+          if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          var ctx = audioCtx;
+          // Resume synchronously (no .then — stay in gesture stack)
+          ctx.resume();
+          // Play silent buffer synchronously — fully unlocks iOS Web Audio
+          var buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+          var src = ctx.createBufferSource();
+          src.buffer = buf;
+          src.connect(ctx.destination);
+          src.start(0);
+          getMasterGain(); // warm up master gain while we're in the gesture
+        } catch(e) {}
+        if (overlay) overlay.style.display = 'none';
       }
-      // Keep listeners alive permanently — iOS can re-suspend after interruptions
-      // useCapture:true catches events before anything else can swallow them
-      document.addEventListener('touchstart', _unlockAudio, true);
-      document.addEventListener('touchend',   _unlockAudio, true);
-      document.addEventListener('click',      _unlockAudio, true);
+
+      // Show overlay only on touch devices
+      if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        if (overlay) overlay.style.display = 'flex';
+        overlay.addEventListener('touchend', function(e) {
+          e.preventDefault();
+          _syncUnlock();
+        }, { passive: false });
+        overlay.addEventListener('click', _syncUnlock);
+      }
+
+      // Also re-unlock on every gesture in case iOS suspends after interruption (calls, bg)
+      function _relock() {
+        if (!audioCtx) return;
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+          try {
+            var buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+            var src = audioCtx.createBufferSource();
+            src.buffer = buf; src.connect(audioCtx.destination); src.start(0);
+          } catch(e) {}
+        }
+      }
+      document.addEventListener('touchstart', _relock, { capture: true, passive: true });
+      document.addEventListener('touchend',   _relock, { capture: true, passive: true });
+      document.addEventListener('click',      _relock, { capture: true, passive: true });
     })();
   });
 
