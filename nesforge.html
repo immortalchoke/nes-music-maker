@@ -50,11 +50,12 @@ select.lcd-select { background: transparent !important; border: none !important;
   display: none;
 }
 #panel-divider:hover, #panel-divider.dragging { background: #00b9be; }
-#arrangement-canvas { display: block; }
+#arrangement-canvas { display: block; touch-action: none; }
 #pianoroll-panel { height: 480px; min-height: 150px; border-top: var(--border); display: flex;
   flex-direction: column; flex-shrink: 0; }
-#pianoroll-canvas { flex: 1; display: block; }
-#velocity-canvas { height: 90px; display: block; border-top: var(--border); }
+#pianoroll-canvas { flex: 1; display: block; touch-action: none; }
+#velocity-canvas { height: 90px; display: block; border-top: var(--border); touch-action: none; }
+#panel-divider { touch-action: none; }
 .nes-btn {
   background: #15788c; color: #ffeecc; border: 2px solid #00b9be;
   font-family: 'Press Start 2P', monospace; font-size: 7px;
@@ -4405,30 +4406,34 @@ function wireDivider() {
   const divider = document.getElementById('panel-divider');
   const avPanel = document.getElementById('arrangement-panel');
   const prPanel = document.getElementById('pianoroll-panel');
-  divider.addEventListener('mousedown', (e) => {
-    e.preventDefault();
+  function _startDividerDrag(startY) {
     divider.classList.add('dragging');
-    const startY = e.clientY;
     const startAvH = avPanel.getBoundingClientRect().height;
     const startPrH = prPanel.getBoundingClientRect().height;
-    const onMove = (ev) => {
-      const delta = ev.clientY - startY;
-      const newAvH = Math.max(60, startAvH + delta);
-      const newPrH = Math.max(150, startPrH - delta);
+    const onMove = (clientY) => {
+      const delta = clientY - startY;
       avPanel.style.flex = 'none';
-      avPanel.style.height = newAvH + 'px';
-      prPanel.style.height = newPrH + 'px';
+      avPanel.style.height = Math.max(60, startAvH + delta) + 'px';
+      prPanel.style.height = Math.max(150, startPrH - delta) + 'px';
       AV.resize(); AV.draw();
       PR.resizeCanvases(); PR.draw(); PR.drawVelocity();
     };
     const onUp = () => {
       divider.classList.remove('dragging');
-      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mousemove', _mouseMove);
       document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', _touchMove);
+      document.removeEventListener('touchend', onUp);
     };
-    document.addEventListener('mousemove', onMove);
+    const _mouseMove = (ev) => onMove(ev.clientY);
+    const _touchMove = (ev) => { ev.preventDefault(); onMove(ev.touches[0].clientY); };
+    document.addEventListener('mousemove', _mouseMove);
     document.addEventListener('mouseup', onUp);
-  });
+    document.addEventListener('touchmove', _touchMove, { passive: false });
+    document.addEventListener('touchend', onUp);
+  }
+  divider.addEventListener('mousedown', (e) => { e.preventDefault(); _startDividerDrag(e.clientY); });
+  divider.addEventListener('touchstart', (e) => { e.preventDefault(); _startDividerDrag(e.touches[0].clientY); }, { passive: false });
 }
 
 function wireTransport() {
