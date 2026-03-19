@@ -750,29 +750,20 @@ body.mobile-mode #mobile-app { display: flex !important; }
     return ctx.resume().then(() => ctx).catch(() => ctx);
   }
 
-  // iOS WebKit audio unlock — must create context AND play a silent buffer
-  // inside a real touch/click gesture. Runs once on first interaction.
-  let _audioUnlocked = false;
-  function _unlockAudio() {
-    if (_audioUnlocked) return;
-    _audioUnlocked = true;
+  // _iosUnlock: call synchronously inside ANY user gesture to unlock Web Audio on iOS.
+  // Safe to call multiple times. Always resume + play silent buffer in gesture stack.
+  function _iosUnlock() {
     try {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const ctx = audioCtx;
-      // Resume suspended context
-      if (ctx.state === 'suspended') ctx.resume();
-      // Play a zero-length silent buffer — this is what actually unlocks iOS
-      const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
-      const src = ctx.createBufferSource();
+      audioCtx.resume(); // always attempt resume (handles 'suspended' and 'interrupted')
+      const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+      const src = audioCtx.createBufferSource();
       src.buffer = buf;
-      src.connect(ctx.destination);
+      src.connect(audioCtx.destination);
       src.start(0);
-      src.onended = () => { src.disconnect(); };
-    } catch (e) { /* silent fail */ }
+      getMasterGain(); // warm up gain graph while in gesture
+    } catch(e) {}
   }
-  ['touchstart', 'touchend', 'mousedown', 'keydown'].forEach(ev => {
-    document.addEventListener(ev, _unlockAudio, { once: false, passive: true, capture: true });
-  });
 
   const masterGain = { node: null };
   function getMasterGain() {
@@ -4190,15 +4181,28 @@ const Sequencer = {
 
   play() {
     if (this._playing) return;
-    const ctx = getAudioCtx();
-    if (ctx.state === 'suspended') ctx.resume();
     this._playing = true;
     this._playStartBar = ProjectState.loopEnabled ? ProjectState.loopStart : ProjectState.playheadBar;
-    this._playStartTime = ctx.currentTime + 0.1;
-    this._scheduledUpToTime = this._playStartTime;
-    this._timer = setInterval(() => this._tick(), this.TICK_MS);
-    this._raf();
     this._updatePlayBtn(true);
+    const ctx = getAudioCtx();
+    const _doStart = () => {
+      this._playStartTime = ctx.currentTime + 0.05;
+      this._scheduledUpToTime = this._playStartTime;
+      this._timer = setInterval(() => this._tick(), this.TICK_MS);
+      this._raf();
+    };
+    if (ctx.state === 'running') {
+      _doStart();
+    } else {
+      // Context not yet running (iOS unlocking) — defer until it transitions
+      ctx.resume();
+      ctx.onstatechange = () => {
+        if (ctx.state === 'running') {
+          ctx.onstatechange = null;
+          _doStart();
+        }
+      };
+    }
   },
 
   stop() {
@@ -4371,6 +4375,7 @@ function wireTransport() {
   document.getElementById('btn-undo').onclick = () => History.undo();
   document.getElementById('btn-redo').onclick = () => History.redo();
   document.getElementById('btn-play').onclick = () => {
+    _iosUnlock(); // must be synchronous in gesture — unlocks Web Audio on iOS
     if (Sequencer._playing) {
       Sequencer.stop();
     } else {
@@ -4925,21 +4930,20 @@ const ExportEngine = {
 
       // Play button
       document.getElementById('mob-play-btn').addEventListener('click', function() {
-        ensureAudioCtxRunning().then(function() {
-          if (typeof Sequencer === 'undefined') return;
-          if (Sequencer._playing) {
-            Sequencer.stop();
-            document.getElementById('mob-play-btn').textContent = '▶';
-            MobileUI._stopRaf();
-            document.getElementById('mob-playhead-fill').style.width = '0%';
-            MobileUI._lastActiveStep = -1;
-            document.querySelectorAll('.mob-step').forEach(s => s.classList.remove('active-step'));
-          } else {
-            Sequencer.play();
-            document.getElementById('mob-play-btn').textContent = '⏹';
-            MobileUI._startRaf();
-          }
-        });
+        _iosUnlock(); // synchronous unlock — must be in gesture stack for iOS
+        if (typeof Sequencer === 'undefined') return;
+        if (Sequencer._playing) {
+          Sequencer.stop();
+          document.getElementById('mob-play-btn').textContent = '▶';
+          MobileUI._stopRaf();
+          document.getElementById('mob-playhead-fill').style.width = '0%';
+          MobileUI._lastActiveStep = -1;
+          document.querySelectorAll('.mob-step').forEach(s => s.classList.remove('active-step'));
+        } else {
+          Sequencer.play();
+          document.getElementById('mob-play-btn').textContent = '⏹';
+          MobileUI._startRaf();
+        }
       });
 
       // Loop button
