@@ -587,7 +587,6 @@ body.mobile-mode #mobile-app { display: flex !important; }
   <!-- Transport bar -->
   <div id="mob-transport">
     <button id="mob-play-btn" class="mob-btn">▶</button>
-    <button id="mob-stop-btn" class="mob-btn">■</button>
     <button id="mob-tap-btn" class="mob-btn">TAP</button>
     <div id="mob-bpm-display">120</div>
     <button id="mob-loop-btn" class="mob-btn">LOOP</button>
@@ -4319,6 +4318,10 @@ const ExportEngine = {
           if (Sequencer._playing) {
             Sequencer.stop();
             document.getElementById('mob-play-btn').textContent = '▶';
+            MobileUI._stopRaf();
+            document.getElementById('mob-playhead-fill').style.width = '0%';
+            MobileUI._lastActiveStep = -1;
+            document.querySelectorAll('.mob-step').forEach(s => s.classList.remove('active-step'));
           } else {
             Sequencer.play();
             document.getElementById('mob-play-btn').textContent = '⏹';
@@ -4331,19 +4334,6 @@ const ExportEngine = {
         } else {
           doPlay();
         }
-      });
-
-      // Stop button
-      document.getElementById('mob-stop-btn').addEventListener('click', async () => {
-        const ctx = getAudioCtx();
-        if (ctx.state === 'suspended') await ctx.resume();
-        if (typeof Sequencer !== 'undefined') Sequencer.stop();
-        document.getElementById('mob-play-btn').textContent = '▶';
-        this._stopRaf();
-        document.getElementById('mob-playhead-fill').style.width = '0%';
-        this._lastActiveStep = -1;
-        const steps = document.querySelectorAll('.mob-step');
-        steps.forEach(s => s.classList.remove('active-step'));
       });
 
       // Loop button
