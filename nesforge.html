@@ -2046,6 +2046,25 @@ body.mobile-mode #mobile-app { display: flex !important; }
       }
     });
 
+    // iOS Safari doesn't fire dblclick from double-tap — detect manually via touchend
+    let _lastTap = null;
+    canvas.addEventListener('touchend', (e) => {
+      if (e.changedTouches.length !== 1) return;
+      const t = e.changedTouches[0];
+      const now = Date.now();
+      if (_lastTap && now - _lastTap.time < 300 &&
+          Math.abs(t.clientX - _lastTap.x) < 30 &&
+          Math.abs(t.clientY - _lastTap.y) < 30) {
+        _lastTap = null;
+        canvas.dispatchEvent(new MouseEvent('dblclick', {
+          bubbles: true, cancelable: true,
+          clientX: t.clientX, clientY: t.clientY
+        }));
+      } else {
+        _lastTap = { time: now, x: t.clientX, y: t.clientY };
+      }
+    }, { passive: true });
+
     canvas.addEventListener('mousedown', (e) => {
       if (e.detail >= 2) return; // dblclick handled separately
       const ap = this.activePattern;
