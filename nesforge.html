@@ -3601,13 +3601,22 @@ const Sequencer = {
 
   play() {
     if (this._playing) return;
-    getAudioCtx().resume();
-    this._playing = true;
-    this._playStartBar = ProjectState.loopEnabled ? ProjectState.loopStart : ProjectState.playheadBar;
-    this._playStartTime = getAudioCtx().currentTime + 0.05;
-    this._scheduledUpToTime = this._playStartTime;
-    this._timer = setInterval(() => this._tick(), this.TICK_MS);
-    this._raf();
+    const ctx = getAudioCtx();
+    const _start = () => {
+      if (this._playing) return; // guard against double-fire
+      this._playing = true;
+      this._playStartBar = ProjectState.loopEnabled ? ProjectState.loopStart : ProjectState.playheadBar;
+      // Read currentTime AFTER resume resolves so it's never frozen
+      this._playStartTime = getAudioCtx().currentTime + 0.1;
+      this._scheduledUpToTime = this._playStartTime;
+      this._timer = setInterval(() => this._tick(), this.TICK_MS);
+      this._raf();
+    };
+    if (ctx.state === 'running') {
+      _start();
+    } else {
+      ctx.resume().then(_start).catch(_start);
+    }
   },
 
   stop() {
@@ -4581,10 +4590,11 @@ const ExportEngine = {
           velocity: 100
         };
         pat.notes.push(newNote);
-        // Preview sound
+        // Preview sound — wait for context to be running first
         try {
           const ctx = getAudioCtx();
-          playNote(track, newNote, ctx.currentTime + 0.01);
+          const _preview = () => { try { playNote(track, newNote, getAudioCtx().currentTime + 0.05); } catch(e) {} };
+          if (ctx.state === 'running') { _preview(); } else { ctx.resume().then(_preview); }
         } catch (e) { /* silent fail */ }
       }
       this._renderGrid();
@@ -4970,6 +4980,9 @@ const ExportEngine = {
             silentSrc.connect(ctx.destination);
             silentSrc.start(0);
           } catch(e) {}
+          // Pre-warm master gain node while context is confirmed running —
+          // avoids creating it later on a potentially suspended context
+          try { getMasterGain(); } catch(e) {}
           // Remove listeners — only need to unlock once
           document.removeEventListener('touchstart', _unlockAudio, true);
           document.removeEventListener('touchend',   _unlockAudio, true);
