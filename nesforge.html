@@ -4099,17 +4099,17 @@ const ExportEngine = {
 };
 
   function createDemoState() {
-    // "Vestibule of Dark" — slow neoclassical / Castlevania 3 + Mr. Crowley style
-    // 76 BPM · D minor · 8 bars · looped
-    ProjectState.bpm = 76;
+    // "Lair of Shadows" — neoclassical metal · Castlevania 3 style
+    // 174 BPM · D harmonic minor (D E F G A Bb C#) · 4 bars · looped
+    ProjectState.bpm = 174;
     ProjectState.key = 'D';
     ProjectState.scale = 'Minor';
     ProjectState.loopStart = 0;
-    ProjectState.loopEnd = 8;
+    ProjectState.loopEnd = 4;
     ProjectState.loopEnabled = true;
 
     // Update LCD displays (buildTopBar already ran)
-    const _bi = document.getElementById('bpm-input');   if (_bi) _bi.value = 76;
+    const _bi = document.getElementById('bpm-input');   if (_bi) _bi.value = 174;
     const _ks = document.getElementById('key-sel');     if (_ks) _ks.value = 'D';
     const _ss = document.getElementById('scale-sel');   if (_ss) _ss.value = 'Minor';
 
@@ -4117,172 +4117,109 @@ const ExportEngine = {
     const n = (pitch, start, dur, vel) => ({ pitch, start, duration: dur, velocity: vel });
     const SX = 0.0625; // 16th note
     const EI = 0.125;  // 8th note
-    const QT = 0.25;   // quarter note
-    const HF = 0.5;    // half note
 
-    // MIDI pitch constants — D minor: D E F G A Bb C
-    const A1=33, Bb1=34, C2=36, D2=38, E2=40, F2=41, G2=43, A2=45,
-          G3=55, A3=57, Bb3=58,
-          C4=60, Cs4=61, D4=62, Eb4=63, E4=64, F4=65, Fs4=66, G4=67, A4=69, Bb4=70, B4=71,
-          C5=72, Cs5=73, D5=74, E5=76,
-          D3=50;
-
-    // ── Chord map (8 bars): Dm | C | Bb | A(V) | Dm | Gm | A(V) | Dm ────────
-    // Progression: i – bVII – bVI – V – i – iv – V – i
-    // Mr. Crowley organ feel; raised 7th (C#) on A bars for harmonic minor drama
+    // MIDI constants — D harmonic minor: D E F G A Bb C# (raised 7th)
+    const A1=33, D2=38, E2=40, A2=45,
+          A3=57, Bb3=58,
+          Cs4=61, D4=62, E4=64, F4=65, G4=67, Ab4=68, A4=69, Bb4=70, B4=71,
+          Cs5=73, D5=74, E5=76, F5=77;
 
     // ── Track 1: Lead (Pulse 25% · Fuzz Med · Vibrato Low) ──────────────────
+    // 4 bars of relentless 16th-note harmonic minor runs and dim7 arpeggios
     const lead = addTrack('pulse25', 'Lead');
     lead.fuzz = 'med'; lead.vibrato = 'low';
-    const leadPat = addPattern(lead.id, 0, 8);
+    const leadPat = addPattern(lead.id, 0, 4);
 
     leadPat.notes.push(
-      // Bar 0 – Dm: open on A4, step down through scale, leap to D5
-      n(A4,  0.000, QT, 115), n(G4,  0.250, EI, 100), n(F4,  0.375, EI, 100),
-      n(E4,  0.500, EI, 100), n(F4,  0.625, EI, 100),
-      n(D5,  0.750, EI, 115), n(A4,  0.875, EI, 105),
+      // Bar 0: descend full D harmonic minor D5→D4, then dim7 arp (F-Ab-B-D) up, step back
+      n(D5,  0.0000, SX, 115), n(Cs5, 0.0625, SX, 110), n(Bb4, 0.1250, SX, 110), n(A4,  0.1875, SX, 110),
+      n(G4,  0.2500, SX, 110), n(F4,  0.3125, SX, 110), n(E4,  0.3750, SX, 110), n(D4,  0.4375, SX, 115),
+      n(F4,  0.5000, SX, 110), n(Ab4, 0.5625, SX, 110), n(B4,  0.6250, SX, 110), n(D5,  0.6875, SX, 115),
+      n(Cs5, 0.7500, SX, 110), n(A4,  0.8125, SX, 105), n(G4,  0.8750, SX, 105), n(F4,  0.9375, SX, 105),
 
-      // Bar 1 – C: step up to C5, modal descent with B natural
-      n(C5,  1.000, QT, 110), n(B4,  1.250, EI,  95), n(A4,  1.375, EI,  95),
-      n(G4,  1.500, EI, 100), n(A4,  1.625, EI, 100),
-      n(G4,  1.750, EI,  95), n(F4,  1.875, EI,  95),
+      // Bar 1: step up through scale, aug-2nd punch Bb→C# (harmonic minor signature), peak E5
+      n(E4,  1.0000, SX, 110), n(F4,  1.0625, SX, 110), n(G4,  1.1250, SX, 110), n(A4,  1.1875, SX, 115),
+      n(Bb4, 1.2500, SX, 115), n(A4,  1.3125, SX, 110), n(G4,  1.3750, SX, 110), n(A4,  1.4375, SX, 110),
+      n(Bb4, 1.5000, SX, 115), n(Cs5, 1.5625, SX, 120), n(D5,  1.6250, SX, 120), n(E5,  1.6875, SX, 125),
+      n(D5,  1.7500, SX, 120), n(Cs5, 1.8125, SX, 115), n(A4,  1.8750, SX, 110), n(G4,  1.9375, SX, 110),
 
-      // Bar 2 – Bb: ascend to Bb4 peak
-      n(F4,  2.000, QT, 100), n(G4,  2.250, EI, 100), n(A4,  2.375, EI, 105),
-      n(Bb4, 2.500, QT, 112),
-      n(A4,  2.750, EI, 100), n(G4,  2.875, EI,  95),
+      // Bar 2: continuous climb to F5 peak, full descent back down
+      n(F4,  2.0000, SX, 110), n(G4,  2.0625, SX, 110), n(A4,  2.1250, SX, 110), n(Bb4, 2.1875, SX, 115),
+      n(Cs5, 2.2500, SX, 115), n(D5,  2.3125, SX, 115), n(E5,  2.3750, SX, 120), n(F5,  2.4375, SX, 125),
+      n(E5,  2.5000, SX, 120), n(D5,  2.5625, SX, 115), n(Cs5, 2.6250, SX, 115), n(Bb4, 2.6875, SX, 110),
+      n(A4,  2.7500, SX, 110), n(G4,  2.8125, SX, 105), n(F4,  2.8750, SX, 105), n(E4,  2.9375, SX, 105),
 
-      // Bar 3 – A major (V): raised C# for harmonic minor tension, peak E5
-      n(A4,  3.000, QT, 110),
-      n(Cs5, 3.250, EI, 115), n(E5,  3.375, EI, 120),
-      n(D5,  3.500, QT, 110),
-      n(Cs5, 3.750, EI, 110), n(B4,  3.875, EI, 105),
-
-      // Bar 4 – Dm: return, sustained A4 then arpeggio leap
-      n(A4,  4.000, HF, 110),
-      n(F4,  4.500, EI, 100), n(G4,  4.625, EI, 100),
-      n(A4,  4.750, EI, 105), n(D5,  4.875, EI, 115),
-
-      // Bar 5 – Gm: descend from D5 through G minor
-      n(D5,  5.000, QT, 110),
-      n(C5,  5.250, EI, 100), n(Bb4, 5.375, EI, 100),
-      n(A4,  5.500, QT, 100),
-      n(G4,  5.750, EI,  95), n(F4,  5.875, EI,  95),
-
-      // Bar 6 – A major (V): chromatic climb to peak E5, maximum tension
-      n(E4,  6.000, EI, 100), n(F4,  6.125, EI, 100),
-      n(Fs4, 6.250, EI, 105), n(G4,  6.375, EI, 105),
-      n(A4,  6.500, QT, 110),
-      n(Cs5, 6.750, EI, 115), n(E5,  6.875, EI, 120),
-
-      // Bar 7 – Dm: baroque cascade down, resolves back into loop
-      n(D5,  7.000, EI, 115), n(C5,  7.125, EI, 110),
-      n(Bb4, 7.250, EI, 105), n(A4,  7.375, EI, 100),
-      n(G4,  7.500, EI,  95), n(F4,  7.625, EI,  95),
-      n(E4,  7.750, EI,  90), n(D4,  7.875, EI, 100)
+      // Bar 3: ascend full harmonic minor D4→D5, descend, end on C#5 leading tone → loops to D5
+      n(D4,  3.0000, SX, 115), n(E4,  3.0625, SX, 110), n(F4,  3.1250, SX, 110), n(G4,  3.1875, SX, 110),
+      n(A4,  3.2500, SX, 115), n(Bb4, 3.3125, SX, 115), n(Cs5, 3.3750, SX, 120), n(D5,  3.4375, SX, 120),
+      n(Cs5, 3.5000, SX, 115), n(Bb4, 3.5625, SX, 110), n(A4,  3.6250, SX, 110), n(G4,  3.6875, SX, 105),
+      n(F4,  3.7500, SX, 105), n(G4,  3.8125, SX, 105), n(A4,  3.8750, SX, 110), n(Cs5, 3.9375, SX, 115)
     );
 
     // ── Track 2: Harmony (Pulse 50% · Vibrato Low) — parallel diatonic 3rds ─
+    // Every note is the diatonic 3rd below the lead in D harmonic minor
     const harm = addTrack('pulse50', 'Harmony');
     harm.vibrato = 'low';
-    const harmPat = addPattern(harm.id, 0, 8);
+    const harmPat = addPattern(harm.id, 0, 4);
 
     harmPat.notes.push(
-      // Bar 0 – Dm: diatonic 3rds below lead (D minor)
-      n(F4,  0.000, QT,  85), n(E4,  0.250, EI,  75), n(D4,  0.375, EI,  75),
-      n(C4,  0.500, EI,  75), n(D4,  0.625, EI,  75),
-      n(Bb4, 0.750, EI,  85), n(F4,  0.875, EI,  80),
+      // Bar 0: 3rds below (scale + dim7 section stays as dim7 a 3rd lower)
+      n(Bb4, 0.0000, SX,  82), n(A4,  0.0625, SX,  78), n(G4,  0.1250, SX,  78), n(F4,  0.1875, SX,  78),
+      n(E4,  0.2500, SX,  78), n(D4,  0.3125, SX,  78), n(Cs4, 0.3750, SX,  78), n(Bb3, 0.4375, SX,  82),
+      n(D4,  0.5000, SX,  78), n(F4,  0.5625, SX,  78), n(Ab4, 0.6250, SX,  78), n(B4,  0.6875, SX,  82),
+      n(A4,  0.7500, SX,  78), n(F4,  0.8125, SX,  75), n(E4,  0.8750, SX,  75), n(D4,  0.9375, SX,  75),
 
-      // Bar 1 – C: 3rds below (C major context)
-      n(A4,  1.000, QT,  80), n(G4,  1.250, EI,  70), n(F4,  1.375, EI,  70),
-      n(E4,  1.500, EI,  75), n(F4,  1.625, EI,  75),
-      n(E4,  1.750, EI,  70), n(D4,  1.875, EI,  70),
+      // Bar 1: mirrors the aug-2nd climb, peaks at C#5
+      n(Cs4, 1.0000, SX,  78), n(D4,  1.0625, SX,  78), n(E4,  1.1250, SX,  78), n(F4,  1.1875, SX,  82),
+      n(G4,  1.2500, SX,  82), n(F4,  1.3125, SX,  78), n(E4,  1.3750, SX,  78), n(F4,  1.4375, SX,  78),
+      n(G4,  1.5000, SX,  82), n(A4,  1.5625, SX,  88), n(Bb4, 1.6250, SX,  88), n(Cs5, 1.6875, SX,  92),
+      n(Bb4, 1.7500, SX,  88), n(A4,  1.8125, SX,  82), n(F4,  1.8750, SX,  78), n(E4,  1.9375, SX,  78),
 
-      // Bar 2 – Bb: 3rds below (D minor diatonic)
-      n(D4,  2.000, QT,  80), n(E4,  2.250, EI,  75), n(F4,  2.375, EI,  75),
-      n(G4,  2.500, QT,  82),
-      n(F4,  2.750, EI,  75), n(E4,  2.875, EI,  70),
+      // Bar 2: mirrors the F5 climb and descent, peaks at D5
+      n(D4,  2.0000, SX,  78), n(E4,  2.0625, SX,  78), n(F4,  2.1250, SX,  78), n(G4,  2.1875, SX,  82),
+      n(A4,  2.2500, SX,  82), n(Bb4, 2.3125, SX,  82), n(Cs5, 2.3750, SX,  88), n(D5,  2.4375, SX,  92),
+      n(Cs5, 2.5000, SX,  88), n(Bb4, 2.5625, SX,  82), n(A4,  2.6250, SX,  82), n(G4,  2.6875, SX,  78),
+      n(F4,  2.7500, SX,  78), n(E4,  2.8125, SX,  75), n(D4,  2.8750, SX,  75), n(Cs4, 2.9375, SX,  75),
 
-      // Bar 3 – A major: major 3rds below (harmonic minor context)
-      n(Fs4, 3.000, QT,  85),
-      n(A4,  3.250, EI,  90), n(Cs5, 3.375, EI,  95),
-      n(B4,  3.500, QT,  88),
-      n(A4,  3.750, EI,  85), n(G4,  3.875, EI,  80),
-
-      // Bar 4 – Dm: 3rds below
-      n(F4,  4.000, HF,  80),
-      n(D4,  4.500, EI,  75), n(E4,  4.625, EI,  75),
-      n(F4,  4.750, EI,  80), n(Bb4, 4.875, EI,  85),
-
-      // Bar 5 – Gm: 3rds below (G minor context, Eb on G)
-      n(Bb4, 5.000, QT,  82),
-      n(A4,  5.250, EI,  75), n(G4,  5.375, EI,  75),
-      n(F4,  5.500, QT,  78),
-      n(Eb4, 5.750, EI,  72), n(D4,  5.875, EI,  70),
-
-      // Bar 6 – A major: hold C#4 under chromatic run, then join the climb
-      n(Cs4, 6.000, HF,  78),
-      n(Fs4, 6.500, QT,  85),
-      n(A4,  6.750, EI,  90), n(Cs5, 6.875, EI,  95),
-
-      // Bar 7 – Dm: parallel cascade 3rds below lead
-      n(Bb4, 7.000, EI,  85), n(A4,  7.125, EI,  80),
-      n(G4,  7.250, EI,  80), n(F4,  7.375, EI,  75),
-      n(E4,  7.500, EI,  75), n(D4,  7.625, EI,  70),
-      n(C4,  7.750, EI,  70), n(Bb3, 7.875, EI,  75)
+      // Bar 3: mirrors the scale ascent/descent, ends on A4 (3rd below C#5)
+      n(Bb3, 3.0000, SX,  82), n(Cs4, 3.0625, SX,  78), n(D4,  3.1250, SX,  78), n(E4,  3.1875, SX,  78),
+      n(F4,  3.2500, SX,  82), n(G4,  3.3125, SX,  82), n(A4,  3.3750, SX,  88), n(Bb4, 3.4375, SX,  88),
+      n(A4,  3.5000, SX,  82), n(G4,  3.5625, SX,  78), n(F4,  3.6250, SX,  78), n(E4,  3.6875, SX,  75),
+      n(D4,  3.7500, SX,  75), n(E4,  3.8125, SX,  75), n(F4,  3.8750, SX,  78), n(A4,  3.9375, SX,  82)
     );
 
-    // ── Track 3: Bass (Triangle) — slow quarter-note root/fifth ─────────────
+    // ── Track 3: Bass (Triangle) — driving 8th-note root/fifth, i–V–i–V ─────
     const bass = addTrack('triangle', 'Bass');
-    const bassPat = addPattern(bass.id, 0, 8);
-    // Each bar: root–fifth–root–fifth (quarter notes, stately pace)
-    [
-      [D2, A2],  // Bar 0: Dm
-      [C2, G2],  // Bar 1: C
-      [Bb1, F2], // Bar 2: Bb
-      [A1, E2],  // Bar 3: A
-      [D2, A2],  // Bar 4: Dm
-      [G2, D3],  // Bar 5: Gm
-      [A1, E2],  // Bar 6: A
-      [D2, A2],  // Bar 7: Dm
-    ].forEach(([root, fifth], bar) => {
-      for (let b = 0; b < 4; b++)
-        bassPat.notes.push(n(b % 2 === 0 ? root : fifth, bar + b * QT, QT, 100));
+    const bassPat = addPattern(bass.id, 0, 4);
+    [[D2, A2], [A1, E2], [D2, A2], [A1, E2]].forEach(([root, fifth], bar) => {
+      for (let e = 0; e < 8; e++)
+        bassPat.notes.push(n(e % 2 === 0 ? root : fifth, bar + e * EI, EI, 105));
     });
 
-    // ── Track 4: Arp (Chord · organ-style ascending arpeggios) ──────────────
+    // ── Track 4: Arp (Chord · 8th-note Dm/A arpeggio bed) ───────────────────
     const arp = addTrack('chord', 'Arp');
-    const arpPat = addPattern(arp.id, 0, 8);
-    // Quarter-note ascent through each chord — slow organ pulse
-    [
-      [D4,  F4,  A4,  D5 ],  // Bar 0: Dm
-      [C4,  E4,  G4,  C5 ],  // Bar 1: C
-      [Bb3, D4,  F4,  Bb4],  // Bar 2: Bb
-      [A3,  Cs4, E4,  A4 ],  // Bar 3: A
-      [D4,  F4,  A4,  D5 ],  // Bar 4: Dm
-      [G3,  Bb3, D4,  G4 ],  // Bar 5: Gm
-      [A3,  Cs4, E4,  A4 ],  // Bar 6: A
-      [D4,  F4,  A4,  D5 ],  // Bar 7: Dm
-    ].forEach((chord, bar) => {
-      for (let i = 0; i < 4; i++)
-        arpPat.notes.push(n(chord[i], bar + i * QT, QT, 55));
+    const arpPat = addPattern(arp.id, 0, 4);
+    [[D4, F4, A4, D5], [A3, Cs4, E4, A4], [D4, F4, A4, D5], [A3, Cs4, E4, A4]].forEach((chord, bar) => {
+      for (let i = 0; i < 8; i++)
+        arpPat.notes.push(n(chord[i % 4], bar + i * EI, EI, 62));
     });
 
-    // ── Track 5: Drums (PCM7 · minimal half-time) ───────────────────────────
+    // ── Track 5: Drums (PCM7 · aggressive double-kick metal) ────────────────
     const drums = addTrack('pcm7', 'Drums');
-    const drumPat = addPattern(drums.id, 0, 8);
+    const drumPat = addPattern(drums.id, 0, 4);
     const KICK=36, SNARE=38, HAT=42;
-    for (let bar = 0; bar < 8; bar++) {
-      // Quarter-note hi-hats (stately, not busy)
-      for (let b = 0; b < 4; b++)
-        drumPat.notes.push(n(HAT, bar + b * QT, SX, 65));
-      // Kick: beat 1
-      drumPat.notes.push(n(KICK, bar + 0.000, SX, 115));
-      // Snare: beat 3 — half-time feel
-      drumPat.notes.push(n(SNARE, bar + 0.500, SX, 100));
-      // Ghost kick on "and" of beat 2 on odd bars for slight drive
-      if (bar % 2 === 1)
-        drumPat.notes.push(n(KICK, bar + 0.375, SX, 78));
+    for (let bar = 0; bar < 4; bar++) {
+      // 16th-note hi-hats
+      for (let s = 0; s < 16; s++)
+        drumPat.notes.push(n(HAT, bar + s * SX, SX, 70));
+      // Double-kick feel: beat 1, and-of-2, beat 3, and-of-4
+      drumPat.notes.push(n(KICK, bar + 0.000, SX, 120));
+      drumPat.notes.push(n(KICK, bar + 0.375, SX, 110));
+      drumPat.notes.push(n(KICK, bar + 0.500, SX, 120));
+      drumPat.notes.push(n(KICK, bar + 0.875, SX, 110));
+      // Snare on beats 2 and 4
+      drumPat.notes.push(n(SNARE, bar + 0.250, SX, 115));
+      drumPat.notes.push(n(SNARE, bar + 0.750, SX, 115));
     }
   }
 
