@@ -741,6 +741,30 @@ body.mobile-mode #mobile-app { display: flex !important; }
     return ctx.resume().then(() => ctx).catch(() => ctx);
   }
 
+  // iOS WebKit audio unlock — must create context AND play a silent buffer
+  // inside a real touch/click gesture. Runs once on first interaction.
+  let _audioUnlocked = false;
+  function _unlockAudio() {
+    if (_audioUnlocked) return;
+    _audioUnlocked = true;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = audioCtx;
+      // Resume suspended context
+      if (ctx.state === 'suspended') ctx.resume();
+      // Play a zero-length silent buffer — this is what actually unlocks iOS
+      const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+      src.onended = () => { src.disconnect(); };
+    } catch (e) { /* silent fail */ }
+  }
+  ['touchstart', 'touchend', 'mousedown', 'keydown'].forEach(ev => {
+    document.addEventListener(ev, _unlockAudio, { once: false, passive: true, capture: true });
+  });
+
   const masterGain = { node: null };
   function getMasterGain() {
     const ctx = getAudioCtx();
