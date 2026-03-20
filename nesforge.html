@@ -1722,6 +1722,11 @@ body.mobile-mode #mobile-app { display: flex !important; }
       const chordPanel = document.getElementById('chord-panel');
       chordPanel.style.display = track.channelType === 'chord' ? 'block' : 'none';
       if (track.channelType === 'chord' && typeof ChordTool !== 'undefined') ChordTool.renderPalette();
+      // Auto-engage chord mode for chord tracks, disengage for all others.
+      // This lets the user toggle it off on chord tracks if they want single notes.
+      this._chordMode = (track.channelType === 'chord');
+      const chordBtn = document.getElementById('btn-chord');
+      if (chordBtn) chordBtn.classList.toggle('engaged', this._chordMode);
     },
 
     resizeCanvases() {
@@ -2066,7 +2071,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       } else {
         const pos = posToNote(mx, my);
         if (!pos) return;
-        if (ap.track.channelType === 'chord' || PR._chordMode) {
+        if (PR._chordMode) {
           window._showChordInsertPopup(clientX, clientY, pos.pitch, pos.snappedStart);
           return;
         }
@@ -4146,7 +4151,9 @@ function buildTopBar() {
       if (!ap) { alert('Open a pattern in the piano roll first.'); return; }
       const root = document.getElementById('ci-root').value;
       const type = document.getElementById('ci-type').value;
-      const rootMIDI = Scales.NOTE_ORDER.indexOf(root) + 60;
+      // Preserve the octave of the clicked cell; fall back to octave 4 if none
+      const baseOctave = rootMidi != null ? Math.floor(rootMidi / 12) : 5;
+      const rootMIDI = Scales.NOTE_ORDER.indexOf(root) + baseOctave * 12;
       const intervals = CHORD_INTERVALS[type][numNotes];
       const chordNotes = intervals.map(i => rootMIDI + i);
       // Use provided snappedRelBar, or fall back to playhead position
