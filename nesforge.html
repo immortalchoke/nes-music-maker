@@ -1999,9 +1999,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
         ctx.rect(KEY_WIDTH, 0, W - KEY_WIDTH, H);
         ctx.clip();
 
-        // Cell highlight
-        ctx.fillStyle = 'rgba(0,185,190,0.45)';
-        ctx.fillRect(cellX, cellY, cellW, ROW_HEIGHT);
+        // Cell outline (half a 16th note wide)
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cellX + 0.5, cellY + 0.5, cellW / 2 - 1, ROW_HEIGHT - 1);
 
         ctx.restore();
       }
