@@ -2335,6 +2335,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
             dragState.note.start = newStart;
           }
 
+          this._pressedKey = newPitch;
           if (pitchChanged) previewNote(ap.track, newPitch, 0.125); // short stab per cell
           this.draw(); this.drawVelocity();
         }
@@ -2396,6 +2397,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
           if (firstSelected) this._stampDuration = firstSelected.duration;
         }
       }
+      this._pressedKey = null;
       dragState = null;
       this._dragState = null;
       if (this.activePattern) { this.draw(); this.drawVelocity(); }
@@ -2539,6 +2541,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
               dragState.note.pitch = newPitch;
               dragState.note.start = newStart;
             }
+            this._pressedKey = newPitch;
             if (pitchChanged) previewNote(ap.track, newPitch, 0.125); // short stab per cell
             this.draw(); this.drawVelocity();
           }
@@ -2588,6 +2591,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
         } else if (wasResized) {
           History._pushSnapshot(dragState.snapshot);
         }
+        this._pressedKey = null;
         dragState = null; this._dragState = null;
         if (this.activePattern) { this.draw(); this.drawVelocity(); }
       }
