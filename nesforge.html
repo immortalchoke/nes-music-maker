@@ -18,7 +18,9 @@
 }
 html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text);
   font-family: 'Press Start 2P', monospace; font-size: 14px; overflow: hidden;
-  letter-spacing: 0.05rem; max-width: 100vw; }
+  letter-spacing: 0.05rem; max-width: 100vw;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 #app { display: flex; flex-direction: column; height: 100vh; width: 100%; max-width: 100vw; }
 /* Landscape phone in desktop mode: allow vertical scroll so all panels are reachable */
 @media (max-height: 500px) and (pointer: coarse) {
@@ -50,11 +52,11 @@ select.lcd-select { background: transparent !important; border: none !important;
   display: none;
 }
 #panel-divider:hover, #panel-divider.dragging { background: #00b9be; }
-#arrangement-canvas { display: block; touch-action: none; }
+#arrangement-canvas { display: block; touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
 #pianoroll-panel { height: 480px; min-height: 150px; border-top: var(--border); display: flex;
   flex-direction: column; flex-shrink: 0; }
-#pianoroll-canvas { flex: 1; display: block; touch-action: none; }
-#velocity-canvas { height: 90px; display: block; border-top: var(--border); touch-action: none; }
+#pianoroll-canvas { flex: 1; display: block; touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+#velocity-canvas { height: 90px; display: block; border-top: var(--border); touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
 #panel-divider { touch-action: none; }
 .nes-btn {
   background: #15788c; color: #ffeecc; border: 2px solid #00b9be;
@@ -1775,30 +1777,35 @@ body.mobile-mode #mobile-app { display: flex !important; }
         }
 
         // Grid line
-        ctx.strokeStyle = '#15788c';
+        ctx.strokeStyle = 'rgba(0,185,190,0.35)';
         ctx.beginPath();
         ctx.moveTo(KEY_WIDTH, y); ctx.lineTo(W, y);
         ctx.stroke();
       }
 
-      // Beat/bar grid lines
+      // Vertical grid lines — 4-tier hierarchy: measure > beat > 8th > 16th
       if (ap) {
         const sixteenth = this.sixteenthWidth();
         const beats = ProjectState.timeSignature[0];
         for (let s = 0; s <= ap.pattern.lengthBars * beats * 4; s++) {
           const x = KEY_WIDTH + s * sixteenth - scrollX;
           if (x < KEY_WIDTH || x > W) continue;
-          const isBeat = s % 4 === 0;               // every bar (4 steps per bar)
-          const isPhrase = s % (beats * 4) === 0;   // every 4 bars
-          if (isPhrase) {
-            ctx.lineWidth = 1.5;
-            ctx.strokeStyle = '#15788c';
+          const isMeasure = s % (beats * 4) === 0;  // bar/measure line
+          const isBeat    = s % 4 === 0;            // quarter-note beat
+          const isEighth  = s % 2 === 0;            // 8th-note subdivision
+          // else: 16th-note subdivision
+          if (isMeasure) {
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(0,200,210,0.9)';
           } else if (isBeat) {
             ctx.lineWidth = 1;
-            ctx.strokeStyle = 'rgba(21,120,140,0.85)'; // bar/measure line — clearly visible
+            ctx.strokeStyle = 'rgba(0,185,190,0.7)';
+          } else if (isEighth) {
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(0,185,190,0.4)';
           } else {
             ctx.lineWidth = 1;
-            ctx.strokeStyle = 'rgba(21,120,140,0.4)';  // quarter-note subdivisions
+            ctx.strokeStyle = 'rgba(0,185,190,0.22)';
           }
           ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
         }
@@ -2050,35 +2057,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
       _onDblClick(e.clientX - rect.left, e.clientY - rect.top, e.clientX, e.clientY);
     });
 
-    // iOS Safari doesn't reliably fire dblclick from double-tap.
-    // Detect manually: two touchend events within 300ms and 30px.
-    // Call preventDefault() to suppress any native dblclick that might also fire.
-    let _lastTap = null;
-    canvas.addEventListener('touchend', (e) => {
-      if (e.changedTouches.length !== 1) { _prTouch = null; return; }
-      _prTouch = null; // clear scroll state
-      const t = e.changedTouches[0];
-      const now = Date.now();
-      if (_lastTap && now - _lastTap.time < 500 &&
-          Math.abs(t.clientX - _lastTap.x) < 44 &&
-          Math.abs(t.clientY - _lastTap.y) < 44) {
-        e.preventDefault(); // suppress native dblclick + follow-on mouse events
-        _lastTap = null;
-        const rect = canvas.getBoundingClientRect();
-        _onDblClick(t.clientX - rect.left, t.clientY - rect.top, t.clientX, t.clientY);
-      } else {
-        _lastTap = { time: now, x: t.clientX, y: t.clientY };
-        // Flash the row briefly so the user knows the first tap registered
-        const rect = canvas.getBoundingClientRect();
-        const mx = t.clientX - rect.left, my = t.clientY - rect.top;
-        if (mx >= this.KEY_WIDTH) {
-          const pos = posToNote(mx, my);
-          if (pos) {
-            _markPitchActive(pos.pitch, 0.08);
-          }
-        }
-      }
-    }, { passive: false });
+    // Double-tap state: recorded on touchend, checked on next touchstart.
+    // This sidesteps all synthetic-event race conditions — by the time tap2's
+    // touchstart fires, tap1's mouse events have already completed.
+    let _lastTapEnd = null;
 
     canvas.addEventListener('mousedown', (e) => {
       if (e.detail >= 2) return; // dblclick handled separately
@@ -2375,27 +2357,190 @@ body.mobile-mode #mobile-app { display: flex !important; }
       PR.draw();
     }, { passive: false });
 
-    // Touch scroll for piano roll (mobile/tablet — no mouse wheel available)
+    // ── Touch handling for piano roll ──────────────────────────────────────
+    //
+    // Double-tap strategy: record finger-lift in touchend (_lastTapEnd), detect
+    // on next touchstart. By the time tap2's touchstart fires, tap1's synthetic
+    // mouse events have ALREADY completed — no race condition possible.
+    //
+    // Note drag/resize: computed directly in touchmove — no synthetic events.
+    // Scroll: touchmove detects axis and scrolls; preventDefault only there.
+    // ────────────────────────────────────────────────────────────────────────
     let _prTouch = null;
+
     canvas.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1) return;
-      const t = e.touches[0];
-      _prTouch = { x: t.clientX, y: t.clientY, scrolling: false };
-    }, { passive: true });
+      if (e.touches.length > 1) return;
+      const t = e.changedTouches[0] || e.touches[0];
+      if (!t) return;
+      const now = Date.now();
+      const rect = canvas.getBoundingClientRect();
+      const mx = t.clientX - rect.left;
+      const my = t.clientY - rect.top;
+      const ap = this.activePattern;
+
+      // ── Double-tap detection: check _lastTapEnd (set in touchend) ──
+      // Viewport-relative distance for iOS Desktop Mode compatibility.
+      const dblDist = Math.max(60, window.innerWidth * 0.15);
+      if (_lastTapEnd && now - _lastTapEnd.time < 700 &&
+          Math.abs(t.clientX - _lastTapEnd.x) < dblDist &&
+          Math.abs(t.clientY - _lastTapEnd.y) < dblDist) {
+        e.preventDefault();
+        _lastTapEnd = null;
+        _prTouch = null;
+        dragState = null; this._dragState = null;
+        _onDblClick(mx, my, t.clientX, t.clientY);
+        return;
+      }
+
+      if (!ap || my < this.RULER_HEIGHT || mx < this.KEY_WIDTH) {
+        _prTouch = { x: t.clientX, y: t.clientY, scrolling: false, horiz: false };
+        return;
+      }
+
+      // ── Note hit? ──
+      const hit = hitTestNote(mx, my, _touchExpand);
+      if (hit) {
+        e.preventDefault(); // prevent mousedown overwriting dragState
+        _prTouch = { mode: 'note', startMx: mx, startMy: my };
+        const { note, x, w } = hit;
+        const snapshot = JSON.stringify(ProjectState);
+        const resizeZone = _touchExpand ? Math.max(6, _touchExpand * 2) : 6;
+        if (mx > x + w - resizeZone) {
+          const selMap = new Map();
+          for (const n of ap.pattern.notes) if (n.selected) selMap.set(n, n.duration);
+          selMap.set(note, note.duration);
+          dragState = { type: 'resize', note, startX: mx, origDur: note.duration, selMap, snapshot };
+        } else {
+          const wasSelected = !!note.selected;
+          if (!wasSelected) ap.pattern.notes.forEach(n => { n.selected = false; });
+          note.selected = true;
+          this._stampDuration = note.duration;
+          dragState = {
+            type: 'move', note,
+            startX: mx, startY: my,
+            origPitch: note.pitch, origStart: note.start,
+            lastPitch: note.pitch, lastStart: note.start,
+            hasMoved: false, movingSelection: wasSelected,
+            snapshot
+          };
+          this.draw();
+        }
+        return;
+      }
+
+      // ── Empty grid area: track for scroll ──
+      _prTouch = { x: t.clientX, y: t.clientY, scrolling: false, horiz: false };
+    }, { passive: false });
+
     canvas.addEventListener('touchmove', (e) => {
-      if (!_prTouch || e.touches.length !== 1) return;
+      if (!_prTouch) return;
+      if (e.touches.length > 1) return;
       const t = e.touches[0];
+
+      // ── Note drag / resize: compute directly (no synthetic events) ──
+      if (_prTouch.mode === 'note') {
+        if (!dragState) return;
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const mx = t.clientX - rect.left;
+        const my = t.clientY - rect.top;
+        const ap = this.activePattern;
+        if (!ap) return;
+        if (dragState.type === 'resize') {
+          const snap32 = 1 / 32;
+          const deltaBars = (mx - dragState.startX) / this.barWidth();
+          const snapDur = (orig) => Math.max(snap32, Math.round((orig + deltaBars) / snap32) * snap32);
+          for (const [n, origDur] of dragState.selMap) n.duration = snapDur(origDur);
+          this.draw();
+        } else if (dragState.type === 'move') {
+          const dx = mx - dragState.startX, dy = my - dragState.startY;
+          if (!dragState.hasMoved && Math.sqrt(dx*dx + dy*dy) < 4) return;
+          dragState.hasMoved = true;
+          const pos = posToNote(mx, my);
+          if (!pos) return;
+          const newStart = Math.max(0, pos.snappedStart);
+          const isNoise = isDrumChannel(ap.track.channelType);
+          const newPitch = isNoise
+            ? (this.DRUM_ROWS.includes(pos.pitch) ? pos.pitch : dragState.lastPitch)
+            : Math.max(0, Math.min(127, pos.pitch));
+          if (newPitch !== dragState.lastPitch || newStart !== dragState.lastStart) {
+            const pitchChanged = newPitch !== dragState.lastPitch;
+            const dStart = newStart - dragState.lastStart, dPitch = newPitch - dragState.lastPitch;
+            dragState.lastPitch = newPitch; dragState.lastStart = newStart;
+            if (dragState.movingSelection) {
+              ap.pattern.notes.forEach(n => {
+                if (n.selected) {
+                  n.start = Math.max(0, n.start + dStart);
+                  if (!isNoise) n.pitch = Math.max(0, Math.min(127, n.pitch + dPitch));
+                }
+              });
+            } else {
+              dragState.note.pitch = newPitch;
+              dragState.note.start = newStart;
+            }
+            if (pitchChanged) previewNote(ap.track, newPitch, dragState.note.duration);
+            this.draw(); this.drawVelocity();
+          }
+        }
+        return;
+      }
+
+      // ── Scroll ──
+      if (!_prTouch.x) return;
       const dx = t.clientX - _prTouch.x;
       const dy = t.clientY - _prTouch.y;
-      if (!_prTouch.scrolling && Math.abs(dy) < 6 && Math.abs(dx) < 6) return;
-      if (!_prTouch.scrolling) _prTouch.scrolling = Math.abs(dy) >= Math.abs(dx);
-      if (!_prTouch.scrolling) return;
-      e.preventDefault();
-      PR.scrollY = Math.max(0, Math.min(128 * PR.ROW_HEIGHT - canvas.height, PR.scrollY - dy));
+      if (!_prTouch.scrolling) {
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        e.preventDefault();
+        _prTouch.scrolling = true;
+        _prTouch.horiz = Math.abs(dx) > Math.abs(dy);
+        dragState = null; this._dragState = null; // cancel any pending mouse drag
+      } else {
+        e.preventDefault();
+      }
+      if (_prTouch.horiz) {
+        const ap2 = this.activePattern;
+        const maxSX = ap2 ? Math.max(0, (ap2.pattern.lengthBars + 1) * this.barWidth() - (canvas.width - this.KEY_WIDTH)) : 0;
+        PR.scrollX = Math.max(0, Math.min(maxSX, PR.scrollX - dx));
+      } else {
+        PR.scrollY = Math.max(0, Math.min(128 * PR.ROW_HEIGHT - canvas.height, PR.scrollY - dy));
+      }
       _prTouch.x = t.clientX; _prTouch.y = t.clientY;
       PR.draw();
     }, { passive: false });
-    // Note: touchend also clears _prTouch inside the double-tap handler above
+
+    canvas.addEventListener('touchend', (e) => {
+      const t = e.changedTouches[0];
+      // Determine if this touch was a true tap (no scroll, no drag, no resize)
+      const wasScrolling = _prTouch?.scrolling;
+      const wasDragged = !!(dragState?.hasMoved);
+      const wasResized = !!(dragState?.type === 'resize' && dragState.note.duration !== dragState.origDur);
+
+      if (_prTouch?.mode === 'note') {
+        // Single tap on note: play preview; drag was handled live in touchmove
+        if (dragState && !dragState.hasMoved && dragState.type === 'move') {
+          const ap = this.activePattern;
+          if (ap) previewNote(ap.track, dragState.note.pitch, dragState.note.duration);
+        }
+        if (wasDragged) {
+          History._pushSnapshot(dragState.snapshot);
+        } else if (wasResized) {
+          History._pushSnapshot(dragState.snapshot);
+        }
+        dragState = null; this._dragState = null;
+        if (this.activePattern) { this.draw(); this.drawVelocity(); }
+      }
+
+      // Record tap position for double-tap detection on next touchstart.
+      // Only record if this was a genuine tap (not a scroll, drag, or resize).
+      if (!wasScrolling && !wasDragged && !wasResized && t) {
+        _lastTapEnd = { time: Date.now(), x: t.clientX, y: t.clientY };
+      } else {
+        _lastTapEnd = null;
+      }
+
+      _prTouch = null;
+    }, { passive: true });
 
     // Velocity canvas interaction
     const velCanvas = this.getVelCanvas();
@@ -3977,7 +4122,7 @@ function buildTopBar() {
         const startBar = entry ? entry.startBar : 0;
         const relBar = ProjectState.playheadBar - startBar;
         const sixteenth = PR.sixteenthWidth() / PR.barWidth();
-        insertBar = Math.max(0, Math.min(ap.pattern.lengthBars - sixteenth, Math.floor(relBar / sixteenth) * sixteenth));
+        insertBar = Math.max(0, Math.floor(relBar / sixteenth) * sixteenth);
       }
       History.push();
       ChordTool._insertChord(chordNotes, insertBar, root + type);
@@ -4099,9 +4244,16 @@ const ChordTool = {
     const entry = ap.track.arrangement.find(e => e.patternId === ap.pattern.id);
     const relBar = ProjectState.playheadBar - (entry ? entry.startBar : 0);
     const sixteenth = PR.sixteenthWidth() / PR.barWidth();
-    const snapped = Math.max(0, Math.min(ap.pattern.lengthBars - sixteenth, Math.floor(relBar / sixteenth) * sixteenth));
+    const snapped = Math.max(0, Math.floor(relBar / sixteenth) * sixteenth);
     History.push();
     this._insertChord(chordNotes, snapped, label);
+    // Auto-extend if chord lands beyond pattern end
+    const chordEnd = snapped + sixteenth * 2;
+    if (chordEnd > ap.pattern.lengthBars) {
+      ap.pattern.lengthBars = Math.ceil(chordEnd);
+      if (entry && entry.loopBars && entry.loopBars < ap.pattern.lengthBars) entry.loopBars = ap.pattern.lengthBars;
+      AV.draw();
+    }
   },
 
   openInlinePicker(startBar, screenX, screenY) {
@@ -4426,11 +4578,23 @@ function _paste() {
   const patStartBar = entry ? entry.startBar : 0;
   const relBar = ProjectState.playheadBar - patStartBar;
   const sixteenth = PR.sixteenthWidth() / PR.barWidth();
-  const snapped = Math.max(0, Math.min(ap.pattern.lengthBars - sixteenth,
-    Math.floor(relBar / sixteenth) * sixteenth));
+  // No upper clamp — allow pasting past the current pattern end (auto-extends below)
+  const snapped = Math.max(0, Math.floor(relBar / sixteenth) * sixteenth);
   ap.pattern.notes.forEach(n => { n.selected = false; });
   for (const note of _clipboard) {
     ap.pattern.notes.push({ ...note, start: snapped + note.start, selected: true });
+  }
+  // Auto-extend pattern and container if pasted notes exceed current length
+  const maxEnd = Math.max(..._clipboard.map(n => snapped + n.start + n.duration));
+  if (maxEnd > ap.pattern.lengthBars) {
+    ap.pattern.lengthBars = Math.ceil(maxEnd);
+    if (entry && entry.loopBars && entry.loopBars < ap.pattern.lengthBars) {
+      entry.loopBars = ap.pattern.lengthBars;
+    }
+    AV.draw();
+    if (typeof MobileUI !== 'undefined' && MobileUI._initialized && MobileUI.isMobile()) {
+      MobileUI._syncFromProject();
+    }
   }
   PR.draw(); PR.drawVelocity();
 }
@@ -5206,6 +5370,13 @@ const ExportEngine = {
         }
       });
 
+      // Re-sync when a project is loaded (e.g. from file) so numBars updates.
+      EventBus.on('project:loaded', () => {
+        if (!this.isMobile()) return;
+        this._syncFromProject();
+        this._renderTracks();
+      });
+
       // Double rAF: first fires before paint, second fires after layout is committed
       // Single rAF is not enough on iOS Safari/Chrome — grid has 0 width on first frame
       this._renderKeyboard();
@@ -5232,6 +5403,23 @@ const ExportEngine = {
       const scaleSel = document.getElementById('mob-scale-sel');
       if (keySel) keySel.value = ProjectState.key;
       if (scaleSel) scaleSel.value = ProjectState.scale;
+
+      // Sync numBars from the arrangement — use max container length across all tracks.
+      // Count loopBars (stretched containers) as well as pat.lengthBars.
+      const maxBars = ProjectState.tracks.reduce((max, track) => {
+        const entry = track.arrangement.find(e => e.startBar === 0);
+        if (!entry) return max;
+        const pat = track.patterns.find(p => p.id === entry.patternId);
+        if (!pat) return max;
+        const total = (entry.loopBars && entry.loopBars > pat.lengthBars) ? entry.loopBars : pat.lengthBars;
+        return Math.max(max, total);
+      }, 1);
+      this.numBars = maxBars;
+      if (this.currentBar >= this.numBars) this.currentBar = 0;
+      if (this._initialized) {
+        this._renderBarDots();
+        this._renderGrid();
+      }
     },
 
     _getMobilePattern(track) {
