@@ -1753,10 +1753,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
       pcm7: '#ff6600'
     },
     SELECTED_NOTE_COLORS: {
-      pulse50: '#ff6973', pulse25: '#ff6973',
-      triangle: '#ffeecc', noise: '#00b9be',
-      dpcm: '#ff6973', chord: '#00b9be',
-      pcm7: '#ffaa44'
+      pulse50: '#ffffff', pulse25: '#ffffff',
+      triangle: '#ffffff', noise: '#ffffff',
+      dpcm: '#ffffff', chord: '#ffffff',
+      pcm7: '#ffffff'
     },
     DRUM_ROWS: [46, 42, 39, 37, 38, 36], // top to bottom: hihatO, hihatC, clap, rim, snare, kick
     DRUM_NAMES: { 46:'HH OPEN', 42:'HH CLSD', 39:'CLAP', 37:'RIM', 38:'SNARE', 36:'KICK' },
@@ -4391,14 +4391,13 @@ const MagicGen = (() => {
   // State persisted across open/close
   const _state = {
     mode: 'CHORD',       // 'CHORD' | 'ARPEGGIO'
-    conform: 'FREEFORM', // 'FREEFORM' | 'SONG KEY'
     // Shared
     root: 'C',
     typeName: 'Major',
     numNotes: 3,
     octave: 0,
     inversion: 0,
-    degreeIdx: 0,
+    degreeIdx: -1,
     // Arpeggio-specific (kept for Task 2)
     arpPattern: 'Up',
     arpMirror: true,
@@ -4430,11 +4429,11 @@ const MagicGen = (() => {
 
   // Derive current chord root MIDI from state
   function _rootMidi() {
-    if (_state.conform === 'SONG KEY') {
+    if (_state.degreeIdx >= 0) {
       const info = getDegreeInfo(_state.degreeIdx);
       if (info) return info.rootMidi;
     }
-    // Freeform: use clicked cell pitch octave if available, else octave 4
+    // Free mode: use clicked cell pitch octave if available, else octave 4
     const baseOctave = (_insertCtx && _insertCtx.rootMidi != null)
       ? Math.floor(_insertCtx.rootMidi / 12)
       : 4;
@@ -4521,7 +4520,7 @@ const MagicGen = (() => {
       notes = notes.map(n => n + octaveShift);
     }
     const bar = _getInsertBar();
-    const label = (_state.conform === 'SONG KEY')
+    const label = (_state.degreeIdx >= 0)
       ? `${DEGREE_NAMES[_state.degreeIdx]}${_state.typeName}`
       : `${_state.root}${_state.typeName}`;
     History.push();
@@ -4620,51 +4619,52 @@ const MagicGen = (() => {
         <button id="mg-tab-chord" class="${_state.mode==='CHORD'?'active':''}">CHORD</button>
         <button id="mg-tab-arp" class="${_state.mode==='ARPEGGIO'?'active':''}">ARPEGGIO</button>
       </div>
-    `;
-
-    // Conform tabs: FREEFORM | SONG KEY
-    html += `
-      <div class="mg-seg" style="margin-bottom:10px;">
-        <button id="mg-tab-free" class="${_state.conform==='FREEFORM'?'active':''}">FREEFORM</button>
-        <button id="mg-tab-key"  class="${_state.conform==='SONG KEY'?'active':''}">SONG KEY</button>
-      </div>
       <div class="mg-divider"></div>
     `;
 
-    // --- CHORD params ---
-    if (_state.mode === 'CHORD') {
-      // Root (hidden in SONG KEY mode)
-      if (_state.conform === 'FREEFORM') {
-        html += `
-          <div class="mg-row">
-            <span class="mg-label">ROOT</span>
-            <select id="mg-root" style="font-size:7px;flex:1;max-width:120px;">
-              ${NOTE_NAMES.map(n=>`<option${n===_state.root?' selected':''}>${n}</option>`).join('')}
-            </select>
-          </div>`;
-      }
+    const DEGREE_OPTIONS = [
+      { value: -1, label: 'Free' },
+      { value: 0,  label: 'I' },
+      { value: 1,  label: 'II' },
+      { value: 2,  label: 'III' },
+      { value: 3,  label: 'IV' },
+      { value: 4,  label: 'V' },
+      { value: 5,  label: 'VI' },
+      { value: 6,  label: 'VII' },
+    ];
 
-      // Degree (SONG KEY only)
-      if (_state.conform === 'SONG KEY') {
-        html += `
-          <div class="mg-row">
-            <span class="mg-label">DEGREE</span>
-            <select id="mg-degree" style="font-size:7px;flex:1;max-width:120px;">
-              ${DEGREE_NAMES.map((d,i)=>`<option value="${i}"${i===_state.degreeIdx?' selected':''}>${d}</option>`).join('')}
-            </select>
-          </div>`;
-      }
+    // Degree dropdown (always shown)
+    html += `
+      <div class="mg-row">
+        <span class="mg-label">DEGREE</span>
+        <select id="mg-degree" style="font-size:7px;flex:1;max-width:120px;">
+          ${DEGREE_OPTIONS.map(o=>`<option value="${o.value}"${o.value===_state.degreeIdx?' selected':''}>${o.label}</option>`).join('')}
+        </select>
+      </div>`;
 
-      // Type
+    // Root dropdown — only shown in Free mode (degreeIdx === -1)
+    if (_state.degreeIdx === -1) {
       html += `
         <div class="mg-row">
-          <span class="mg-label">TYPE</span>
-          <select id="mg-type" style="font-size:7px;flex:1;max-width:120px;">
-            ${TYPE_NAMES.map(t=>`<option${t===_state.typeName?' selected':''}>${t}</option>`).join('')}
+          <span class="mg-label">ROOT</span>
+          <select id="mg-root" style="font-size:7px;flex:1;max-width:120px;">
+            ${NOTE_NAMES.map(n=>`<option${n===_state.root?' selected':''}>${n}</option>`).join('')}
           </select>
         </div>`;
+    }
 
-      // Notes (3 / 4 segmented toggle)
+    // Type (always shown)
+    html += `
+      <div class="mg-row">
+        <span class="mg-label">TYPE</span>
+        <select id="mg-type" style="font-size:7px;flex:1;max-width:120px;">
+          ${TYPE_NAMES.map(t=>`<option${t===_state.typeName?' selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>`;
+
+    // --- CHORD-specific params ---
+    if (_state.mode === 'CHORD') {
+      // Notes (3 / 4)
       html += `
         <div class="mg-row">
           <span class="mg-label">NOTES</span>
@@ -4696,34 +4696,9 @@ const MagicGen = (() => {
         </div>`;
     }
 
-    // --- ARPEGGIO params ---
+    // --- ARPEGGIO-specific params ---
     if (_state.mode === 'ARPEGGIO') {
-      // Root (freeform only)
-      if (_state.conform === 'FREEFORM') {
-        html += `
-          <div class="mg-row">
-            <span class="mg-label">ROOT</span>
-            <select id="mg-root" style="font-size:7px;flex:1;max-width:120px;">
-              ${NOTE_NAMES.map(n=>`<option${n===_state.root?' selected':''}>${n}</option>`).join('')}
-            </select>
-          </div>`;
-      }
-      if (_state.conform === 'SONG KEY') {
-        html += `
-          <div class="mg-row">
-            <span class="mg-label">DEGREE</span>
-            <select id="mg-degree" style="font-size:7px;flex:1;max-width:120px;">
-              ${DEGREE_NAMES.map((d,i)=>`<option value="${i}"${i===_state.degreeIdx?' selected':''}>${d}</option>`).join('')}
-            </select>
-          </div>`;
-      }
       html += `
-        <div class="mg-row">
-          <span class="mg-label">TYPE</span>
-          <select id="mg-type" style="font-size:7px;flex:1;max-width:120px;">
-            ${TYPE_NAMES.map(t=>`<option${t===_state.typeName?' selected':''}>${t}</option>`).join('')}
-          </select>
-        </div>
         <div class="mg-row">
           <span class="mg-label">NOTES</span>
           <div class="mg-seg" style="width:110px;">
@@ -4746,7 +4721,7 @@ const MagicGen = (() => {
             ${['Up','Down','Up-Down','Down-Up','Random'].map(p=>`<option${p===_state.arpPattern?' selected':''}>${p}</option>`).join('')}
           </select>
         </div>`;
-      // Mirror toggle — only show for Up-Down and Down-Up
+      // Mirror toggle — only for Up-Down and Down-Up
       if (_state.arpPattern === 'Up-Down' || _state.arpPattern === 'Down-Up') {
         html += `
           <div class="mg-row">
@@ -4777,44 +4752,38 @@ const MagicGen = (() => {
 
     html += `<div class="mg-divider"></div>`;
 
-    // Preview + Insert buttons (no longer disabled for arpeggio)
-    const arpDisabled = '';
     html += `
       <div style="display:flex;gap:6px;margin-top:4px;">
-        <button id="mg-preview" class="nes-btn" style="flex:1;" ${arpDisabled}>▶ PREVIEW</button>
-        <button id="mg-insert"  class="nes-btn" style="flex:2;background:#00b9be;color:#1e1c30;border-color:#00ccaa;" ${arpDisabled}>INSERT</button>
+        <button id="mg-preview" class="nes-btn" style="flex:1;">▶ PREVIEW</button>
+        <button id="mg-insert"  class="nes-btn" style="flex:2;background:#00b9be;color:#1e1c30;border-color:#00ccaa;">INSERT</button>
       </div>
     `;
 
     content.innerHTML = html;
 
-    // Wire events
+    // ── Wire events ──
     document.getElementById('mg-close').onclick = close;
-
     document.getElementById('mg-tab-chord').onclick = () => { _state.mode = 'CHORD'; _renderModal(); };
     document.getElementById('mg-tab-arp').onclick   = () => { _state.mode = 'ARPEGGIO'; _renderModal(); };
-    document.getElementById('mg-tab-free').onclick  = () => { _state.conform = 'FREEFORM'; _renderModal(); };
-    document.getElementById('mg-tab-key').onclick   = () => {
-      _state.conform = 'SONG KEY';
-      // Auto-populate type from current degree
-      const info = getDegreeInfo(_state.degreeIdx);
-      if (info) _state.typeName = info.quality;
+
+    // Degree change handler (shared for both modes)
+    document.getElementById('mg-degree').onchange = e => {
+      _state.degreeIdx = +e.target.value;
+      if (_state.degreeIdx >= 0) {
+        const info = getDegreeInfo(_state.degreeIdx);
+        if (info) _state.typeName = info.quality;
+      }
       _renderModal();
     };
 
+    // Root only exists when Free
+    if (_state.degreeIdx === -1) {
+      document.getElementById('mg-root').onchange = e => { _state.root = e.target.value; };
+    }
+
+    document.getElementById('mg-type').onchange = e => { _state.typeName = e.target.value; };
+
     if (_state.mode === 'CHORD') {
-      if (_state.conform === 'FREEFORM') {
-        document.getElementById('mg-root').onchange = e => { _state.root = e.target.value; };
-      }
-      if (_state.conform === 'SONG KEY') {
-        document.getElementById('mg-degree').onchange = e => {
-          _state.degreeIdx = +e.target.value;
-          const info = getDegreeInfo(_state.degreeIdx);
-          if (info) _state.typeName = info.quality;
-          _renderModal();
-        };
-      }
-      document.getElementById('mg-type').onchange = e => { _state.typeName = e.target.value; };
       document.getElementById('mg-notes-3').onclick = () => {
         _state.numNotes = 3;
         if (_state.inversion > 2) _state.inversion = 0;
@@ -4831,18 +4800,6 @@ const MagicGen = (() => {
     }
 
     if (_state.mode === 'ARPEGGIO') {
-      if (_state.conform === 'FREEFORM') {
-        document.getElementById('mg-root').onchange = e => { _state.root = e.target.value; };
-      }
-      if (_state.conform === 'SONG KEY') {
-        document.getElementById('mg-degree').onchange = e => {
-          _state.degreeIdx = +e.target.value;
-          const info = getDegreeInfo(_state.degreeIdx);
-          if (info) _state.typeName = info.quality;
-          _renderModal();
-        };
-      }
-      document.getElementById('mg-type').onchange = e => { _state.typeName = e.target.value; };
       document.getElementById('mg-notes-3').onclick = () => { _state.numNotes = 3; _renderModal(); };
       document.getElementById('mg-notes-4').onclick = () => { _state.numNotes = 4; _renderModal(); };
       document.getElementById('mg-notes-5').onclick = () => { _state.numNotes = 5; _renderModal(); };
@@ -4868,10 +4825,8 @@ const MagicGen = (() => {
       });
     }
 
-    if (!document.getElementById('mg-preview').disabled) {
-      document.getElementById('mg-preview').onclick = _state.mode === 'ARPEGGIO' ? _previewArp : _previewChord;
-      document.getElementById('mg-insert').onclick  = _state.mode === 'ARPEGGIO' ? _insertArp  : _insertChord;
-    }
+    document.getElementById('mg-preview').onclick = _state.mode === 'ARPEGGIO' ? _previewArp : _previewChord;
+    document.getElementById('mg-insert').onclick  = _state.mode === 'ARPEGGIO' ? _insertArp  : _insertChord;
   }
 
   function _escHandler(e) {
