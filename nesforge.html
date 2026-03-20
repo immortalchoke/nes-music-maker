@@ -2000,7 +2000,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
         ctx.clip();
 
         // Cell outline (half a 16th note wide)
-        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
         ctx.lineWidth = 1;
         ctx.strokeRect(cellX + 0.5, cellY + 0.5, cellW / 2 - 1, ROW_HEIGHT - 1);
 
@@ -2514,6 +2514,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       } else if (dragState.type === 'marquee') {
         dragState.currentX = mx;
         dragState.currentY = my;
+        if (this._selectedCell) { this._selectedCell = null; }
         this.draw();
       }
     });
