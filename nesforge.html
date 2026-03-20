@@ -719,6 +719,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       <button id="mob-rem-bar" class="mob-btn danger" style="min-width:32px;height:36px;font-size:10px;">−</button>
       <button id="mob-add-bar" class="mob-btn" style="min-width:32px;height:36px;font-size:10px;">+</button>
       <button id="mob-clear-track" class="mob-btn danger" style="min-width:32px;height:36px;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 512 512" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m210.82 60.24h90.35v30.12h-90.35z"/><path d="m60.24 90.35h391.53v30.12h-391.53z"/><path d="m90.35 120.47h30.12v301.18h-30.12z"/><path d="m391.53 120.47h30.12v301.18h-30.12z"/><path d="m90.35 421.65h331.29v30.12h-331.29z"/><path d="m180.71 150.59h30.12v271.06h-30.12z"/><path d="m301.18 150.59h30.12v271.06h-30.12z"/></svg></button>
+      <button id="mob-magic-btn" class="mob-btn" style="min-width:48px;height:36px;">MAGIC</button>
     </div>
     <div id="mob-playhead-bar"><div id="mob-playhead-fill"></div></div>
     <div id="mob-grid"></div>
@@ -4483,6 +4484,10 @@ const MagicGen = (() => {
     return buildChordNotes(_rootMidi(), _state.typeName, _state.numNotes, _state.octave, _state.inversion);
   }
 
+  function _buildArpTones() {
+    return buildChordNotes(_rootMidi(), _state.typeName, _state.numNotes, _state.octave, 0);
+  }
+
   function _previewChord() {
     if (_previewPlaying) return;
     ensureAudioCtxRunning().then(() => {
@@ -4531,8 +4536,9 @@ const MagicGen = (() => {
       const track = _getTrack();
       if (!track) return;
       const ctx = getAudioCtx();
-      const tones = _buildCurrentChord();
+      const tones = _buildArpTones();
       const seq = _buildArpSequence(tones, _state.arpPattern, _state.arpMirror, _state.arpRepeats);
+      if (!seq.length) return;
       const noteLenBars = _noteLenBars(_state.arpNoteLen);
       const noteLenSecs = barToSeconds(noteLenBars);
       const t0 = ctx.currentTime + 0.05;
@@ -4550,7 +4556,7 @@ const MagicGen = (() => {
       if (typeof MobileUI !== 'undefined') MobileUI._showToast('Open a pattern first');
       return;
     }
-    const tones = _buildCurrentChord();
+    const tones = _buildArpTones();
     const seq = _buildArpSequence(tones, _state.arpPattern, _state.arpMirror, _state.arpRepeats);
     const noteLenBars = _noteLenBars(_state.arpNoteLen);
     const insertBar = _getInsertBar();
@@ -5787,6 +5793,11 @@ const ExportEngine = {
         ProjectState.loopEnabled = !ProjectState.loopEnabled;
         loopBtn.style.borderColor = ProjectState.loopEnabled ? 'var(--hi)' : '';
         this._showToast(ProjectState.loopEnabled ? 'LOOP ON' : 'LOOP OFF');
+      });
+
+      // Magic generator button
+      document.getElementById('mob-magic-btn').addEventListener('click', () => {
+        MagicGen.open();
       });
 
       // Tap tempo
