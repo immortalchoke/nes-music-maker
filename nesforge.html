@@ -1807,10 +1807,13 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
       // Vertical grid lines — 4-tier hierarchy: measure > beat > 8th > 16th
       if (ap) {
-        const sixteenth = this.sixteenthWidth();
         const beats = ProjectState.timeSignature[0];
-        for (let s = 0; s <= ap.pattern.lengthBars * beats * 4; s++) {
-          const x = KEY_WIDTH + s * sixteenth - scrollX;
+        // Use true 16th-note pixel width (barWidth / 16 in 4/4) so every
+        // subdivision position is visited, not just beat/bar positions.
+        const sixteenthPx = this.barWidth() / (beats * 4);
+        const totalSteps = ap.pattern.lengthBars * beats * 4;
+        for (let s = 0; s <= totalSteps; s++) {
+          const x = KEY_WIDTH + s * sixteenthPx - scrollX;
           if (x < KEY_WIDTH || x > W) continue;
           const isMeasure = s % (beats * 4) === 0;  // bar/measure line
           const isBeat    = s % 4 === 0;            // quarter-note beat
