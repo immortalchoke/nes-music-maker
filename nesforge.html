@@ -4094,7 +4094,7 @@ function buildTopBar() {
       background:#1e1c30;border:2px solid #15788c;padding:8px 10px;z-index:2000;
       display:flex;flex-direction:column;align-items:center;gap:6px;`;
     const inp = document.createElement('input');
-    inp.type = 'number'; inp.min = 40; inp.max = 300; inp.value = ProjectState.bpm;
+    inp.type = 'text'; inp.inputMode = 'numeric'; inp.value = ProjectState.bpm;
     inp.style.cssText = `width:64px;background:#46425e;border:2px solid #00ccaa;color:#ffeecc;
       font:11px "Press Start 2P",monospace;text-align:center;padding:4px;outline:none;`;
     const lbl = document.createElement('div');
