@@ -4350,6 +4350,10 @@ const MagicGen = (() => {
   const TYPE_NAMES = Object.keys(INTERVALS);
   const DEGREE_NAMES = ['I','II','III','IV','V','VI','VII'];
   const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const DEGREE_OPTIONS = [
+    { value: -1, label: 'Free' },
+    ...DEGREE_NAMES.map((label, i) => ({ value: i, label })),
+  ];
 
   // Diatonic quality map from interval set
   function detectQuality(third, fifth) {
@@ -4363,7 +4367,7 @@ const MagicGen = (() => {
   // Get the root MIDI and diatonic quality for a given degree in the current key/scale
   function getDegreeInfo(degreeIdx) {
     const chords = ChordTool.getDiatonicChords(ProjectState.key, ProjectState.scale);
-    if (!chords || degreeIdx >= chords.length) return null;
+    if (degreeIdx < 0 || !chords || degreeIdx >= chords.length) return null;
     const ch = chords[degreeIdx];
     const rootMidi = ch.triad.notes[0];
     // Detect quality from intervals
@@ -4622,17 +4626,6 @@ const MagicGen = (() => {
       <div class="mg-divider"></div>
     `;
 
-    const DEGREE_OPTIONS = [
-      { value: -1, label: 'Free' },
-      { value: 0,  label: 'I' },
-      { value: 1,  label: 'II' },
-      { value: 2,  label: 'III' },
-      { value: 3,  label: 'IV' },
-      { value: 4,  label: 'V' },
-      { value: 5,  label: 'VI' },
-      { value: 6,  label: 'VII' },
-    ];
-
     // Degree dropdown (always shown)
     html += `
       <div class="mg-row">
@@ -4836,7 +4829,7 @@ const MagicGen = (() => {
   function open(ctx) {
     _insertCtx = ctx || null;
     // Pre-fill root from clicked cell pitch
-    if (ctx && ctx.rootMidi != null) {
+    if (ctx && ctx.rootMidi != null && _state.degreeIdx === -1) {
       _state.root = NOTE_NAMES[ctx.rootMidi % 12];
     }
     const modal = document.getElementById('magic-modal');
