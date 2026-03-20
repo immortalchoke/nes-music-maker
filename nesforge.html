@@ -247,6 +247,26 @@ input:focus, select:focus { border-color: #00b9be; }
 }
 .mg-step-len:last-child { border-right: 1px solid #15788c; }
 .mg-step-len.beat-marker { border-right: 2px solid #00b9be !important; }
+.mg-step-oct {
+  width: 28px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 5px;
+  color: #8888aa;
+  cursor: pointer;
+  border: 1px solid #15788c;
+  border-right: none;
+  border-top: none;
+  background: #1e1c30;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.mg-step-oct:last-child { border-right: 1px solid #15788c; }
+.mg-step-oct.beat-marker { border-right: 2px solid #00b9be !important; }
+.mg-step-oct.nonzero { color: #00b9be; }
 
 /* Global typography & pixel-art constraints */
 * { border-radius: 0 !important; box-shadow: none !important; }
@@ -4499,14 +4519,15 @@ const MagicGen = (() => {
   // Returns available note lengths for current time signature
   function _getNoteLengths() {
     const [beats, denom] = ProjectState.timeSignature;
-    if (denom === 8 && beats === 6) return ['dotted 1/4','1/8','1/16','1/32'];
-    return ['1/4','1/8','1/16','1/32'];
+    if (denom === 8 && beats === 6) return ['1','1/2','dotted 1/4','1/8','1/16','1/32'];
+    return ['1','1/2','1/4','1/8','1/16','1/32'];
   }
 
   // Convert note length string to fraction of a bar
   function _noteLenBars(lenStr) {
     const [beats] = ProjectState.timeSignature;
     const map = {
+      '1': 1, '1/2': 0.5,
       '1/4': 1/beats, '1/8': 1/(beats*2), '1/16': 1/(beats*4), '1/32': 1/(beats*8),
       'dotted 1/4': 1.5/beats,
     };
@@ -4610,7 +4631,8 @@ const MagicGen = (() => {
             const lenBars = _noteLenBars(step.len);
             const lenSecs = barToSeconds(lenBars);
             if (step.toneIdx >= 0 && tones[step.toneIdx] != null) {
-              playNote(track, { pitch: tones[step.toneIdx], start: 0, duration: lenBars, velocity: 90 }, t);
+              const pitch = Math.max(0, Math.min(127, tones[step.toneIdx] + (step.octave || 0) * 12));
+              playNote(track, { pitch, start: 0, duration: lenBars, velocity: 90 }, t);
             }
             t += lenSecs;
             totalDuration += lenSecs;
@@ -4654,7 +4676,7 @@ const MagicGen = (() => {
           const lenBars = _noteLenBars(step.len);
           if (step.toneIdx >= 0 && tones[step.toneIdx] != null) {
             ap.pattern.notes.push({
-              pitch: tones[step.toneIdx],
+              pitch: Math.max(0, Math.min(127, tones[step.toneIdx] + (step.octave || 0) * 12)),
               start: pos,
               duration: lenBars,
               velocity: 100,
@@ -4704,7 +4726,7 @@ const MagicGen = (() => {
     const seq = _buildArpSequence(tones, _state.arpPattern, _state.arpMirror, 1);
     const steps = seq.slice(0, 16).map(pitch => {
       const toneIdx = tones.indexOf(pitch);
-      return { toneIdx: toneIdx >= 0 ? toneIdx : 0, len: _state.arpNoteLen };
+      return { toneIdx: toneIdx >= 0 ? toneIdx : 0, len: _state.arpNoteLen, octave: 0 };
     });
     _state.arpSteps = steps;
   }
@@ -4906,6 +4928,16 @@ const MagicGen = (() => {
           html += `<div class="mg-step-len${beatMarkerClass}" data-step="${i}">${short}</div>`;
         });
         html += `</div>`;
+        // Octave row
+        html += `<div class="mg-step-row">`;
+        _state.arpSteps.forEach((step, i) => {
+          const isBeatMarker = ((i + 1) % 4 === 0 && i < _state.arpSteps.length - 1);
+          const beatMarkerClass = isBeatMarker ? ' beat-marker' : '';
+          const oct = step.octave || 0;
+          const label = oct > 0 ? `+${oct}` : `${oct}`;
+          html += `<div class="mg-step-oct${oct !== 0 ? ' nonzero' : ''}${beatMarkerClass}" data-step="${i}">${label}</div>`;
+        });
+        html += `</div>`;
         html += `</div></div>`;
       }
     }
@@ -5018,7 +5050,7 @@ const MagicGen = (() => {
         document.getElementById('mg-steps-up').onclick = () => {
           if (_state.arpSteps.length < 16) {
             const lastLen = _state.arpSteps.length > 0 ? _state.arpSteps[_state.arpSteps.length - 1].len : _state.arpNoteLen;
-            _state.arpSteps.push({ toneIdx: 0, len: lastLen });
+            _state.arpSteps.push({ toneIdx: 0, len: lastLen, octave: 0 });
             _renderModal();
           }
         };
@@ -5046,6 +5078,16 @@ const MagicGen = (() => {
             if (!step) return;
             const curIdx = avail.indexOf(step.len);
             step.len = avail[(curIdx + 1) % avail.length];
+            _renderModal();
+          };
+        });
+        document.querySelectorAll('.mg-step-oct').forEach(cell => {
+          cell.onclick = () => {
+            const idx = +cell.dataset.step;
+            const step = _state.arpSteps[idx];
+            if (!step) return;
+            const cur = step.octave || 0;
+            step.octave = cur >= 1 ? -1 : cur + 1; // -1 → 0 → +1 → -1
             _renderModal();
           };
         });
