@@ -1761,9 +1761,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
       const scalePitches = Scales.getInScalePitches(ProjectState.key, ProjectState.scale);
 
+      const drumOffset = isNoise ? this.RULER_HEIGHT : 0;
       for (let i = 0; i < numRows; i++) {
         const pitch = isNoise ? rows[i] : (127 - i);
-        const y = i * ROW_HEIGHT - scrollY;
+        const y = drumOffset + i * ROW_HEIGHT - scrollY;
         if (y + ROW_HEIGHT < 0 || y > H) continue;
 
         const noteName = this.NOTE_NAMES[pitch % 12];
@@ -2000,7 +2001,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
       const isNoise = isDrumChannel(ap.track.channelType);
       const rows = isNoise ? this.DRUM_ROWS : null;
       const relX = mx - this.KEY_WIDTH + this.scrollX;
-      const relY = my + this.scrollY;
+      // Drum rows are drawn below the ruler; subtract RULER_HEIGHT so row 0 maps to top drum row
+      const relY = (my - (isNoise ? this.RULER_HEIGHT : 0)) + this.scrollY;
       const barW = this.barWidth();
       const snapPx = barW / 32; // snap to 1/32 note
       const snappedStart = Math.floor(relX / snapPx) * snapPx / barW;
@@ -2018,9 +2020,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
       const isNoise = isDrumChannel(ap.track.channelType);
       const rows = isNoise ? this.DRUM_ROWS : null;
       const barW = this.barWidth();
+      const drumOffset = isNoise ? this.RULER_HEIGHT : 0;
       for (const note of ap.pattern.notes) {
         const rowIdx = isNoise ? rows.indexOf(note.pitch) : (127 - note.pitch);
-        const y = rowIdx * this.ROW_HEIGHT - this.scrollY;
+        const y = drumOffset + rowIdx * this.ROW_HEIGHT - this.scrollY;
         const x = this.KEY_WIDTH + note.start * barW - this.scrollX;
         const w = note.duration * barW;
         if (mx >= x - expand && mx <= x + w + expand &&
@@ -2095,6 +2098,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
     canvas.addEventListener('mousedown', (e) => {
       if (e.detail >= 2) return; // dblclick handled separately
+      if (_prTouch?.mode === 'note') return; // touch already handling this note drag
       const ap = this.activePattern;
       if (!ap) return;
       const rect = canvas.getBoundingClientRect();
@@ -2142,8 +2146,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
       if (mx < this.KEY_WIDTH) {
         // Click on piano key — audition the note at this row
         if (my >= this.RULER_HEIGHT) {
-          const rowIdx = Math.floor((my + this.scrollY) / this.ROW_HEIGHT);
           const isNoise = isDrumChannel(ap.track.channelType);
+          const rowIdx = isNoise
+            ? Math.floor((my - this.RULER_HEIGHT) / this.ROW_HEIGHT)
+            : Math.floor((my + this.scrollY) / this.ROW_HEIGHT);
           const pitch = isNoise ? this.DRUM_ROWS[rowIdx] : (127 - rowIdx);
           if (pitch !== undefined && pitch >= 0 && pitch <= 127) {
             previewNote(ap.track, pitch, 0.5);
@@ -2363,10 +2369,11 @@ body.mobile-mode #mobile-app { display: flex !important; }
           const barW = this.barWidth();
           const isNoise = isDrumChannel(ap.track.channelType);
           const rows = isNoise ? this.DRUM_ROWS : null;
+          const drumOffset = isNoise ? this.RULER_HEIGHT : 0;
           for (const note of ap.pattern.notes) {
             const rowIdx = isNoise ? rows.indexOf(note.pitch) : (127 - note.pitch);
             const noteX = this.KEY_WIDTH + note.start * barW - this.scrollX;
-            const noteY = rowIdx * this.ROW_HEIGHT - this.scrollY;
+            const noteY = drumOffset + rowIdx * this.ROW_HEIGHT - this.scrollY;
             const noteW = note.duration * barW;
             if (noteX < rectRight && noteX + noteW > rectLeft &&
                 noteY < rectBottom && noteY + this.ROW_HEIGHT > rectTop) {
@@ -4068,6 +4075,44 @@ function buildTopBar() {
   }, { passive: false });
   document.getElementById('bpm-up').onclick   = () => _setBpm(ProjectState.bpm + 1);
   document.getElementById('bpm-down').onclick = () => _setBpm(ProjectState.bpm - 1);
+
+  // Scroll on BPM display to nudge value
+  document.getElementById('bpm-display').addEventListener('wheel', (e) => {
+    e.preventDefault();
+    _setBpm(ProjectState.bpm + (e.deltaY < 0 ? 1 : -1));
+  }, { passive: false });
+
+  // Click on BPM display to open NES-style inline input
+  document.getElementById('bpm-display').style.cursor = 'pointer';
+  document.getElementById('bpm-display').addEventListener('click', () => {
+    let popup = document.getElementById('bpm-popup');
+    if (popup) { popup.remove(); return; }
+    popup = document.createElement('div');
+    popup.id = 'bpm-popup';
+    const anchor = document.getElementById('bpm-display').getBoundingClientRect();
+    popup.style.cssText = `position:fixed;left:${anchor.left}px;top:${anchor.bottom + 4}px;
+      background:#1e1c30;border:2px solid #15788c;padding:8px 10px;z-index:2000;
+      display:flex;flex-direction:column;align-items:center;gap:6px;`;
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.min = 40; inp.max = 300; inp.value = ProjectState.bpm;
+    inp.style.cssText = `width:64px;background:#46425e;border:2px solid #00ccaa;color:#ffeecc;
+      font:11px "Press Start 2P",monospace;text-align:center;padding:4px;outline:none;`;
+    const lbl = document.createElement('div');
+    lbl.textContent = 'BPM'; lbl.style.cssText = `font:5px "Press Start 2P",monospace;color:#ffb0a3;letter-spacing:0.05rem;`;
+    const confirm = (v) => {
+      const n = parseInt(v, 10);
+      if (!isNaN(n)) _setBpm(n);
+      popup.remove();
+    };
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') confirm(inp.value); if (e.key === 'Escape') popup.remove(); });
+    popup.appendChild(lbl);
+    popup.appendChild(inp);
+    document.body.appendChild(popup);
+    inp.select();
+    setTimeout(() => document.addEventListener('mousedown', function _dismiss(ev) {
+      if (!popup.contains(ev.target) && ev.target.id !== 'bpm-display') { confirm(inp.value); document.removeEventListener('mousedown', _dismiss); }
+    }), 100);
+  });
 
   document.getElementById('ts-num').onchange = e => {
     ProjectState.timeSignature[0] = +e.target.value; AV.draw();
