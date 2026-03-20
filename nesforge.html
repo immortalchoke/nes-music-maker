@@ -1006,23 +1006,30 @@ body.mobile-mode #mobile-app { display: flex !important; }
     return _waveCache[key];
   }
 
-  // Algorithmic reverb impulse response
-  function buildReverbImpulse(ctx, duration, decay, type) {
-    const len = ctx.sampleRate * duration;
+  // NES-style reverb: sparse early reflections only — no diffuse tail.
+  // The NES had no reverb hardware; this simulates a small lo-fi room by placing
+  // a handful of discrete echo taps at short intervals with fast decay.
+  function buildReverbImpulse(ctx, reflections, decayPerTap, spacingSec, stereoOffsetSec) {
+    const spacing = Math.floor(ctx.sampleRate * spacingSec);
+    const len = (reflections + 1) * spacing;
     const buf = ctx.createBuffer(2, len, ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) {
       const d = buf.getChannelData(ch);
-      for (let i = 0; i < len; i++) {
-        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      d[0] = 1.0; // direct impulse
+      for (let r = 1; r <= reflections; r++) {
+        // Right channel gets a tiny offset per tap to add subtle stereo width
+        const pos = Math.floor(r * spacing + (ch === 1 ? ctx.sampleRate * stereoOffsetSec * r : 0));
+        if (pos < len) d[pos] = Math.pow(decayPerTap, r);
       }
     }
     return buf;
   }
 
+  // room: 3 reflections ~16ms apart — small stone room feel
+  // hall: 5 reflections ~22ms apart — slightly larger but still lo-fi
   const REVERB_PRESETS = {
-    off:  null,
-    room: { duration: 0.8, decay: 3 },
-    hall: { duration: 2.5, decay: 2 }
+    room: { reflections: 3, decayPerTap: 0.30, spacing: 0.016, stereoOffset: 0.0025, wet: 0.18 },
+    hall: { reflections: 5, decayPerTap: 0.38, spacing: 0.022, stereoOffset: 0.003,  wet: 0.22 },
   };
   const _reverbCache = {};
 
@@ -1032,13 +1039,13 @@ body.mobile-mode #mobile-app { display: flex !important; }
     if (_reverbCache[type]) return _reverbCache[type];
     const conv = ctx.createConvolver();
     const p = REVERB_PRESETS[type];
-    conv.buffer = buildReverbImpulse(ctx, p.duration, p.decay);
+    conv.buffer = buildReverbImpulse(ctx, p.reflections, p.decayPerTap, p.spacing, p.stereoOffset);
     _reverbCache[type] = conv;
     return conv;
   }
 
   const VIBRATO_DEPTH = { off: 0, low: 10, med: 25, high: 50 };
-  const DELAY_TIME = { off: 0, short: 0.15, long: 0.3 };
+  // Delay times are now tempo-synced (computed in buildEffectChain from ProjectState.bpm)
 
   // Fuzz: channels eligible for waveshaping
   const FUZZ_ELIGIBLE = new Set(['pulse50', 'pulse25', 'triangle', 'chord']);
@@ -1128,33 +1135,47 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
     panner.connect(chanGain);
 
-    // Delay
+    // Delay — tempo-synced, with feedback for 2-3 decaying echoes.
+    // Short = 1/16 note, Long = 1/8 note at current BPM.
+    // Dry signal passes through at full volume; echo is added at low wet level.
     let delayOut = chanGain;
     if (track.delay !== 'off') {
-      const delay = ctx.createDelay(1.0);
-      delay.delayTime.value = DELAY_TIME[track.delay];
-      const dryGain = ctx.createGain(); dryGain.gain.value = 0.7;
-      const wetGain = ctx.createGain(); wetGain.gain.value = 0.3;
-      chanGain.connect(dryGain);
-      chanGain.connect(delay);
+      const bps = ProjectState.bpm / 60;
+      const delayTimeSec = track.delay === 'short' ? 1 / (bps * 4) : 1 / (bps * 2);
+      const feedbackAmt  = track.delay === 'short' ? 0.35 : 0.30;
+      const wetAmt       = track.delay === 'short' ? 0.22 : 0.18;
+
+      const delay = ctx.createDelay(2.0);
+      delay.delayTime.value = delayTimeSec;
+
+      // Feedback loop: delay → feedbackGain → delay
+      const feedbackGain = ctx.createGain();
+      feedbackGain.gain.value = feedbackAmt;
+      delay.connect(feedbackGain);
+      feedbackGain.connect(delay);
+
+      const wetGain = ctx.createGain(); wetGain.gain.value = wetAmt;
       delay.connect(wetGain);
+
       const mixNode = ctx.createGain(); mixNode.gain.value = 1;
-      dryGain.connect(mixNode);
-      wetGain.connect(mixNode);
+      chanGain.connect(mixNode);   // dry — full level
+      chanGain.connect(delay);     // feed into delay chain
+      wetGain.connect(mixNode);    // wet echoes — low level
       delayOut = mixNode;
     }
 
-    // Reverb
+    // Reverb — sparse early reflections, very low wet level.
+    // Dry signal is kept at full volume so reverb only adds subtle room presence.
     let reverbOut = delayOut;
     if (track.reverb !== 'off') {
       const rev = getReverbNode(track.reverb);
-      const dryG = ctx.createGain(); dryG.gain.value = 0.6;
-      const wetG = ctx.createGain(); wetG.gain.value = 0.4;
-      delayOut.connect(dryG);
+      const wetAmt = REVERB_PRESETS[track.reverb].wet;
+      const wetG = ctx.createGain(); wetG.gain.value = wetAmt;
+      const mix = ctx.createGain(); mix.gain.value = 1;
+      delayOut.connect(mix);       // dry — full level
       delayOut.connect(rev);
       rev.connect(wetG);
-      const mix = ctx.createGain(); mix.gain.value = 1;
-      dryG.connect(mix); wetG.connect(mix);
+      wetG.connect(mix);           // wet reflections — low level
       reverbOut = mix;
     }
 
