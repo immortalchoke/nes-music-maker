@@ -118,6 +118,90 @@ input:focus, select:focus { border-color: #00b9be; }
   display: inline-flex; align-items: center; justify-content: center;
 }
 
+/* MagicGen modal */
+#magic-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+#magic-modal.open { display: flex; }
+#magic-modal-content {
+  background: #1e1c30;
+  border: 2px solid #15788c;
+  padding: 14px;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  max-height: 90vh;
+  overflow-y: auto;
+  font-family: 'Press Start 2P', monospace;
+}
+.mg-seg {
+  display: flex;
+}
+.mg-seg button {
+  flex: 1;
+  background: #15788c;
+  color: #ffb0a3;
+  border: 2px solid #15788c;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  padding: 5px 4px;
+  cursor: pointer;
+  letter-spacing: 0.05rem;
+}
+.mg-seg button.active {
+  background: #00b9be;
+  color: #46425e;
+  border-color: #00b9be;
+}
+.mg-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 6px;
+}
+.mg-label {
+  font-size: 6px;
+  color: #ffb0a3;
+  letter-spacing: 0.05rem;
+  flex-shrink: 0;
+}
+.mg-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mg-stepper button {
+  background: #15788c;
+  color: #ffeecc;
+  border: 2px solid #15788c;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.mg-stepper span {
+  font-size: 8px;
+  color: #ffeecc;
+  min-width: 20px;
+  text-align: center;
+}
+.mg-divider {
+  height: 1px;
+  background: #15788c;
+  margin: 10px 0;
+}
+
 /* Global typography & pixel-art constraints */
 * { border-radius: 0 !important; box-shadow: none !important; }
 button, input, select, textarea { letter-spacing: 0.05rem; }
@@ -593,6 +677,9 @@ body.mobile-mode #mobile-app { display: flex !important; }
     <div id="chord-panel" style="display:none;"></div>
   </div>
   <div id="export-modal" style="display:none;"></div>
+  <div id="magic-modal">
+    <div id="magic-modal-content"></div>
+  </div>
 </div>
 
 <!-- iOS audio unlock overlay — shown only on touch devices, removed on first tap -->
@@ -1684,7 +1771,6 @@ body.mobile-mode #mobile-app { display: flex !important; }
     _dragState: null,
     _onMouseUp: null,
     _stampDuration: null, // duration inherited from last selected note (null = use default)
-    _chordMode: false,    // when true, dblclick opens chord insert popup instead of placing single note
     _pressedKey: null,    // pitch currently pressed in the piano key gutter (for visual feedback)
 
     getCanvas() { return document.getElementById('pianoroll-canvas'); },
@@ -1723,11 +1809,6 @@ body.mobile-mode #mobile-app { display: flex !important; }
       const chordPanel = document.getElementById('chord-panel');
       chordPanel.style.display = track.channelType === 'chord' ? 'block' : 'none';
       if (track.channelType === 'chord' && typeof ChordTool !== 'undefined') ChordTool.renderPalette();
-      // Auto-engage chord mode for chord tracks, disengage for all others.
-      // This lets the user toggle it off on chord tracks if they want single notes.
-      this._chordMode = (track.channelType === 'chord');
-      const chordBtn = document.getElementById('btn-chord');
-      if (chordBtn) chordBtn.classList.toggle('engaged', this._chordMode);
     },
 
     resizeCanvases() {
@@ -2079,8 +2160,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
       } else {
         const pos = posToNote(mx, my);
         if (!pos) return;
-        if (PR._chordMode) {
-          window._showChordInsertPopup(clientX, clientY, pos.pitch, pos.snappedStart);
+        if (ap.track.channelType === 'chord') {
+          MagicGen.open({ rootMidi: pos.pitch, snappedStart: pos.snappedStart });
           return;
         }
         placeNote(ap, pos.pitch, pos.snappedStart);
@@ -4153,11 +4234,8 @@ function buildTopBar() {
     AV.draw();
   };
 
-  // Chord mode toggle
-  document.getElementById('btn-chord').onclick = () => {
-    PR._chordMode = !PR._chordMode;
-    document.getElementById('btn-chord').classList.toggle('engaged', PR._chordMode);
-  };
+  // Open MagicGen chord/arpeggio generator
+  document.getElementById('btn-chord').onclick = () => MagicGen.open();
 
   // Shared chord insert popup — screenX/Y is where to anchor, rootMidi pre-sets the root dropdown
   window._showChordInsertPopup = function(screenX, screenY, rootMidi, snappedRelBar) {
@@ -4416,6 +4494,345 @@ const ChordTool = {
     });
   }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MagicGen — chord & arpeggio generator modal
+// ─────────────────────────────────────────────────────────────────────────────
+const MagicGen = (() => {
+  // Chord interval table (semitones from root): 3-note and 4-note voicings
+  const INTERVALS = {
+    'Major':      { 3:[0,4,7],      4:[0,4,7,12]  },
+    'Minor':      { 3:[0,3,7],      4:[0,3,7,12]  },
+    'Diminished': { 3:[0,3,6],      4:[0,3,6,9]   },
+    'Augmented':  { 3:[0,4,8],      4:[0,4,8,12]  },
+    'Maj7':       { 3:[0,4,7],      4:[0,4,7,11]  },
+    'Min7':       { 3:[0,3,7],      4:[0,3,7,10]  },
+    'Dom7':       { 3:[0,4,7],      4:[0,4,7,10]  },
+    'Dim7':       { 3:[0,3,6],      4:[0,3,6,9]   },
+    'Aug7':       { 3:[0,4,8],      4:[0,4,8,10]  },
+    'Sus2':       { 3:[0,2,7],      4:[0,2,7,12]  },
+    'Sus4':       { 3:[0,5,7],      4:[0,5,7,12]  },
+  };
+  const TYPE_NAMES = Object.keys(INTERVALS);
+  const DEGREE_NAMES = ['I','II','III','IV','V','VI','VII'];
+  const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+  // Diatonic quality map from interval set
+  function detectQuality(third, fifth) {
+    if (third === 4 && fifth === 7)  return 'Major';
+    if (third === 3 && fifth === 7)  return 'Minor';
+    if (third === 3 && fifth === 6)  return 'Diminished';
+    if (third === 4 && fifth === 8)  return 'Augmented';
+    return 'Major';
+  }
+
+  // Get the root MIDI and diatonic quality for a given degree in the current key/scale
+  function getDegreeInfo(degreeIdx) {
+    const chords = ChordTool.getDiatonicChords(ProjectState.key, ProjectState.scale);
+    if (!chords || degreeIdx >= chords.length) return null;
+    const ch = chords[degreeIdx];
+    const rootMidi = ch.triad.notes[0];
+    // Detect quality from intervals
+    const third = ch.triad.notes[1] - ch.triad.notes[0];
+    const fifth  = ch.triad.notes[2] - ch.triad.notes[0];
+    const quality = detectQuality(third, fifth);
+    return { rootMidi, rootName: ch.rootName, quality };
+  }
+
+  // Build chord MIDI notes from root + type + numNotes + octaveOffset + inversion
+  function buildChordNotes(rootMidi, typeName, numNotes, octaveOffset, inversion) {
+    const ivals = (INTERVALS[typeName] || INTERVALS['Major'])[numNotes] || INTERVALS['Major'][3];
+    let notes = ivals.map(i => rootMidi + i + octaveOffset * 12);
+    // Apply inversion: take the lowest `inversion` notes and raise by 12
+    for (let i = 0; i < inversion; i++) {
+      notes[i] += 12;
+    }
+    notes.sort((a, b) => a - b);
+    // Clamp to MIDI range
+    return notes.filter(n => n >= 0 && n <= 127);
+  }
+
+  // State persisted across open/close
+  const _state = {
+    mode: 'CHORD',       // 'CHORD' | 'ARPEGGIO'
+    conform: 'FREEFORM', // 'FREEFORM' | 'SONG KEY'
+    // Shared
+    root: 'C',
+    typeName: 'Major',
+    numNotes: 3,
+    octave: 0,
+    inversion: 0,
+    degreeIdx: 0,
+    // Arpeggio-specific (kept for Task 2)
+    arpPattern: 'Up',
+    arpMirror: true,
+    arpRepeats: 1,
+    arpNoteLen: '1/8',
+  };
+
+  // Insert context from double-click: { rootMidi, snappedStart }
+  let _insertCtx = null;
+  let _previewPlaying = false;
+
+  function _getTrack() {
+    if (PR.activePattern) return PR.activePattern.track;
+    const id = (typeof MobileUI !== 'undefined') ? MobileUI.activeTrackId : null;
+    if (id) return ProjectState.tracks.find(t => t.id === id) || null;
+    return null;
+  }
+
+  function _getInsertBar() {
+    if (_insertCtx && _insertCtx.snappedStart != null) return _insertCtx.snappedStart;
+    const ap = PR.activePattern;
+    if (!ap) return 0;
+    const entry = ap.track.arrangement.find(e => e.patternId === ap.pattern.id);
+    const startBar = entry ? entry.startBar : 0;
+    const sixteenth = PR.sixteenthWidth() / PR.barWidth();
+    const relBar = ProjectState.playheadBar - startBar;
+    return Math.max(0, Math.floor(relBar / sixteenth) * sixteenth);
+  }
+
+  // Derive current chord root MIDI from state
+  function _rootMidi() {
+    if (_state.conform === 'SONG KEY') {
+      const info = getDegreeInfo(_state.degreeIdx);
+      if (info) return info.rootMidi;
+    }
+    // Freeform: use clicked cell pitch octave if available, else octave 4
+    const baseOctave = (_insertCtx && _insertCtx.rootMidi != null)
+      ? Math.floor(_insertCtx.rootMidi / 12)
+      : 4;
+    return NOTE_NAMES.indexOf(_state.root) + baseOctave * 12;
+  }
+
+  function _buildCurrentChord() {
+    return buildChordNotes(_rootMidi(), _state.typeName, _state.numNotes, _state.octave, _state.inversion);
+  }
+
+  function _previewChord() {
+    if (_previewPlaying) return;
+    ensureAudioCtxRunning().then(() => {
+      const track = _getTrack();
+      if (!track) return;
+      const ctx = getAudioCtx();
+      const notes = _buildCurrentChord();
+      const t0 = ctx.currentTime + 0.05;
+      notes.forEach(pitch => {
+        playNote(track, { pitch, start: 0, duration: 0.4 / barToSeconds(1), velocity: 90 }, t0);
+      });
+      _previewPlaying = true;
+      setTimeout(() => { _previewPlaying = false; }, 600);
+    });
+  }
+
+  function _insertChord() {
+    const ap = PR.activePattern;
+    if (!ap) {
+      if (typeof MobileUI !== 'undefined') MobileUI._showToast('Open a pattern first');
+      return;
+    }
+    const notes = _buildCurrentChord();
+    const bar = _getInsertBar();
+    const label = (_state.conform === 'SONG KEY')
+      ? `${DEGREE_NAMES[_state.degreeIdx]}${_state.typeName}`
+      : `${_state.root}${_state.typeName}`;
+    History.push();
+    const sixteenth = PR.sixteenthWidth() / PR.barWidth();
+    // Auto-extend pattern if needed
+    const entry = ap.track.arrangement.find(e => e.patternId === ap.pattern.id);
+    const chordEnd = bar + sixteenth * 2;
+    if (chordEnd > ap.pattern.lengthBars) {
+      ap.pattern.lengthBars = Math.ceil(chordEnd);
+      if (entry && entry.loopBars && entry.loopBars < ap.pattern.lengthBars)
+        entry.loopBars = ap.pattern.lengthBars;
+    }
+    ChordTool._insertChord(notes, bar, label);
+    AV.draw();
+    close();
+  }
+
+  // ── Build the modal content HTML ──
+  function _renderModal() {
+    const content = document.getElementById('magic-modal-content');
+    if (!content) return;
+
+    // Header row
+    let html = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font:8px 'Press Start 2P',monospace;color:#00b9be;letter-spacing:0.05rem;">MAGIC GEN</div>
+        <button id="mg-close" style="background:none;border:none;color:#ffb0a3;font:10px 'Press Start 2P',monospace;cursor:pointer;">×</button>
+      </div>
+    `;
+
+    // Mode tabs: CHORD | ARPEGGIO
+    html += `
+      <div class="mg-seg" style="margin-bottom:8px;">
+        <button id="mg-tab-chord" class="${_state.mode==='CHORD'?'active':''}">CHORD</button>
+        <button id="mg-tab-arp" class="${_state.mode==='ARPEGGIO'?'active':''}">ARPEGGIO</button>
+      </div>
+    `;
+
+    // Conform tabs: FREEFORM | SONG KEY
+    html += `
+      <div class="mg-seg" style="margin-bottom:10px;">
+        <button id="mg-tab-free" class="${_state.conform==='FREEFORM'?'active':''}">FREEFORM</button>
+        <button id="mg-tab-key"  class="${_state.conform==='SONG KEY'?'active':''}">SONG KEY</button>
+      </div>
+      <div class="mg-divider"></div>
+    `;
+
+    // --- CHORD params ---
+    if (_state.mode === 'CHORD') {
+      // Root (hidden in SONG KEY mode)
+      if (_state.conform === 'FREEFORM') {
+        html += `
+          <div class="mg-row">
+            <span class="mg-label">ROOT</span>
+            <select id="mg-root" style="font-size:7px;flex:1;max-width:120px;">
+              ${NOTE_NAMES.map(n=>`<option${n===_state.root?' selected':''}>${n}</option>`).join('')}
+            </select>
+          </div>`;
+      }
+
+      // Degree (SONG KEY only)
+      if (_state.conform === 'SONG KEY') {
+        html += `
+          <div class="mg-row">
+            <span class="mg-label">DEGREE</span>
+            <select id="mg-degree" style="font-size:7px;flex:1;max-width:120px;">
+              ${DEGREE_NAMES.map((d,i)=>`<option value="${i}"${i===_state.degreeIdx?' selected':''}>${d}</option>`).join('')}
+            </select>
+          </div>`;
+      }
+
+      // Type
+      html += `
+        <div class="mg-row">
+          <span class="mg-label">TYPE</span>
+          <select id="mg-type" style="font-size:7px;flex:1;max-width:120px;">
+            ${TYPE_NAMES.map(t=>`<option${t===_state.typeName?' selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>`;
+
+      // Notes (3 / 4 segmented toggle)
+      html += `
+        <div class="mg-row">
+          <span class="mg-label">NOTES</span>
+          <div class="mg-seg" style="width:80px;">
+            <button id="mg-notes-3" class="${_state.numNotes===3?'active':''}">3</button>
+            <button id="mg-notes-4" class="${_state.numNotes===4?'active':''}">4</button>
+          </div>
+        </div>`;
+
+      // Octave stepper
+      html += `
+        <div class="mg-row">
+          <span class="mg-label">OCTAVE</span>
+          <div class="mg-stepper">
+            <button id="mg-oct-dn">−</button>
+            <span id="mg-oct-val">${_state.octave >= 0 ? '+'+_state.octave : _state.octave}</span>
+            <button id="mg-oct-up">+</button>
+          </div>
+        </div>`;
+
+      // Inversion
+      const invOptions = ['Root','1st','2nd','3rd'].slice(0, _state.numNotes);
+      html += `
+        <div class="mg-row">
+          <span class="mg-label">INVERSION</span>
+          <select id="mg-inv" style="font-size:7px;flex:1;max-width:120px;">
+            ${invOptions.map((v,i)=>`<option value="${i}"${i===_state.inversion?' selected':''}>${v}</option>`).join('')}
+          </select>
+        </div>`;
+    }
+
+    // --- ARPEGGIO params placeholder (Task 2) ---
+    if (_state.mode === 'ARPEGGIO') {
+      html += `<div style="font:6px 'Press Start 2P',monospace;color:#ffb0a3;text-align:center;padding:16px 0;">ARPEGGIO MODE<br><span style="color:#15788c;margin-top:6px;display:block;">COMING SOON</span></div>`;
+    }
+
+    html += `<div class="mg-divider"></div>`;
+
+    // Preview + Insert buttons
+    html += `
+      <div style="display:flex;gap:6px;margin-top:4px;">
+        <button id="mg-preview" class="nes-btn" style="flex:1;">▶ PREVIEW</button>
+        <button id="mg-insert"  class="nes-btn" style="flex:2;background:#00b9be;color:#1e1c30;border-color:#00ccaa;">INSERT</button>
+      </div>
+    `;
+
+    content.innerHTML = html;
+
+    // Wire events
+    document.getElementById('mg-close').onclick = close;
+
+    document.getElementById('mg-tab-chord').onclick = () => { _state.mode = 'CHORD'; _renderModal(); };
+    document.getElementById('mg-tab-arp').onclick   = () => { _state.mode = 'ARPEGGIO'; _renderModal(); };
+    document.getElementById('mg-tab-free').onclick  = () => { _state.conform = 'FREEFORM'; _renderModal(); };
+    document.getElementById('mg-tab-key').onclick   = () => {
+      _state.conform = 'SONG KEY';
+      // Auto-populate type from current degree
+      const info = getDegreeInfo(_state.degreeIdx);
+      if (info) _state.typeName = info.quality;
+      _renderModal();
+    };
+
+    if (_state.mode === 'CHORD') {
+      if (_state.conform === 'FREEFORM') {
+        document.getElementById('mg-root').onchange = e => { _state.root = e.target.value; };
+      }
+      if (_state.conform === 'SONG KEY') {
+        document.getElementById('mg-degree').onchange = e => {
+          _state.degreeIdx = +e.target.value;
+          const info = getDegreeInfo(_state.degreeIdx);
+          if (info) _state.typeName = info.quality;
+          _renderModal();
+        };
+      }
+      document.getElementById('mg-type').onchange = e => { _state.typeName = e.target.value; };
+      document.getElementById('mg-notes-3').onclick = () => {
+        _state.numNotes = 3;
+        if (_state.inversion > 2) _state.inversion = 0;
+        _renderModal();
+      };
+      document.getElementById('mg-notes-4').onclick = () => { _state.numNotes = 4; _renderModal(); };
+      document.getElementById('mg-oct-dn').onclick = () => {
+        if (_state.octave > -2) { _state.octave--; document.getElementById('mg-oct-val').textContent = _state.octave >= 0 ? '+'+_state.octave : _state.octave; }
+      };
+      document.getElementById('mg-oct-up').onclick = () => {
+        if (_state.octave < 2) { _state.octave++; document.getElementById('mg-oct-val').textContent = _state.octave >= 0 ? '+'+_state.octave : _state.octave; }
+      };
+      document.getElementById('mg-inv').onchange = e => { _state.inversion = +e.target.value; };
+    }
+
+    document.getElementById('mg-preview').onclick = _previewChord;
+    document.getElementById('mg-insert').onclick  = _insertChord;
+  }
+
+  function open(ctx) {
+    _insertCtx = ctx || null;
+    // Pre-fill root from clicked cell pitch
+    if (ctx && ctx.rootMidi != null) {
+      _state.root = NOTE_NAMES[ctx.rootMidi % 12];
+    }
+    const modal = document.getElementById('magic-modal');
+    _renderModal();
+    modal.classList.add('open');
+    // Close on overlay click (not content click)
+    modal.onclick = e => { if (e.target === modal) close(); };
+    // Close on Escape
+    const _esc = (e) => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', _esc); } };
+    document.addEventListener('keydown', _esc);
+  }
+
+  function close() {
+    const modal = document.getElementById('magic-modal');
+    modal.classList.remove('open');
+    modal.onclick = null;
+  }
+
+  return { open, close };
+})();
 
 // ============================================================
 // MODULE: DPCMSampler
