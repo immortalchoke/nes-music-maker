@@ -1532,13 +1532,9 @@ body.mobile-mode #mobile-app { display: flex !important; }
       playPCM7(track, note.pitch, startTime, vel);
     } else if (track.channelType === 'dpcm') {
       playDPCM(track, note.pitch, startTime, dur);
-    } else if (track.channelType === 'chord') {
-      // Each chord tone is a separate note object with its own pitch;
-      // the Sequencer schedules them individually as single oscillators.
-      // This is correct — chord tones share a chordId for UI grouping only.
-      playPitchedNote(track, note.pitch, startTime, dur, null, vel);
     } else {
-      playPitchedNote(track, note.pitch, startTime, dur, null, vel);
+      // chord and all pitched channels — return stop fn for preview cutoff
+      return playPitchedNote(track, note.pitch, startTime, dur, null, vel);
     }
   }
 
@@ -2006,10 +2002,16 @@ body.mobile-mode #mobile-app { display: flex !important; }
       return null;
     };
 
+    // Stop the currently-playing preview note (if any) immediately.
+    let _previewStop = null;
+    const stopPreview = () => {
+      if (_previewStop) { try { _previewStop(); } catch(e) {} _previewStop = null; }
+    };
     const previewNote = (track, pitch, duration) => {
+      stopPreview();
       const ctx = getAudioCtx();
       const fakeNote = { pitch, start: 0, duration, velocity: 100 };
-      playNote(track, fakeNote, ctx.currentTime + 0.01);
+      _previewStop = playNote(track, fakeNote, ctx.currentTime + 0.01) || null;
     };
 
     const placeNote = (ap, pitch, snappedStart) => {
@@ -2108,7 +2110,18 @@ body.mobile-mode #mobile-app { display: flex !important; }
         return;
       }
 
-      if (mx < this.KEY_WIDTH) return;
+      if (mx < this.KEY_WIDTH) {
+        // Click on piano key — audition the note at this row
+        if (my >= this.RULER_HEIGHT) {
+          const rowIdx = Math.floor((my + this.scrollY) / this.ROW_HEIGHT);
+          const isNoise = isDrumChannel(ap.track.channelType);
+          const pitch = isNoise ? this.DRUM_ROWS[rowIdx] : (127 - rowIdx);
+          if (pitch !== undefined && pitch >= 0 && pitch <= 127) {
+            previewNote(ap.track, pitch, 0.5);
+          }
+        }
+        return;
+      }
 
       const hit = hitTestNote(mx, my, _touchExpand);
       if (hit) {
@@ -2275,7 +2288,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
             dragState.note.start = newStart;
           }
 
-          if (pitchChanged) previewNote(ap.track, newPitch, dragState.note.duration);
+          if (pitchChanged) previewNote(ap.track, newPitch, 0.125); // short stab per cell
           this.draw(); this.drawVelocity();
         }
 
@@ -2478,7 +2491,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
               dragState.note.pitch = newPitch;
               dragState.note.start = newStart;
             }
-            if (pitchChanged) previewNote(ap.track, newPitch, dragState.note.duration);
+            if (pitchChanged) previewNote(ap.track, newPitch, 0.125); // short stab per cell
             this.draw(); this.drawVelocity();
           }
         }
