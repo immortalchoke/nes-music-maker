@@ -1685,6 +1685,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
     _onMouseUp: null,
     _stampDuration: null, // duration inherited from last selected note (null = use default)
     _chordMode: false,    // when true, dblclick opens chord insert popup instead of placing single note
+    _pressedKey: null,    // pitch currently pressed in the piano key gutter (for visual feedback)
 
     getCanvas() { return document.getElementById('pianoroll-canvas'); },
     getVelCanvas() { return document.getElementById('velocity-canvas'); },
@@ -1782,18 +1783,19 @@ body.mobile-mode #mobile-app { display: flex !important; }
         ctx.fillRect(KEY_WIDTH, y, W - KEY_WIDTH, ROW_HEIGHT);
 
         // Key gutter
+        const isPressed = this._pressedKey === pitch;
         if (isNoise) {
-          ctx.fillStyle = '#46425e';
+          ctx.fillStyle = isPressed ? '#00ccaa' : '#46425e';
           ctx.fillRect(0, y, KEY_WIDTH, ROW_HEIGHT);
-          ctx.fillStyle = ap.track.channelType === 'pcm7' ? '#ff6600' : '#00b9be';
+          ctx.fillStyle = isPressed ? '#1e1c30' : (ap.track.channelType === 'pcm7' ? '#ff6600' : '#00b9be');
           ctx.font = '5px "Press Start 2P"';
           const drumNames = ap.track.channelType === 'pcm7' ? this.PCM7_DRUM_NAMES : this.DRUM_NAMES;
           ctx.fillText(drumNames[pitch] || '', 2, y + 7);
         } else {
-          ctx.fillStyle = isBlack ? '#46425e' : '#ffeecc';
+          ctx.fillStyle = isPressed ? '#00ccaa' : (isBlack ? '#46425e' : '#ffeecc');
           ctx.fillRect(0, y, KEY_WIDTH - 2, ROW_HEIGHT - 1);
           if (!isBlack && pitch % 12 === 0) {
-            ctx.fillStyle = '#00b9be';
+            ctx.fillStyle = isPressed ? '#1e1c30' : '#00b9be';
             ctx.font = '5px "Press Start 2P"';
             ctx.fillText('C' + Math.floor(pitch / 12), 1, y + 7);
           }
@@ -2152,7 +2154,17 @@ body.mobile-mode #mobile-app { display: flex !important; }
             : Math.floor((my + this.scrollY) / this.ROW_HEIGHT);
           const pitch = isNoise ? this.DRUM_ROWS[rowIdx] : (127 - rowIdx);
           if (pitch !== undefined && pitch >= 0 && pitch <= 127) {
+            this._pressedKey = pitch;
+            this.draw();
             previewNote(ap.track, pitch, 0.5);
+            const clearPress = () => {
+              this._pressedKey = null;
+              this.draw();
+              document.removeEventListener('mouseup', clearPress);
+              document.removeEventListener('touchend', clearPress);
+            };
+            document.addEventListener('mouseup', clearPress, { once: true });
+            document.addEventListener('touchend', clearPress, { once: true });
           }
         }
         return;
