@@ -2154,7 +2154,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       } else {
         const pos = posToNote(mx, my);
         if (!pos) return;
-        if (ap.track.channelType === 'chord') {
+        if (MagicGen.engaged) {
           MagicGen.open({ rootMidi: pos.pitch, snappedStart: pos.snappedStart });
           return;
         }
@@ -4227,7 +4227,10 @@ function buildTopBar() {
   };
 
   // Open MagicGen chord/arpeggio generator
-  document.getElementById('btn-chord').onclick = () => MagicGen.open();
+  document.getElementById('btn-chord').onclick = () => {
+    MagicGen.engaged = !MagicGen.engaged;
+    document.getElementById('btn-chord').classList.toggle('engaged', MagicGen.engaged);
+  };
 
   document.getElementById('btn-add-track').onclick = (e) => {
     const btn = e.currentTarget;
@@ -4510,7 +4513,13 @@ const MagicGen = (() => {
       if (typeof MobileUI !== 'undefined') MobileUI._showToast('Open a pattern first');
       return;
     }
-    const notes = _buildCurrentChord();
+    let notes = _buildCurrentChord();
+    if (_insertCtx && _insertCtx.rootMidi != null) {
+      const clickedPitch = _insertCtx.rootMidi;
+      const chordCenter = notes.reduce((a, b) => a + b, 0) / notes.length;
+      const octaveShift = Math.round((clickedPitch - chordCenter) / 12) * 12;
+      notes = notes.map(n => n + octaveShift);
+    }
     const bar = _getInsertBar();
     const label = (_state.conform === 'SONG KEY')
       ? `${DEGREE_NAMES[_state.degreeIdx]}${_state.typeName}`
@@ -4557,7 +4566,13 @@ const MagicGen = (() => {
       return;
     }
     const tones = _buildArpTones();
-    const seq = _buildArpSequence(tones, _state.arpPattern, _state.arpMirror, _state.arpRepeats);
+    let seq = _buildArpSequence(tones, _state.arpPattern, _state.arpMirror, _state.arpRepeats);
+    if (_insertCtx && _insertCtx.rootMidi != null && seq.length) {
+      const clickedPitch = _insertCtx.rootMidi;
+      const seqCenter = seq.reduce((a, b) => a + b, 0) / seq.length;
+      const octaveShift = Math.round((clickedPitch - seqCenter) / 12) * 12;
+      seq = seq.map(n => n + octaveShift);
+    }
     const noteLenBars = _noteLenBars(_state.arpNoteLen);
     const insertBar = _getInsertBar();
     const entry = ap.track.arrangement.find(e => e.patternId === ap.pattern.id);
@@ -4885,7 +4900,8 @@ const MagicGen = (() => {
     modal.onclick = null;
   }
 
-  return { open, close };
+  const api = { open, close, engaged: false };
+  return api;
 })();
 
 // ============================================================
