@@ -4503,7 +4503,7 @@ const MagicGen = (() => {
   const INTERVALS = {
     'Major':      { 3:[0,4,7],      4:[0,4,7,12]  },
     'Minor':      { 3:[0,3,7],      4:[0,3,7,12]  },
-    'Diminished': { 3:[0,3,6],      4:[0,3,6,9]   },
+    'Diminished': { 3:[0,3,6],      4:[0,3,6,12]  },
     'Augmented':  { 3:[0,4,8],      4:[0,4,8,12]  },
     'Maj7':       { 3:[0,4,7],      4:[0,4,7,11]  },
     'Min7':       { 3:[0,3,7],      4:[0,3,7,10]  },
@@ -4754,10 +4754,11 @@ const MagicGen = (() => {
     html += `<div class="mg-divider"></div>`;
 
     // Preview + Insert buttons
+    const arpDisabled = _state.mode === 'ARPEGGIO' ? 'disabled' : '';
     html += `
       <div style="display:flex;gap:6px;margin-top:4px;">
-        <button id="mg-preview" class="nes-btn" style="flex:1;">▶ PREVIEW</button>
-        <button id="mg-insert"  class="nes-btn" style="flex:2;background:#00b9be;color:#1e1c30;border-color:#00ccaa;">INSERT</button>
+        <button id="mg-preview" class="nes-btn" style="flex:1;" ${arpDisabled}>▶ PREVIEW</button>
+        <button id="mg-insert"  class="nes-btn" style="flex:2;background:#00b9be;color:#1e1c30;border-color:#00ccaa;" ${arpDisabled}>INSERT</button>
       </div>
     `;
 
@@ -4809,6 +4810,10 @@ const MagicGen = (() => {
     document.getElementById('mg-insert').onclick  = _insertChord;
   }
 
+  function _escHandler(e) {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', _escHandler); }
+  }
+
   function open(ctx) {
     _insertCtx = ctx || null;
     // Pre-fill root from clicked cell pitch
@@ -4820,9 +4825,9 @@ const MagicGen = (() => {
     modal.classList.add('open');
     // Close on overlay click (not content click)
     modal.onclick = e => { if (e.target === modal) close(); };
-    // Close on Escape
-    const _esc = (e) => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', _esc); } };
-    document.addEventListener('keydown', _esc);
+    // Close on Escape (remove before re-adding to prevent accumulation)
+    document.removeEventListener('keydown', _escHandler);
+    document.addEventListener('keydown', _escHandler);
   }
 
   function close() {
