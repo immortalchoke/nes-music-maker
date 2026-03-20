@@ -1838,6 +1838,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
     _onMouseUp: null,
     _stampDuration: null, // duration inherited from last selected note (null = use default)
     _pressedKey: null,    // pitch currently pressed in the piano key gutter (for visual feedback)
+    _selectedCell: null,  // { pitch, snappedStart } — last clicked empty cell, shown as crosshair
 
     getCanvas() { return document.getElementById('pianoroll-canvas'); },
     getVelCanvas() { return document.getElementById('velocity-canvas'); },
@@ -1982,6 +1983,33 @@ body.mobile-mode #mobile-app { display: flex !important; }
           ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
         }
         ctx.lineWidth = 1; // reset
+      }
+
+      // Selected cell crosshair (pitch row + time column)
+      if (ap && this._selectedCell) {
+        const { pitch, snappedStart } = this._selectedCell;
+        const sixteenthBars = this.sixteenthWidth() / this.barWidth();
+        const cellW = sixteenthBars * this.barWidth();
+        const cellX = KEY_WIDTH + snappedStart * this.barWidth() - scrollX;
+        const rowIdx = isNoise ? (rows ? rows.indexOf(pitch) : -1) : (127 - pitch);
+        const cellY = drumOffset + rowIdx * ROW_HEIGHT - scrollY;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(KEY_WIDTH, 0, W - KEY_WIDTH, H);
+        ctx.clip();
+
+        // Row highlight
+        ctx.fillStyle = 'rgba(0,185,190,0.12)';
+        ctx.fillRect(KEY_WIDTH, cellY, W - KEY_WIDTH, ROW_HEIGHT);
+        // Column highlight
+        ctx.fillStyle = 'rgba(0,185,190,0.22)';
+        ctx.fillRect(cellX, 0, cellW, H);
+        // Cell intersection
+        ctx.fillStyle = 'rgba(0,185,190,0.35)';
+        ctx.fillRect(cellX, cellY, cellW, ROW_HEIGHT);
+
+        ctx.restore();
       }
 
       // Notes — clipped to grid area so they never paint over the piano key gutter
@@ -2224,6 +2252,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
         const pos = posToNote(mx, my);
         if (!pos) return;
         if (MagicGen.engaged) {
+          this._selectedCell = pos;
+          this.draw();
           MagicGen.open({ rootMidi: pos.pitch, snappedStart: pos.snappedStart });
           return;
         }
@@ -2363,6 +2393,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
         }
       } else {
         ap.pattern.notes.forEach(n => { n.selected = false; });
+        const pos = posToNote(mx, my);
+        if (pos) this._selectedCell = pos;
         dragState = { type: 'marquee', startX: mx, startY: my, currentX: mx, currentY: my };
         this._dragState = dragState;
         this.draw();
