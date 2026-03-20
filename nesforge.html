@@ -1999,14 +1999,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
         ctx.rect(KEY_WIDTH, 0, W - KEY_WIDTH, H);
         ctx.clip();
 
-        // Row highlight
-        ctx.fillStyle = 'rgba(0,185,190,0.12)';
-        ctx.fillRect(KEY_WIDTH, cellY, W - KEY_WIDTH, ROW_HEIGHT);
-        // Column highlight
-        ctx.fillStyle = 'rgba(0,185,190,0.22)';
-        ctx.fillRect(cellX, 0, cellW, H);
-        // Cell intersection
-        ctx.fillStyle = 'rgba(0,185,190,0.35)';
+        // Cell highlight
+        ctx.fillStyle = 'rgba(0,185,190,0.45)';
         ctx.fillRect(cellX, cellY, cellW, ROW_HEIGHT);
 
         ctx.restore();
