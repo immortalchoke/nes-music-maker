@@ -4941,7 +4941,13 @@ const MagicGen = (() => {
       document.getElementById('mg-root').onchange = e => { _state.root = e.target.value; };
     }
 
-    document.getElementById('mg-type').onchange = e => { _state.typeName = e.target.value; };
+    document.getElementById('mg-type').onchange = e => {
+      _state.typeName = e.target.value;
+      if (_state.mode === 'ARPEGGIO' && _state.arpCustom) {
+        _prefillCustomSteps();
+        _renderModal();
+      }
+    };
 
     if (_state.mode === 'CHORD') {
       document.getElementById('mg-notes-3').onclick = () => {
