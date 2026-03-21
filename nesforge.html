@@ -4554,7 +4554,8 @@ const MagicGen = (() => {
   let _previewLooping = false;
   let _previewLoopTimeout = null;
   let _arpPreviewLooping = false;
-  let _arpPreviewTimeouts = [];
+  let _arpLoopTimer = null;          // dedicated handle for the loop iteration timer
+  let _arpHighlightTimers = [];      // handles for per-step highlight timeouts
 
   function _getTrack() {
     if (PR.activePattern) return PR.activePattern.track;
@@ -4693,8 +4694,8 @@ const MagicGen = (() => {
   function _stopArpPreview() {
     _arpPreviewLooping = false;
     _previewPlaying = false;
-    _arpPreviewTimeouts.forEach(clearTimeout);
-    _arpPreviewTimeouts = [];
+    clearTimeout(_arpLoopTimer); _arpLoopTimer = null;
+    _arpHighlightTimers.forEach(clearTimeout); _arpHighlightTimers = [];
     document.querySelectorAll('.mg-step-tone.preview-active').forEach(el => el.classList.remove('preview-active'));
     _updateArpPreviewBtn();
   }
@@ -4735,7 +4736,7 @@ const MagicGen = (() => {
         }
         // Light up this step cell when it fires
         const delayMs = Math.max(0, (startTime - ctx.currentTime) * 1000);
-        _arpPreviewTimeouts.push(setTimeout(() => {
+        _arpHighlightTimers.push(setTimeout(() => {
           if (!_arpPreviewLooping) return;
           document.querySelectorAll('.mg-step-tone.preview-active').forEach(el => el.classList.remove('preview-active'));
           const el = document.querySelector(`.mg-step-tone[data-step="${stepIdx}"]`);
@@ -4755,12 +4756,16 @@ const MagicGen = (() => {
     }
 
     if (totalBars === 0) { _stopArpPreview(); return; }
-    const loopT = setTimeout(_scheduleArpLoop, (t0 - ctx.currentTime + barToSeconds(totalBars)) * 1000);
-    _arpPreviewTimeouts.push(loopT);
+    _arpLoopTimer = setTimeout(_scheduleArpLoop, (t0 - ctx.currentTime + barToSeconds(totalBars)) * 1000);
   }
 
   function _previewArp() {
-    if (_arpPreviewLooping) { _stopArpPreview(); return; }
+    if (_arpPreviewLooping) {
+      _stopArpPreview();
+      // If we stopped arp from a non-arp context, re-render so the button re-wires to _previewChord
+      if (_state.mode !== 'ARPEGGIO') _renderModal();
+      return;
+    }
     if (_previewPlaying) return;
     ensureAudioCtxRunning().then(() => {
       _arpPreviewLooping = true;
@@ -5612,9 +5617,10 @@ const MagicGen = (() => {
       }
     }
 
-    document.getElementById('mg-preview').onclick = _state.mode === 'ARPEGGIO' ? _previewArp : _previewChord;
+    // If arp preview is active, the button always stops it regardless of current mode
+    document.getElementById('mg-preview').onclick = (_arpPreviewLooping || _state.mode === 'ARPEGGIO') ? _previewArp : _previewChord;
     document.getElementById('mg-insert').onclick  = _state.mode === 'ARPEGGIO' ? _insertArp  : _insertChord;
-    if (_state.mode === 'ARPEGGIO') _updateArpPreviewBtn(); // reflect loop state after re-render
+    _updateArpPreviewBtn(); // always reflect arp loop state
   }
 
   function _escHandler(e) {
