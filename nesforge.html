@@ -228,6 +228,7 @@ input:focus, select:focus { border-color: #00b9be; }
 .mg-step-tone:last-child { border-right: 1px solid #15788c; }
 .mg-step-tone.rest { background: #46425e; color: #15788c; }
 .mg-step-tone.beat-marker { border-right: 2px solid #00b9be !important; }
+.mg-step-tone.preview-active { outline: 2px solid #fff; outline-offset: -2px; filter: brightness(1.5); }
 .mg-step-len {
   width: 28px;
   height: 18px;
@@ -4549,6 +4550,8 @@ const MagicGen = (() => {
   let _previewPlaying = false;
   let _previewLooping = false;
   let _previewLoopTimeout = null;
+  let _arpPreviewLooping = false;
+  let _arpPreviewTimeouts = [];
 
   function _getTrack() {
     if (PR.activePattern) return PR.activePattern.track;
@@ -4680,44 +4683,83 @@ const MagicGen = (() => {
     close();
   }
 
+  function _stopArpPreview() {
+    _arpPreviewLooping = false;
+    _previewPlaying = false;
+    _arpPreviewTimeouts.forEach(clearTimeout);
+    _arpPreviewTimeouts = [];
+    document.querySelectorAll('.mg-step-tone.preview-active').forEach(el => el.classList.remove('preview-active'));
+    _updateArpPreviewBtn();
+  }
+
+  function _updateArpPreviewBtn() {
+    const btn = document.getElementById('mg-preview');
+    if (!btn) return;
+    if (_arpPreviewLooping) {
+      btn.textContent = '■ STOP';
+      btn.style.background = '#8b0000';
+      btn.style.color = '#fff';
+      btn.style.borderColor = '#cc2200';
+    } else {
+      btn.textContent = '▶ PREVIEW';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }
+  }
+
+  function _scheduleArpLoop() {
+    if (!_arpPreviewLooping) return;
+    const track = _getTrack();
+    if (!track) { _stopArpPreview(); return; }
+    const ctx = getAudioCtx();
+    const tones = _buildArpTones();
+    const t0 = ctx.currentTime + 0.05;
+    let totalBars = 0;
+
+    if (_state.arpCustom && _state.arpSteps.length > 0) {
+      let pos = 0;
+      _state.arpSteps.forEach((step, stepIdx) => {
+        const lenBars = _noteLenBars(step.len);
+        const startTime = t0 + barToSeconds(pos);
+        if (step.toneIdx >= 0 && tones[step.toneIdx] != null) {
+          const pitch = Math.max(0, Math.min(127, tones[step.toneIdx] + (step.octave || 0) * 12));
+          playNote(track, { pitch, start: 0, duration: lenBars, velocity: 90 }, startTime);
+        }
+        // Light up this step cell when it fires
+        const delayMs = Math.max(0, (startTime - ctx.currentTime) * 1000);
+        _arpPreviewTimeouts.push(setTimeout(() => {
+          if (!_arpPreviewLooping) return;
+          document.querySelectorAll('.mg-step-tone.preview-active').forEach(el => el.classList.remove('preview-active'));
+          const el = document.querySelector(`.mg-step-tone[data-step="${stepIdx}"]`);
+          if (el) el.classList.add('preview-active');
+        }, delayMs));
+        pos += lenBars;
+      });
+      totalBars = pos;
+    } else {
+      const seq = _buildArpSequence(tones, _state.arpPattern, _state.arpMirror, 1);
+      if (!seq.length) { _stopArpPreview(); return; }
+      const noteLenBars = _noteLenBars(_state.arpNoteLen);
+      seq.forEach((pitch, i) => {
+        playNote(track, { pitch, start: 0, duration: noteLenBars, velocity: 90 }, t0 + barToSeconds(i * noteLenBars));
+      });
+      totalBars = seq.length * noteLenBars;
+    }
+
+    if (totalBars === 0) { _stopArpPreview(); return; }
+    const loopT = setTimeout(_scheduleArpLoop, (t0 - ctx.currentTime + barToSeconds(totalBars)) * 1000);
+    _arpPreviewTimeouts.push(loopT);
+  }
+
   function _previewArp() {
+    if (_arpPreviewLooping) { _stopArpPreview(); return; }
     if (_previewPlaying) return;
     ensureAudioCtxRunning().then(() => {
-      const track = _getTrack();
-      if (!track) return;
-      const ctx = getAudioCtx();
-      const tones = _buildArpTones();
-
-      if (_state.arpCustom && _state.arpSteps.length > 0) {
-        let t = ctx.currentTime + 0.05;
-        let totalDuration = 0;
-        for (let r = 0; r < _state.arpRepeats; r++) {
-          for (const step of _state.arpSteps) {
-            const lenBars = _noteLenBars(step.len);
-            const lenSecs = barToSeconds(lenBars);
-            if (step.toneIdx >= 0 && tones[step.toneIdx] != null) {
-              const pitch = Math.max(0, Math.min(127, tones[step.toneIdx] + (step.octave || 0) * 12));
-              playNote(track, { pitch, start: 0, duration: lenBars, velocity: 90 }, t);
-            }
-            t += lenSecs;
-            totalDuration += lenSecs;
-          }
-        }
-        if (totalDuration === 0) return;
-        _previewPlaying = true;
-        setTimeout(() => { _previewPlaying = false; }, (totalDuration + 0.3) * 1000);
-      } else {
-        const seq = _buildArpSequence(tones, _state.arpPattern, _state.arpMirror, _state.arpRepeats);
-        if (!seq.length) return;
-        const noteLenBars = _noteLenBars(_state.arpNoteLen);
-        const noteLenSecs = barToSeconds(noteLenBars);
-        const t0 = ctx.currentTime + 0.05;
-        seq.forEach((pitch, i) => {
-          playNote(track, { pitch, start: 0, duration: noteLenBars, velocity: 90 }, t0 + i * noteLenSecs);
-        });
-        _previewPlaying = true;
-        setTimeout(() => { _previewPlaying = false; }, (seq.length * noteLenSecs + 0.3) * 1000);
-      }
+      _arpPreviewLooping = true;
+      _previewPlaying = true;
+      _updateArpPreviewBtn();
+      _scheduleArpLoop();
     });
   }
 
@@ -5562,6 +5604,7 @@ const MagicGen = (() => {
 
     document.getElementById('mg-preview').onclick = _state.mode === 'ARPEGGIO' ? _previewArp : _previewChord;
     document.getElementById('mg-insert').onclick  = _state.mode === 'ARPEGGIO' ? _insertArp  : _insertChord;
+    if (_state.mode === 'ARPEGGIO') _updateArpPreviewBtn(); // reflect loop state after re-render
   }
 
   function _escHandler(e) {
@@ -5573,7 +5616,8 @@ const MagicGen = (() => {
     // Pre-fill root from clicked cell pitch (skip for drum channels — pitch is irrelevant)
     const _openAp = PR.activePattern;
     const _openIsDrum = _openAp && isDrumChannel(_openAp.track.channelType);
-    if (!_openIsDrum && ctx && ctx.rootMidi != null && _state.degreeIdx === -1) {
+    // Always sync root to the clicked cell's pitch (drum channels have no tonal root)
+    if (!_openIsDrum && ctx && ctx.rootMidi != null) {
       _state.root = NOTE_NAMES[ctx.rootMidi % 12];
     }
     const modal = document.getElementById('magic-modal');
@@ -5588,6 +5632,7 @@ const MagicGen = (() => {
 
   function close() {
     _stopPreviewDrum();
+    _stopArpPreview();
     const modal = document.getElementById('magic-modal');
     modal.classList.remove('open');
     modal.onclick = null;
