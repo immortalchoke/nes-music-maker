@@ -1480,10 +1480,22 @@ body.mobile-mode #mobile-app { display: flex !important; }
     }
 
     if (presetName === 'snare') {
-      // Short-period (93-step LFSR) noise — no tonal layer to avoid pitch clash with melodic content
-      wireNoise(getShortNoiseBuffer(), 'highpass', 1800, 1.0, 0.8, 0, 120);
-      // Broader bandpass layer for body/snap
-      wireNoise(getNoiseBuffer(), 'bandpass', 600, 0.8, 0.35, 0, 80);
+      // Layer 1: white noise highpass — crisp transient, exponential decay
+      const dur1 = 0.15;
+      const src1 = ctx.createBufferSource();
+      src1.buffer = getNoiseBuffer();
+      src1.loop = true;
+      const filt1 = ctx.createBiquadFilter();
+      filt1.type = 'highpass';
+      filt1.frequency.value = 1800;
+      filt1.Q.value = 0.5;
+      const env1 = ctx.createGain();
+      env1.gain.setValueAtTime(velocity * 0.9, startTime);
+      env1.gain.exponentialRampToValueAtTime(0.0001, startTime + dur1);
+      src1.connect(filt1); filt1.connect(env1); env1.connect(chanGain);
+      src1.start(startTime); src1.stop(startTime + dur1 + 0.01);
+      // Layer 2: triangle osc for heavy body weight (200→120Hz over 60ms)
+      wireTriOsc(200, 120, 60, 0.7, 0, 80);
       return; // ✅ SNARE
     }
 
@@ -2018,7 +2030,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
         for (const note of ap.pattern.notes) {
           const rowIdx = isNoise ? rows.indexOf(note.pitch) : (127 - note.pitch);
           if (rowIdx < 0) continue;
-          const y = rowIdx * ROW_HEIGHT - scrollY;
+          const y = drumOffset + rowIdx * ROW_HEIGHT - scrollY;
           const x = KEY_WIDTH + note.start * this.barWidth() - scrollX;
           const w = note.duration * this.barWidth() - 1;
           if (note.selected) {
@@ -2515,6 +2527,17 @@ body.mobile-mode #mobile-app { display: flex !important; }
         dragState.currentX = mx;
         dragState.currentY = my;
         if (this._selectedCell) { this._selectedCell = null; }
+        // Edge auto-scroll: scroll when cursor is within 40px of grid edges
+        const EDGE = 40, SPEED = 8;
+        const ap2 = this.activePattern;
+        if (ap2) {
+          const maxScrollX = Math.max(0, (ap2.pattern.lengthBars + 1) * this.barWidth() - (canvas.width - this.KEY_WIDTH));
+          const maxScrollY = Math.max(0, 128 * this.ROW_HEIGHT - canvas.height);
+          if (mx > canvas.width - EDGE) this.scrollX = Math.min(maxScrollX, this.scrollX + SPEED);
+          else if (mx < this.KEY_WIDTH + EDGE) this.scrollX = Math.max(0, this.scrollX - SPEED);
+          if (my > canvas.height - EDGE) this.scrollY = Math.min(maxScrollY, this.scrollY + SPEED);
+          else if (my < EDGE) this.scrollY = Math.max(0, this.scrollY - SPEED);
+        }
         this.draw();
       }
     });
@@ -3207,6 +3230,9 @@ AV.initEvents = function() {
   let dragState = null;
   let loopDragState = null;
   let playheadDrag = false;
+  // Track the zone of the most recent detail=1 mousedown so dblclick can verify
+  // both clicks landed in the same logical zone before acting.
+  let _lastMdZone = null;
 
   const getHit = (mx, my) => {
     const { HEADER_WIDTH, TRACK_HEIGHT, RULER_HEIGHT, scrollX, scrollY } = this;
@@ -3252,7 +3278,8 @@ AV.initEvents = function() {
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     const hit = getHit(mx, my);
-    if (!hit) return;
+    if (!hit) { _lastMdZone = null; return; }
+    _lastMdZone = hit.zone;
 
     if (hit.zone === 'ruler') {
       const { HEADER_WIDTH, scrollX } = this;
@@ -3441,6 +3468,11 @@ AV.initEvents = function() {
     const hit = getHit(mx, my);
     if (!hit) return;
     if (hit.zone === 'empty') {
+      // Only create a pattern if the first click of this double-click also
+      // landed on empty space. If the first click hit a header, pattern block,
+      // or any other zone, ignore the create action to prevent accidental
+      // pattern creation from cross-zone double-clicks.
+      if (_lastMdZone !== 'empty') return;
       History.push();
       addPattern(hit.track.id, Math.max(0, hit.bar), 2);
       AV.draw();
@@ -3560,7 +3592,8 @@ AV.initEvents = function() {
     }
   });
 
-  canvas.addEventListener('mouseup', () => {
+  document.addEventListener('mouseup', () => {
+    if (!dragState && !loopDragState && !AV._avMarquee && !playheadDrag) return;
     if (dragState?.snapshot) {
       const changed = dragState.type === 'resize-pattern' ? dragState.pat.lengthBars !== dragState.origLengthBars
         : dragState.type === 'loop-pattern' ? (dragState.entry.loopBars || dragState.pat.lengthBars) !== dragState.origLoopBars
@@ -4503,11 +4536,19 @@ const MagicGen = (() => {
     arpNoteLen: '1/8',
     arpCustom: false,
     arpSteps: [],
+    // Drum-specific
+    drumPreset: 'FOUR-ON-FLOOR',
+    drumLayers: { kick: true, snare: true, hat: true, clap: true },
+    drumIntensity: 3,
+    drumHumanize: false,
+    drumRepeats: 1,
   };
 
   // Insert context from double-click: { rootMidi, snappedStart }
   let _insertCtx = null;
   let _previewPlaying = false;
+  let _previewLooping = false;
+  let _previewLoopTimeout = null;
 
   function _getTrack() {
     if (PR.activePattern) return PR.activePattern.track;
@@ -4755,10 +4796,401 @@ const MagicGen = (() => {
     _state.arpSteps = steps;
   }
 
+  // ── DRUM MAGIC ──
+
+  // Generate a run of hat notes at a given step interval
+  function _drumHats(pitch, step, vel) {
+    const count = Math.round(1 / step);
+    return Array.from({ length: count }, (_, i) => ({ pitch, start: i * step, duration: 0.0625, velocity: vel }));
+  }
+
+  const DRUM_PRESETS = {
+    'FOUR-ON-FLOOR': [
+      { pitch: 36, start: 0,    duration: 0.0625, velocity: 100 },
+      { pitch: 36, start: 0.25, duration: 0.0625, velocity: 100 },
+      { pitch: 36, start: 0.5,  duration: 0.0625, velocity: 100 },
+      { pitch: 36, start: 0.75, duration: 0.0625, velocity: 100 },
+      { pitch: 38, start: 0.25, duration: 0.0625, velocity: 95 },
+      { pitch: 38, start: 0.75, duration: 0.0625, velocity: 95 },
+      ..._drumHats(42, 0.125, 80),
+    ],
+    'BREAKBEAT': [
+      { pitch: 36, start: 0,      duration: 0.0625, velocity: 100 },
+      { pitch: 36, start: 0.1875, duration: 0.0625, velocity: 90 },
+      { pitch: 36, start: 0.375,  duration: 0.0625, velocity: 95 },
+      { pitch: 36, start: 0.6875, duration: 0.0625, velocity: 100 },
+      { pitch: 38, start: 0.25,   duration: 0.0625, velocity: 95 },
+      { pitch: 38, start: 0.5,    duration: 0.0625, velocity: 85 },
+      { pitch: 38, start: 0.75,   duration: 0.0625, velocity: 95 },
+      ..._drumHats(42, 0.0625, 75),
+    ],
+    'SHUFFLE': [
+      { pitch: 36, start: 0,     duration: 0.0625, velocity: 100 },
+      { pitch: 36, start: 0.375, duration: 0.0625, velocity: 95 },
+      { pitch: 38, start: 0.25,  duration: 0.0625, velocity: 95 },
+      { pitch: 38, start: 0.75,  duration: 0.0625, velocity: 95 },
+      { pitch: 46, start: 0,      duration: 0.0625, velocity: 80 },
+      { pitch: 46, start: 0.1875, duration: 0.0625, velocity: 80 },
+      { pitch: 46, start: 0.375,  duration: 0.0625, velocity: 80 },
+      { pitch: 46, start: 0.5625, duration: 0.0625, velocity: 80 },
+      { pitch: 42, start: 0.125,  duration: 0.0625, velocity: 75 },
+      { pitch: 42, start: 0.3125, duration: 0.0625, velocity: 75 },
+      { pitch: 42, start: 0.5,    duration: 0.0625, velocity: 75 },
+      { pitch: 42, start: 0.6875, duration: 0.0625, velocity: 75 },
+    ],
+    'MARCH': [
+      { pitch: 36, start: 0,    duration: 0.0625, velocity: 100 },
+      { pitch: 36, start: 0.5,  duration: 0.0625, velocity: 95 },
+      { pitch: 38, start: 0.25, duration: 0.0625, velocity: 95 },
+      { pitch: 38, start: 0.75, duration: 0.0625, velocity: 95 },
+      { pitch: 42, start: 0,    duration: 0.0625, velocity: 80 },
+      { pitch: 42, start: 0.25, duration: 0.0625, velocity: 80 },
+      { pitch: 42, start: 0.5,  duration: 0.0625, velocity: 80 },
+      { pitch: 42, start: 0.75, duration: 0.0625, velocity: 80 },
+    ],
+    'HALF-TIME': [
+      { pitch: 36, start: 0,      duration: 0.0625, velocity: 100 },
+      { pitch: 36, start: 0.4375, duration: 0.0625, velocity: 90 },
+      { pitch: 38, start: 0.5,    duration: 0.0625, velocity: 95 },
+      ..._drumHats(42, 0.125, 80),
+    ],
+    'REGGAE': [
+      { pitch: 36, start: 0,      duration: 0.0625, velocity: 100 },
+      { pitch: 38, start: 0.3125, duration: 0.0625, velocity: 90 },
+      { pitch: 38, start: 0.5625, duration: 0.0625, velocity: 85 },
+      ..._drumHats(42, 0.125, 75),
+      { pitch: 39, start: 0.25,   duration: 0.0625, velocity: 90 },
+      { pitch: 39, start: 0.75,   duration: 0.0625, velocity: 90 },
+    ],
+    'JUNGLE': [
+      { pitch: 36, start: 0,      duration: 0.0625, velocity: 100 },
+      { pitch: 36, start: 0.1875, duration: 0.0625, velocity: 85 },
+      { pitch: 36, start: 0.375,  duration: 0.0625, velocity: 90 },
+      { pitch: 38, start: 0.25,   duration: 0.0625, velocity: 95 },
+      { pitch: 38, start: 0.3125, duration: 0.0625, velocity: 80 },
+      { pitch: 38, start: 0.5,    duration: 0.0625, velocity: 90 },
+      { pitch: 38, start: 0.75,   duration: 0.0625, velocity: 95 },
+      ..._drumHats(42, 0.0625, 70),
+      { pitch: 46, start: 0.125,  duration: 0.0625, velocity: 85 },
+      { pitch: 46, start: 0.375,  duration: 0.0625, velocity: 85 },
+      { pitch: 46, start: 0.625,  duration: 0.0625, velocity: 85 },
+    ],
+    'TRAP': [
+      { pitch: 36, start: 0,      duration: 0.0625, velocity: 100 },
+      { pitch: 36, start: 0.1875, duration: 0.0625, velocity: 85 },
+      { pitch: 36, start: 0.5,    duration: 0.0625, velocity: 95 },
+      { pitch: 38, start: 0.5,    duration: 0.0625, velocity: 95 },
+      ..._drumHats(42, 0.0625, 70),
+      { pitch: 46, start: 0.25,   duration: 0.0625, velocity: 85 },
+      { pitch: 46, start: 0.75,   duration: 0.0625, velocity: 85 },
+      { pitch: 39, start: 0.25,   duration: 0.0625, velocity: 90 },
+      { pitch: 39, start: 0.75,   duration: 0.0625, velocity: 90 },
+    ],
+    'WALTZ': [
+      { pitch: 36, start: 0,       duration: 0.0625, velocity: 100 },
+      { pitch: 38, start: 0.333,   duration: 0.0625, velocity: 90 },
+      { pitch: 38, start: 0.667,   duration: 0.0625, velocity: 85 },
+      { pitch: 42, start: 0,       duration: 0.0625, velocity: 80 },
+      { pitch: 42, start: 0.333,   duration: 0.0625, velocity: 75 },
+      { pitch: 42, start: 0.667,   duration: 0.0625, velocity: 75 },
+    ],
+  };
+
+  const _DRUM_PRESET_NAMES = Object.keys(DRUM_PRESETS);
+
+  // Layer membership: which MIDI pitches belong to each layer
+  const _DRUM_LAYER_PITCHES = {
+    kick:  [36],
+    snare: [38, 37],
+    hat:   [42, 46],
+    clap:  [39],
+  };
+
+  function _isDrumPitch(pitch, layer) {
+    return _DRUM_LAYER_PITCHES[layer] && _DRUM_LAYER_PITCHES[layer].includes(pitch);
+  }
+
+  function _pitchLayer(pitch) {
+    for (const [layer, pitches] of Object.entries(_DRUM_LAYER_PITCHES)) {
+      if (pitches.includes(pitch)) return layer;
+    }
+    return null;
+  }
+
+  function _stopPreviewDrum() {
+    _previewLooping = false;
+    _previewPlaying = false;
+    clearTimeout(_previewLoopTimeout);
+    _previewLoopTimeout = null;
+    _updatePreviewBtn();
+  }
+
+  function _updatePreviewBtn() {
+    const btn = document.getElementById('mg-drum-preview');
+    if (!btn) return;
+    if (_previewLooping) {
+      btn.textContent = '■ STOP';
+      btn.style.background = '#8b0000';
+      btn.style.color = '#fff';
+      btn.style.borderColor = '#cc2200';
+    } else {
+      btn.textContent = '▶ PREVIEW';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }
+  }
+
+  function _scheduleDrumLoop() {
+    if (!_previewLooping) return;
+    const track = _getTrack();
+    if (!track) { _stopPreviewDrum(); return; }
+    const ctx = getAudioCtx();
+    const base = DRUM_PRESETS[_state.drumPreset] || DRUM_PRESETS['FOUR-ON-FLOOR'];
+    const notes = base.filter(n => {
+      const layer = _pitchLayer(n.pitch);
+      return layer && _state.drumLayers[layer];
+    });
+    if (!notes.length) { _stopPreviewDrum(); return; }
+    const t0 = ctx.currentTime + 0.05;
+    const barSecs = barToSeconds(1);
+    notes.forEach(n => playDrum(track, n.pitch, t0 + n.start * barSecs, n.velocity / 127));
+    _previewLoopTimeout = setTimeout(_scheduleDrumLoop, barSecs * 1000);
+  }
+
+  function _previewDrum() {
+    if (_previewLooping) { _stopPreviewDrum(); return; }
+    if (_previewPlaying) return; // non-drum preview in progress
+    ensureAudioCtxRunning().then(() => {
+      _previewLooping = true;
+      _previewPlaying = true;
+      _updatePreviewBtn();
+      _scheduleDrumLoop();
+    });
+  }
+
+  function _insertDrumPattern() {
+    const ap = PR.activePattern;
+    if (!ap) return;
+
+    // 1. Get base pattern
+    const base = DRUM_PRESETS[_state.drumPreset] || DRUM_PRESETS['FOUR-ON-FLOOR'];
+
+    // 2. Filter by active layers
+    let notes = base.filter(n => {
+      const layer = _pitchLayer(n.pitch);
+      return layer && _state.drumLayers[layer];
+    });
+
+    // 3. Apply intensity
+    const intensity = _state.drumIntensity;
+    if (intensity === 1) {
+      // Keep only kick + snare; drop 60% of hats randomly
+      notes = notes.filter(n => {
+        const layer = _pitchLayer(n.pitch);
+        if (layer === 'hat') return Math.random() > 0.6;
+        return layer === 'kick' || layer === 'snare';
+      });
+    } else if (intensity === 2) {
+      // Drop 30% of hat notes
+      notes = notes.filter(n => {
+        if (_pitchLayer(n.pitch) === 'hat') return Math.random() > 0.3;
+        return true;
+      });
+    } else if (intensity === 4) {
+      // Double hat density: add a 16th between each existing hat
+      const extraHats = [];
+      notes.forEach(n => {
+        if (_pitchLayer(n.pitch) !== 'hat') return;
+        const midStart = n.start + 0.0625 / 2;
+        if (midStart < 1) extraHats.push({ pitch: n.pitch, start: midStart, duration: 0.0625, velocity: Math.round(n.velocity * 0.75) });
+      });
+      notes = [...notes, ...extraHats];
+    } else if (intensity === 5) {
+      // Double hats + ghost snares on offbeats 0.125 and 0.625
+      const extraHats = [];
+      notes.forEach(n => {
+        if (_pitchLayer(n.pitch) !== 'hat') return;
+        const midStart = n.start + 0.0625 / 2;
+        if (midStart < 1) extraHats.push({ pitch: n.pitch, start: midStart, duration: 0.0625, velocity: Math.round(n.velocity * 0.75) });
+      });
+      const ghostVel = [40, 50, 60];
+      const ghosts = [0.125, 0.625].map(s => ({
+        pitch: 38, start: s, duration: 0.0625,
+        velocity: ghostVel[Math.floor(Math.random() * ghostVel.length)],
+      }));
+      notes = [...notes, ...extraHats, ...ghosts];
+    }
+
+    // 4. Apply humanize
+    if (_state.drumHumanize) {
+      notes = notes.map(n => ({
+        ...n,
+        velocity: Math.max(40, Math.min(127, n.velocity + Math.round((Math.random() * 30) - 15))),
+        start: Math.max(0, n.start + (Math.random() * 0.01) - 0.005),
+      }));
+    }
+
+    // 5. Tile for drumRepeats bars at the insert position; extend pattern if needed
+    const repeats = _state.drumRepeats || 1;
+    const insertBar = _getInsertBar();
+    const tiled = [];
+    for (let bar = 0; bar < repeats; bar++) {
+      notes.forEach(n => {
+        tiled.push({ id: makeId(), pitch: n.pitch, start: insertBar + bar + n.start, duration: n.duration, velocity: n.velocity, selected: true });
+      });
+    }
+    if (insertBar + repeats > ap.pattern.lengthBars) {
+      ap.pattern.lengthBars = Math.ceil(insertBar + repeats);
+      const entry = ap.track.arrangement.find(e => e.patternId === ap.pattern.id);
+      if (entry && entry.loopBars && entry.loopBars < ap.pattern.lengthBars) entry.loopBars = ap.pattern.lengthBars;
+    }
+
+    // 6. Push history, append notes (sorted by start), redraw
+    History.push();
+    ap.pattern.notes = [...ap.pattern.notes, ...tiled].sort((a, b) => a.start - b.start);
+    PR.draw(); PR.drawVelocity();
+    MagicGen.close();
+  }
+
+  function _renderDrumModal() {
+    const content = document.getElementById('magic-modal-content');
+    if (!content) return;
+
+    // Header — title left, randomize middle, close right
+    let html = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font:8px 'Press Start 2P',monospace;color:var(--hi,#00b9be);letter-spacing:0.05rem;">✦ DRUM MAGIC</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button id="mg-drum-randomize" style="font:5px 'Press Start 2P',monospace;padding:3px 6px;cursor:pointer;background:none;border:1px solid #444466;color:#8888aa;">⚄ RANDOM</button>
+          <button id="mg-close" style="background:none;border:none;color:#ffb0a3;font:10px 'Press Start 2P',monospace;cursor:pointer;">×</button>
+        </div>
+      </div>
+    `;
+
+    // Preset grid (3 columns)
+    html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-bottom:8px;">`;
+    _DRUM_PRESET_NAMES.forEach(name => {
+      const active = _state.drumPreset === name;
+      const style = active
+        ? 'border:1px solid var(--hi,#00b9be);background:rgba(0,185,190,0.15);color:var(--hi,#00b9be);'
+        : 'border:1px solid #444466;background:none;color:#8888aa;';
+      const shortName = name.replace('FOUR-ON-FLOOR','4-ON-FLOOR');
+      html += `<button class="mg-drum-preset" data-preset="${name}" style="font:5px 'Press Start 2P',monospace;padding:4px 2px;cursor:pointer;${style}">${shortName}</button>`;
+    });
+    html += `</div><div class="mg-divider"></div>`;
+
+    // Layer toggles
+    html += `<div class="mg-row" style="margin-bottom:6px;">
+      <span class="mg-label">LAYERS</span>
+      <div style="display:flex;gap:4px;">`;
+    ['kick','snare','hat','clap'].forEach(layer => {
+      const on = _state.drumLayers[layer];
+      const style = on
+        ? 'background:var(--accent,#ff6600);color:#1e1c30;border-color:var(--accent,#ff6600);'
+        : 'background:none;color:#8888aa;border:1px solid #444466;';
+      html += `<button class="mg-drum-layer" data-layer="${layer}" style="font:5px 'Press Start 2P',monospace;padding:4px 6px;cursor:pointer;${style}">${layer.toUpperCase()}</button>`;
+    });
+    html += `</div></div><div class="mg-divider"></div>`;
+
+    // Intensity pips
+    html += `<div class="mg-row" style="margin-bottom:6px;">
+      <span class="mg-label">INTENSITY</span>
+      <div style="display:flex;gap:5px;align-items:center;">`;
+    for (let i = 1; i <= 5; i++) {
+      const active = _state.drumIntensity === i;
+      const style = active
+        ? 'width:12px;height:12px;border-radius:50%;background:var(--hi,#00b9be);border:none;cursor:pointer;'
+        : 'width:12px;height:12px;border-radius:50%;background:none;border:1px solid #444466;cursor:pointer;';
+      html += `<button class="mg-drum-intensity" data-intensity="${i}" style="${style}"></button>`;
+    }
+    html += `</div></div><div class="mg-divider"></div>`;
+
+    // Humanize toggle
+    const humOn = _state.drumHumanize;
+    const humStyle = humOn
+      ? 'background:var(--accent,#ff6600);color:#1e1c30;border-color:var(--accent,#ff6600);'
+      : 'background:none;color:#8888aa;border:1px solid #444466;';
+    html += `<div class="mg-row" style="margin-bottom:6px;">
+      <span class="mg-label">HUMANIZE</span>
+      <button id="mg-drum-humanize" style="font:5px 'Press Start 2P',monospace;padding:4px 8px;cursor:pointer;${humStyle}">${humOn ? 'ON' : 'OFF'}</button>
+    </div>`;
+
+    // Repeats
+    html += `
+      <div class="mg-row" style="margin-bottom:6px;">
+        <span class="mg-label">REPEATS</span>
+        <div class="mg-stepper">
+          <button id="mg-drum-rep-dn">−</button>
+          <span id="mg-drum-rep-val">${_state.drumRepeats}</span>
+          <button id="mg-drum-rep-up">+</button>
+        </div>
+      </div>
+    `;
+
+    html += `<div class="mg-divider"></div>`;
+
+    // PREVIEW + INSERT
+    html += `
+      <div style="display:flex;gap:6px;margin-top:4px;">
+        <button id="mg-drum-preview" class="nes-btn" style="flex:1;">▶ PREVIEW</button>
+        <button id="mg-drum-insert"  class="nes-btn" style="flex:2;background:#00b9be;color:#1e1c30;border-color:#00ccaa;">INSERT</button>
+      </div>
+    `;
+
+    content.innerHTML = html;
+
+    // Wire events
+    document.getElementById('mg-close').onclick = close;
+
+    document.querySelectorAll('.mg-drum-preset').forEach(btn => {
+      btn.onclick = () => { _state.drumPreset = btn.dataset.preset; _renderDrumModal(); };
+    });
+
+    document.querySelectorAll('.mg-drum-layer').forEach(btn => {
+      btn.onclick = () => {
+        const layer = btn.dataset.layer;
+        _state.drumLayers[layer] = !_state.drumLayers[layer];
+        _renderDrumModal();
+      };
+    });
+
+    document.querySelectorAll('.mg-drum-intensity').forEach(btn => {
+      btn.onclick = () => { _state.drumIntensity = +btn.dataset.intensity; _renderDrumModal(); };
+    });
+
+    document.getElementById('mg-drum-humanize').onclick = () => {
+      _state.drumHumanize = !_state.drumHumanize;
+      _renderDrumModal();
+    };
+
+    document.getElementById('mg-drum-rep-dn').onclick = () => {
+      if (_state.drumRepeats > 1) { _state.drumRepeats--; document.getElementById('mg-drum-rep-val').textContent = _state.drumRepeats; }
+    };
+    document.getElementById('mg-drum-rep-up').onclick = () => {
+      if (_state.drumRepeats < 8) { _state.drumRepeats++; document.getElementById('mg-drum-rep-val').textContent = _state.drumRepeats; }
+    };
+
+    document.getElementById('mg-drum-randomize').onclick = () => {
+      _state.drumPreset = _DRUM_PRESET_NAMES[Math.floor(Math.random() * _DRUM_PRESET_NAMES.length)];
+      _state.drumIntensity = 2 + Math.floor(Math.random() * 3); // 2–4
+      _renderDrumModal();
+    };
+
+    document.getElementById('mg-drum-preview').onclick = _previewDrum;
+    document.getElementById('mg-drum-insert').onclick = _insertDrumPattern;
+    _updatePreviewBtn(); // reflect current loop state after re-render
+  }
+
   // ── Build the modal content HTML ──
   function _renderModal() {
     const content = document.getElementById('magic-modal-content');
     if (!content) return;
+
+    // Route to drum UI when active pattern is a drum channel
+    const _ap = PR.activePattern;
+    const _isDrum = _ap && isDrumChannel(_ap.track.channelType);
+    if (_isDrum) { _renderDrumModal(); return; }
 
     // Header row
     let html = `
@@ -5128,8 +5560,10 @@ const MagicGen = (() => {
 
   function open(ctx) {
     _insertCtx = ctx || null;
-    // Pre-fill root from clicked cell pitch
-    if (ctx && ctx.rootMidi != null && _state.degreeIdx === -1) {
+    // Pre-fill root from clicked cell pitch (skip for drum channels — pitch is irrelevant)
+    const _openAp = PR.activePattern;
+    const _openIsDrum = _openAp && isDrumChannel(_openAp.track.channelType);
+    if (!_openIsDrum && ctx && ctx.rootMidi != null && _state.degreeIdx === -1) {
       _state.root = NOTE_NAMES[ctx.rootMidi % 12];
     }
     const modal = document.getElementById('magic-modal');
@@ -5143,6 +5577,7 @@ const MagicGen = (() => {
   }
 
   function close() {
+    _stopPreviewDrum();
     const modal = document.getElementById('magic-modal');
     modal.classList.remove('open');
     modal.onclick = null;
