@@ -4474,7 +4474,7 @@ const MagicGen = (() => {
     'Sus2':       { 3:[0,2,7],      4:[0,2,7,12]  },
     'Sus4':       { 3:[0,5,7],      4:[0,5,7,12]  },
   };
-  const TYPE_NAMES = Object.keys(INTERVALS);
+  const TYPE_NAMES = [...Object.keys(INTERVALS), 'Chromatic'];
   const DEGREE_NAMES = ['I','II','III','IV','V','VI','VII'];
   const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   const DEGREE_OPTIONS = [
@@ -4482,6 +4482,9 @@ const MagicGen = (() => {
     ...DEGREE_NAMES.map((label, i) => ({ value: i, label })),
   ];
   const TONE_LABELS = { 0: '1', 1: '3', 2: '5', 3: '7', 4: '8' };
+  const CHROMATIC_LABELS = { 0:'1', 1:'2', 2:'3', 3:'4', 4:'5', 5:'6', 6:'7' };
+  const _getToneLabel = (idx) => _state.typeName === 'Chromatic' ? (CHROMATIC_LABELS[idx] || '?') : (TONE_LABELS[idx] || '?');
+  const _maxToneIdx   = ()    => _state.typeName === 'Chromatic' ? 6 : _state.numNotes - 1;
 
   // Diatonic quality map from interval set
   function detectQuality(third, fifth) {
@@ -4632,6 +4635,10 @@ const MagicGen = (() => {
   }
 
   function _buildArpTones() {
+    if (_state.typeName === 'Chromatic') {
+      const root = _rootMidi() + _state.octave * 12;
+      return [0,1,2,3,4,5,6].map(i => root + i).filter(n => n >= 0 && n <= 127);
+    }
     return buildChordNotes(_rootMidi(), _state.typeName, _state.numNotes, _state.octave, 0);
   }
 
@@ -5320,7 +5327,8 @@ const MagicGen = (() => {
 
     // --- ARPEGGIO-specific params ---
     if (_state.mode === 'ARPEGGIO') {
-      html += `
+      if (_state.typeName !== 'Chromatic') {
+        html += `
         <div class="mg-row">
           <span class="mg-label">NOTES</span>
           <div class="mg-seg" style="width:110px;">
@@ -5328,7 +5336,9 @@ const MagicGen = (() => {
             <button id="mg-notes-4" class="${_state.numNotes===4?'active':''}">4</button>
             <button id="mg-notes-5" class="${_state.numNotes===5?'active':''}">5</button>
           </div>
-        </div>
+        </div>`;
+      }
+      html += `
         <div class="mg-row">
           <span class="mg-label">OCTAVE</span>
           <div class="mg-stepper">
@@ -5417,7 +5427,7 @@ const MagicGen = (() => {
           const isBeatMarker = ((i + 1) % 4 === 0 && i < _state.arpSteps.length - 1);
           const beatMarkerClass = isBeatMarker ? ' beat-marker' : '';
           const bg = isRest ? '' : `background:${noteColor};`;
-          const label = isRest ? '—' : (TONE_LABELS[step.toneIdx] || '?');
+          const label = isRest ? '—' : _getToneLabel(step.toneIdx);
           html += `<div class="mg-step-tone${isRest ? ' rest' : ''}${beatMarkerClass}" data-step="${i}" style="${bg}">${label}</div>`;
         });
         html += `</div>`;
@@ -5568,7 +5578,7 @@ const MagicGen = (() => {
             const idx = +cell.dataset.step;
             const step = _state.arpSteps[idx];
             if (!step) return;
-            const maxTone = _state.numNotes - 1;
+            const maxTone = _maxToneIdx();
             if (step.toneIdx < 0) {
               step.toneIdx = 0;
             } else if (step.toneIdx >= maxTone) {
