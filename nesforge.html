@@ -5187,6 +5187,10 @@ const MagicGen = (() => {
     const content = document.getElementById('magic-modal-content');
     if (!content) return;
 
+    // Preserve step-scroll position across re-renders
+    const _prevScrollEl = content.querySelector('.mg-step-scroll');
+    const _savedScrollLeft = _prevScrollEl ? _prevScrollEl.scrollLeft : 0;
+
     // Route to drum UI when active pattern is a drum channel
     const _ap = PR.activePattern;
     const _isDrum = _ap && isDrumChannel(_ap.track.channelType);
@@ -5408,6 +5412,12 @@ const MagicGen = (() => {
     `;
 
     content.innerHTML = html;
+
+    // Restore step-scroll position
+    if (_savedScrollLeft > 0) {
+      const scrollEl = content.querySelector('.mg-step-scroll');
+      if (scrollEl) scrollEl.scrollLeft = _savedScrollLeft;
+    }
 
     // ── Wire events ──
     document.getElementById('mg-close').onclick = close;
