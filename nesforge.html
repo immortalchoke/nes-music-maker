@@ -727,6 +727,61 @@ body.mobile-mode #mobile-app { display: flex !important; }
   max-width: 70px;
 }
 
+
+#pr-topbar {
+  height: 34px; background: #1e1c30; border-bottom: 2px solid #15788c;
+  display: flex; align-items: center; gap: 6px; padding: 0 8px;
+  flex-shrink: 0; flex-wrap: nowrap; overflow-x: auto;
+}
+#pr-body {
+  display: flex; flex: 1; min-height: 0; overflow: hidden;
+}
+#pr-side-panel {
+  width: 190px; flex-shrink: 0; background: #1e1c30;
+  border-right: 2px solid #15788c; display: flex;
+  flex-direction: column; padding: 6px; gap: 5px;
+  overflow-y: auto; font-size: 6px; color: var(--text);
+  font-family: 'Press Start 2P', monospace;
+}
+#pr-note-info {
+  display: flex; flex-direction: column; flex: 1; gap: 5px; min-height: 0;
+}
+#pr-canvas-area {
+  flex: 1; display: flex; flex-direction: column; min-width: 0;
+}
+.pr-side-title {
+  font-size: 6px; color: var(--hi); letter-spacing: 0.05rem;
+  padding-bottom: 4px; border-bottom: 1px solid #15788c; margin-bottom: 2px;
+}
+.pr-info-row {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.pr-info-label {
+  font-size: 5px; color: var(--text2); letter-spacing: 0.05rem;
+}
+.pr-info-value {
+  font-size: 6px; color: var(--text); background: #46425e;
+  border: 1px solid #15788c; padding: 2px 3px;
+}
+.pr-info-input {
+  font-size: 6px; background: #46425e; color: var(--text);
+  border: 1px solid #15788c; font-family: 'Press Start 2P', monospace;
+  padding: 2px 3px; width: 100%; box-sizing: border-box; border-radius: 0;
+}
+.pr-topbar-label {
+  font-size: 5px; color: var(--text2); letter-spacing: 0.05rem;
+  white-space: nowrap; flex-shrink: 0;
+}
+.pr-topbar-btn {
+  height: 24px; font-size: 5px; padding: 0 5px; flex-shrink: 0;
+}
+.pr-section-divider {
+  border-top: 1px solid #15788c; margin: 4px 0;
+}
+#pr-note-info select option, #pr-topbar select option {
+  font-size: 11px;
+}
+
   </style>
 </head>
 <body>
@@ -738,8 +793,17 @@ body.mobile-mode #mobile-app { display: flex !important; }
     </div>
     <div id="panel-divider"></div>
     <div id="pianoroll-panel" style="display:none;">
-      <canvas id="pianoroll-canvas"></canvas>
-      <canvas id="velocity-canvas"></canvas>
+      <div id="pr-topbar"></div>
+      <div id="pr-body">
+        <div id="pr-side-panel">
+          <div class="pr-side-title">NOTE INFO</div>
+          <div id="pr-note-info"></div>
+        </div>
+        <div id="pr-canvas-area">
+          <canvas id="pianoroll-canvas"></canvas>
+          <canvas id="velocity-canvas"></canvas>
+        </div>
+      </div>
     </div>
   </div>
   <div id="export-modal" style="display:none;"></div>
@@ -1856,6 +1920,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
     _stampDuration: null, // duration inherited from last selected note (null = use default)
     _pressedKey: null,    // pitch currently pressed in the piano key gutter (for visual feedback)
     _selectedCell: null,  // { pitch, snappedStart } — last clicked empty cell, shown as crosshair
+    _hoverCell: null,     // { rowIdx, snappedStart } — cell under cursor, shown as faint highlight
 
     getCanvas() { return document.getElementById('pianoroll-canvas'); },
     getVelCanvas() { return document.getElementById('velocity-canvas'); },
@@ -1874,6 +1939,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       const panel = document.getElementById('pianoroll-panel');
       panel.style.display = 'flex';
       document.getElementById('panel-divider').style.display = 'block';
+      if (typeof buildPRTopbar === 'function') buildPRTopbar();
       AV.resize(); // arrangement canvas must know its new (shorter) height before next scroll
       this.resizeCanvases();
 
@@ -1890,15 +1956,16 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
       this.draw();
       this.drawVelocity();
+      this.updateSidePanel();
     },
 
     resizeCanvases() {
       const prCanvas = this.getCanvas();
       const velCanvas = this.getVelCanvas();
       const panel = document.getElementById('pianoroll-panel');
-      const w = panel.clientWidth;
+      const w = panel.clientWidth - 190;
       prCanvas.width = w;
-      prCanvas.height = panel.clientHeight - this.VELOCITY_HEIGHT;
+      prCanvas.height = panel.clientHeight - this.VELOCITY_HEIGHT - 34; // subtract pr-topbar
       velCanvas.width = w;
       velCanvas.height = this.VELOCITY_HEIGHT;
     },
@@ -2005,8 +2072,9 @@ body.mobile-mode #mobile-app { display: flex !important; }
       // Selected cell crosshair (pitch row + time column)
       if (ap && this._selectedCell) {
         const { pitch, snappedStart } = this._selectedCell;
-        const sixteenthBars = this.sixteenthWidth() / this.barWidth();
-        const cellW = sixteenthBars * this.barWidth();
+        const defaultDur = this.sixteenthWidth() / this.barWidth() / 2;
+        const cellDur = this._stampDuration !== null ? this._stampDuration : defaultDur;
+        const cellW = cellDur * this.barWidth();
         const cellX = KEY_WIDTH + snappedStart * this.barWidth() - scrollX;
         const rowIdx = isNoise ? (rows ? rows.indexOf(pitch) : -1) : (127 - pitch);
         const cellY = drumOffset + rowIdx * ROW_HEIGHT - scrollY;
@@ -2016,11 +2084,28 @@ body.mobile-mode #mobile-app { display: flex !important; }
         ctx.rect(KEY_WIDTH, 0, W - KEY_WIDTH, H);
         ctx.clip();
 
-        // Cell outline (half a 16th note wide)
         ctx.strokeStyle = 'rgba(255,255,255,0.45)';
         ctx.lineWidth = 1;
-        ctx.strokeRect(cellX + 0.5, cellY + 0.5, cellW / 2 - 1, ROW_HEIGHT - 1);
+        ctx.strokeRect(cellX + 0.5, cellY + 0.5, cellW - 1, ROW_HEIGHT - 1);
 
+        ctx.restore();
+      }
+
+      // Hover cell highlight — faint fill on the cell under the cursor
+      if (ap && this._hoverCell) {
+        const { rowIdx, snappedStart } = this._hoverCell;
+        const defaultDur = this.sixteenthWidth() / this.barWidth() / 2;
+        const cellDur = this._stampDuration !== null ? this._stampDuration : defaultDur;
+        const cellW = cellDur * this.barWidth();
+        const cellX = KEY_WIDTH + snappedStart * this.barWidth() - scrollX;
+        const cellY = drumOffset + rowIdx * ROW_HEIGHT - scrollY;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(KEY_WIDTH, 0, W - KEY_WIDTH, H);
+        ctx.clip();
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.fillRect(cellX, cellY, cellW, ROW_HEIGHT);
         ctx.restore();
       }
 
@@ -2145,6 +2230,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
         ctx.lineWidth = 1;
         ctx.strokeRect(rx, ry, rw, rh);
       }
+      this.updateSidePanel();
     },
 
     drawVelocity() {
@@ -2169,6 +2255,290 @@ body.mobile-mode #mobile-app { display: flex !important; }
         ctx.fillStyle = color;
         ctx.fillRect(x + 1, H - barH, Math.max(4, this.sixteenthWidth() - 2), barH);
       }
+    },
+
+    updateSidePanel() {
+      const el = document.getElementById('pr-note-info');
+      if (!el) return;
+      const ap = this.activePattern;
+      if (!ap) { el.innerHTML = ''; return; }
+      const selected = ap.pattern.notes.filter(n => n.selected);
+      if (selected.length === 0) {
+        el.innerHTML = `<div style="font-size:5px;color:var(--text2);line-height:1.8;">SELECT<br>A NOTE</div>`;
+        return;
+      }
+      const multi = selected.length > 1;
+      const note = selected[0];
+      const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+      const durFracs = [[0.0625,'1/16'],[0.125,'1/8'],[0.1875,'3/16'],
+        [0.25,'1/4'],[0.375,'3/8'],[0.5,'1/2'],[0.75,'3/4'],[1,'1 bar']];
+      const refDur = multi
+        ? selected.reduce((acc, n) => { acc[n.duration] = (acc[n.duration] || 0) + 1; return acc; }, {})
+        : null;
+      const displayDur = multi
+        ? parseFloat(Object.entries(refDur).sort((a, b) => b[1] - a[1])[0][0])
+        : note.duration;
+      const lenStr = durFracs.reduce((best, cur) =>
+        Math.abs(cur[0] - displayDur) < Math.abs(best[0] - displayDur) ? cur : best, durFracs[0])[1];
+      const displayVel = multi
+        ? Math.round(selected.reduce((s, n) => s + n.velocity, 0) / selected.length)
+        : note.velocity;
+      const pitchName = multi ? null : NOTE_NAMES[note.pitch % 12] + Math.floor(note.pitch / 12);
+      const startStr = multi ? null
+        : 'B' + (Math.floor(note.start) + 1) + ' S' + (Math.round((note.start % 1) * 16) + 1);
+      const isChromatic = ProjectState.scale === 'Chromatic';
+      const selStyle = `font-size:8px;width:100%;font-family:'Press Start 2P',monospace;background:#46425e;color:#ffeecc;border:1px solid #15788c;box-sizing:border-box;`;
+
+      el.innerHTML = `
+        ${multi ? `<div style="font-size:5px;color:var(--text2);margin-bottom:3px;">${selected.length} NOTES</div>` : ''}
+        ${!multi ? `
+        <div class="pr-info-row">
+          <span class="pr-info-label">PITCH</span>
+          <span class="pr-info-value">${pitchName}</span>
+        </div>
+        <div class="pr-info-row">
+          <span class="pr-info-label">START</span>
+          <span class="pr-info-value">${startStr}</span>
+        </div>` : ''}
+        <div class="pr-info-row">
+          <span class="pr-info-label">LEN</span>
+          <div style="display:flex;align-items:center;gap:2px;">
+            <span class="pr-info-value" style="flex:1;">${lenStr}</span>
+            <div style="display:flex;flex-direction:column;gap:1px;">
+              <button class="bpm-arrow" id="pr-len-up">&#9650;</button>
+              <button class="bpm-arrow" id="pr-len-dn">&#9660;</button>
+            </div>
+          </div>
+        </div>
+        <div class="pr-info-row">
+          <span class="pr-info-label">VEL</span>
+          <div style="display:flex;align-items:center;gap:2px;">
+            <span class="pr-info-value" style="flex:1;" id="pr-vel-display">${displayVel}</span>
+            <div style="display:flex;flex-direction:column;gap:1px;">
+              <button class="bpm-arrow" id="pr-vel-up">&#9650;</button>
+              <button class="bpm-arrow" id="pr-vel-dn">&#9660;</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pr-section-divider"></div>
+        <div class="pr-side-title" style="margin-top:2px;">RHYTHM</div>
+        <div class="pr-info-row">
+          <span class="pr-info-label">GRID</span>
+          <select id="pr-rhythm-grid" style="${selStyle}">
+            <option value="0.25">1/4</option>
+            <option value="0.125">1/8</option>
+            <option value="0.0625" selected>1/16</option>
+            <option value="0.03125">1/32</option>
+            <option value="triplet-quarter">&#9834;3 (quarter triplet)</option>
+            <option value="triplet-8th">&#9835;3 (8th triplet)</option>
+            <option value="triplet-16th">&#9836;3 (16th triplet)</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:3px;margin-top:3px;">
+          <button class="nes-btn" id="pr-quantize-btn" style="flex:1;font-size:7px;">QUANTIZE</button>
+          <button class="nes-btn" id="pr-redist-btn"   style="flex:1;font-size:7px;">REDISTRIBUTE</button>
+        </div>
+
+        <div class="pr-section-divider"></div>
+        <div class="pr-side-title" style="margin-top:2px;">PITCH</div>
+        <div style="display:flex;gap:2px;justify-content:space-between;">
+          <button class="nes-btn" id="pr-pitch-oct-dn"  style="flex:1;font-size:7px;padding:0;">-8VA</button>
+          <button class="nes-btn" id="pr-pitch-semi-dn" style="flex:1;font-size:7px;padding:0;">-ST</button>
+          <button class="nes-btn" id="pr-pitch-semi-up" style="flex:1;font-size:7px;padding:0;">+ST</button>
+          <button class="nes-btn" id="pr-pitch-oct-up"  style="flex:1;font-size:7px;padding:0;">+8VA</button>
+        </div>
+        ${!isChromatic ? `
+        <div style="display:flex;gap:2px;justify-content:space-between;margin-top:3px;">
+          <button class="nes-btn" id="pr-pitch-step-dn" style="flex:1;font-size:7px;padding:0;">-STEP</button>
+          <button class="nes-btn" id="pr-pitch-step-up" style="flex:1;font-size:7px;padding:0;">+STEP</button>
+        </div>
+        <span class="pr-info-label" style="margin-top:2px;display:block;">SCALE STEP</span>
+        ` : ''}
+
+        <div class="pr-section-divider"></div>
+        <div class="pr-side-title" style="margin-top:2px;">HARMONIZE</div>
+        <div class="pr-info-row">
+          <span class="pr-info-label">INTERVAL</span>
+          <select id="pr-harm-interval" style="${selStyle}">
+            <option value="2">3rd &#8593;</option>
+            <option value="3">4th &#8593;</option>
+            <option value="4">5th &#8593;</option>
+            <option value="5">6th &#8593;</option>
+            <option value="7">8va &#8593;</option>
+            <option value="-2">3rd &#8595;</option>
+            <option value="-4">5th &#8595;</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:2px;margin-top:3px;">
+          <button class="nes-btn" id="pr-harm-this" style="flex:1;font-size:7px;padding:0 2px;">THIS TRACK</button>
+          <button class="nes-btn" id="pr-harm-new"  style="flex:1;font-size:7px;padding:0 2px;">NEW TRACK</button>
+        </div>
+        <button class="nes-btn" id="pr-harmonize-btn"
+          style="margin-top:3px;width:100%;font-size:7px;color:var(--hi);border-color:var(--hi);">
+          HARMONIZE
+        </button>
+
+        <button class="nes-btn" id="pr-del-note" style="margin-top:auto;width:100%;font-size:7px;color:var(--accent);border-color:var(--accent);">
+          DELETE${multi ? ' ALL' : ''}
+        </button>
+      `;
+
+      // ── LEN stepper ──────────────────────────────────────────────
+      const lenSteps = durFracs.map(f => f[0]);
+      const stepLen = (dir) => {
+        const curIdx = lenSteps.reduce((bi, v, i) =>
+          Math.abs(v - displayDur) < Math.abs(lenSteps[bi] - displayDur) ? i : bi, 0);
+        const newIdx = Math.max(0, Math.min(lenSteps.length - 1, curIdx + dir));
+        const newDur = lenSteps[newIdx];
+        selected.forEach(n => { n.duration = newDur; });
+        PR._stampDuration = newDur;
+        PR.draw(); PR.drawVelocity(); PR.updateSidePanel();
+      };
+      document.getElementById('pr-len-up').onclick = () => stepLen(1);
+      document.getElementById('pr-len-dn').onclick = () => stepLen(-1);
+
+      // ── VEL stepper ──────────────────────────────────────────────
+      let _velVal = displayVel;
+      const velDisplay = document.getElementById('pr-vel-display');
+      const stepVel = (dir) => {
+        _velVal = Math.max(1, Math.min(127, _velVal + dir));
+        velDisplay.textContent = _velVal;
+        selected.forEach(n => { n.velocity = _velVal; });
+        PR.drawVelocity();
+      };
+      document.getElementById('pr-vel-up').onclick = () => stepVel(1);
+      document.getElementById('pr-vel-dn').onclick = () => stepVel(-1);
+
+      // ── DELETE ───────────────────────────────────────────────────
+      document.getElementById('pr-del-note').onclick = () => {
+        History.push();
+        const toDelete = new Set(selected);
+        ap.pattern.notes = ap.pattern.notes.filter(n => !toDelete.has(n));
+        PR.draw(); PR.drawVelocity(); PR.updateSidePanel();
+      };
+
+      // ── RHYTHM helpers ───────────────────────────────────────────
+      const getGridSize = (val) => {
+        if (val === 'triplet-quarter') return 1 / 3;
+        if (val === 'triplet-8th')    return 1 / 6;
+        if (val === 'triplet-16th')   return 1 / 12;
+        return parseFloat(val);
+      };
+
+      // Update REDISTRIBUTE label dynamically based on grid + count
+      const updateRedistLabel = () => {
+        const gridEl = document.getElementById('pr-rhythm-grid');
+        if (!gridEl) return;
+        const gridLabel = gridEl.options[gridEl.selectedIndex]?.text || '';
+        const isTriplet = gridLabel.includes('3');
+        const n = selected.length;
+        const redistBtn = document.getElementById('pr-redist-btn');
+        if (redistBtn) {
+          redistBtn.textContent = (isTriplet && n % 3 !== 0)
+            ? `REDIST (${n}\u2192\u266a3)`
+            : 'REDISTRIBUTE';
+        }
+      };
+      updateRedistLabel();
+      document.getElementById('pr-rhythm-grid').onchange = updateRedistLabel;
+
+      document.getElementById('pr-quantize-btn').onclick = () => {
+        const gridSize = getGridSize(document.getElementById('pr-rhythm-grid').value);
+        History.push();
+        selected.forEach(n => {
+          n.start = Math.max(0, Math.round(n.start / gridSize) * gridSize);
+        });
+        PR.draw(); PR.drawVelocity(); PR.updateSidePanel();
+      };
+
+      document.getElementById('pr-redist-btn').onclick = () => {
+        if (selected.length < 2) return;
+        const gridSize = getGridSize(document.getElementById('pr-rhythm-grid').value);
+        History.push();
+        const sorted = [...selected].sort((a, b) => a.start - b.start);
+        const anchorStart = sorted[0].start;
+        sorted.forEach((n, i) => {
+          n.start = Math.max(0, Math.min(ap.pattern.lengthBars - 0.001, anchorStart + i * gridSize));
+        });
+        PR.draw(); PR.drawVelocity(); PR.updateSidePanel();
+      };
+
+      // ── PITCH SHIFT ──────────────────────────────────────────────
+      const shiftPitch = (semitones, scaleSteps) => {
+        History.push();
+        selected.forEach(n => {
+          let p = n.pitch;
+          if (semitones !== 0) p = Math.max(0, Math.min(127, p + semitones));
+          if (scaleSteps !== 0) p = stepByScale(p, scaleSteps);
+          n.pitch = p;
+        });
+        PR.draw(); PR.drawVelocity(); PR.updateSidePanel();
+      };
+      document.getElementById('pr-pitch-semi-up').onclick = () => shiftPitch(1, 0);
+      document.getElementById('pr-pitch-semi-dn').onclick = () => shiftPitch(-1, 0);
+      document.getElementById('pr-pitch-oct-up').onclick  = () => shiftPitch(12, 0);
+      document.getElementById('pr-pitch-oct-dn').onclick  = () => shiftPitch(-12, 0);
+      if (!isChromatic) {
+        document.getElementById('pr-pitch-step-up').onclick = () => shiftPitch(0, 1);
+        document.getElementById('pr-pitch-step-dn').onclick = () => shiftPitch(0, -1);
+      }
+
+      // ── HARMONIZE target toggle ───────────────────────────────────
+      if (!PR._harmTarget) PR._harmTarget = 'this';
+      const syncHarmTarget = () => {
+        document.getElementById('pr-harm-this').classList.toggle('engaged', PR._harmTarget === 'this');
+        document.getElementById('pr-harm-new').classList.toggle('engaged',  PR._harmTarget === 'new');
+      };
+      syncHarmTarget();
+      document.getElementById('pr-harm-this').onclick = () => { PR._harmTarget = 'this'; syncHarmTarget(); };
+      document.getElementById('pr-harm-new').onclick  = () => { PR._harmTarget = 'new';  syncHarmTarget(); };
+
+      // ── HARMONIZE action ─────────────────────────────────────────
+      document.getElementById('pr-harmonize-btn').onclick = () => {
+        const steps = parseInt(document.getElementById('pr-harm-interval').value);
+        History.push();
+        if (PR._harmTarget === 'this') {
+          const newNotes = selected.map(n => ({
+            id: makeId(),
+            pitch: Math.max(0, Math.min(127, stepByScale(n.pitch, steps))),
+            start: n.start,
+            duration: n.duration,
+            velocity: n.velocity,
+            selected: false
+          }));
+          ap.pattern.notes.push(...newNotes);
+        } else {
+          const tracks = ProjectState.tracks;
+          const sibling = tracks.slice(tracks.indexOf(ap.track) + 1)
+            .find(t => t.channelType === ap.track.channelType);
+          if (!sibling) {
+            const btn = document.getElementById('pr-harmonize-btn');
+            const orig = btn.textContent;
+            btn.textContent = 'NO SIBLING TRACK';
+            btn.style.color = 'var(--accent)';
+            setTimeout(() => { btn.textContent = orig; btn.style.color = 'var(--hi)'; }, 1800);
+            return;
+          }
+          const entry = ap.track.arrangement.find(e => e.patternId === ap.pattern.id);
+          const startBar = entry ? entry.startBar : 0;
+          let sibPat = null;
+          const sibEntry = sibling.arrangement.find(e => e.startBar === startBar);
+          if (sibEntry) sibPat = sibling.patterns.find(p => p.id === sibEntry.patternId);
+          if (!sibPat) sibPat = addPattern(sibling.id, startBar, ap.pattern.lengthBars);
+          const newNotes = selected.map(n => ({
+            id: makeId(),
+            pitch: Math.max(0, Math.min(127, stepByScale(n.pitch, steps))),
+            start: n.start,
+            duration: n.duration,
+            velocity: n.velocity,
+            selected: false
+          }));
+          sibPat.notes.push(...newNotes);
+          AV.draw();
+        }
+        PR.draw(); PR.drawVelocity(); PR.updateSidePanel();
+      };
     }
   };
 
@@ -2193,7 +2563,12 @@ body.mobile-mode #mobile-app { display: flex !important; }
       // Drum rows are drawn below the ruler; subtract RULER_HEIGHT so row 0 maps to top drum row
       const relY = (my - (isNoise ? this.RULER_HEIGHT : 0)) + this.scrollY;
       const barW = this.barWidth();
-      const snapPx = barW / 32; // snap to 1/32 note
+      // Snap to the current cell size (stamp duration) so a click anywhere in a cell
+      // lands at that cell's start rather than an arbitrary 1/32 subdivision.
+      const defaultDur = this.sixteenthWidth() / this.barWidth() / 2;
+      const cellDur = this._stampDuration !== null ? this._stampDuration : defaultDur;
+      const snapVal = (PR._snapVal !== undefined) ? PR._snapVal : cellDur;
+      const snapPx = Math.max(barW / 64, snapVal * barW);
       const snappedStart = Math.floor(relX / snapPx) * snapPx / barW;
       const rowIdx = Math.floor(relY / this.ROW_HEIGHT);
       const pitch = isNoise ? rows[rowIdx] : (127 - rowIdx);
@@ -2236,7 +2611,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
     };
 
     const placeNote = (ap, pitch, snappedStart) => {
-      const defaultDur = this.sixteenthWidth() / this.barWidth(); // quarter note
+      const defaultDur = this.sixteenthWidth() / this.barWidth() / 2; // 1/8 note
       const duration = this._stampDuration !== null ? this._stampDuration : defaultDur;
       let p = pitch;
       if (!isDrumChannel(ap.track.channelType) && ProjectState.scale !== 'Chromatic') {
@@ -2272,8 +2647,44 @@ body.mobile-mode #mobile-app { display: flex !important; }
           MagicGen.open({ rootMidi: pos.pitch, snappedStart: pos.snappedStart });
           return;
         }
+        if (PR._tool === 'stamp') {
+          const count = PR._stampCount || 4;
+          const pitchDelta = PR._stampPitchDelta || 0;
+          const interval = PR._stampInterval || 0.0625;
+          const useScaleSteps = PR._stampPitchMode === 'scale';
+          History.push();
+          ap.pattern.notes.forEach(n => { n.selected = false; });
+          for (let i = 0; i < count; i++) {
+            const start = pos.snappedStart + i * interval;
+            if (start >= ap.pattern.lengthBars) break;
+            let pitch;
+            if (pitchDelta === 0) {
+              pitch = pos.pitch;
+            } else if (useScaleSteps) {
+              pitch = stepByScale(pos.pitch, pitchDelta * i);
+            } else {
+              pitch = pos.pitch + pitchDelta * i;
+            }
+            pitch = Math.max(0, Math.min(127, pitch));
+            if (!isDrumChannel(ap.track.channelType) &&
+                ProjectState.scale !== 'Chromatic' && pitchDelta === 0) {
+              pitch = Scales.snapToScale(pitch, ProjectState.key, ProjectState.scale);
+            }
+            const dur = PR._stampDuration !== null ?
+              PR._stampDuration : PR.sixteenthWidth() / PR.barWidth() / 2;
+            const exists = ap.pattern.notes.find(n => n.pitch === pitch && n.start === start);
+            if (!exists) {
+              ap.pattern.notes.push({
+                id: makeId(), pitch, start,
+                duration: dur, velocity: 100, selected: i === 0
+              });
+            }
+          }
+          this.draw(); this.drawVelocity(); this.updateSidePanel();
+          return;
+        }
         placeNote(ap, pos.pitch, pos.snappedStart);
-        this.draw(); this.drawVelocity();
+        this.draw(); this.drawVelocity(); this.updateSidePanel();
       }
     };
 
@@ -2417,6 +2828,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
         ap.pattern.notes.forEach(n => { n.selected = false; });
         const pos = posToNote(mx, my);
         if (pos) this._selectedCell = pos;
+        this._hoverCell = null;
         dragState = { type: 'marquee', startX: mx, startY: my, currentX: mx, currentY: my, startScrollX: this.scrollX, startScrollY: this.scrollY };
         this._dragState = dragState;
         this.draw();
@@ -2434,9 +2846,23 @@ body.mobile-mode #mobile-app { display: flex !important; }
           if (hit) {
             const { x, w } = hit;
             canvas.style.cursor = mx > x + w - 6 ? 'ew-resize' : (e.altKey ? 'copy' : 'grab');
+            if (this._hoverCell) { this._hoverCell = null; this.draw(); }
           } else {
             canvas.style.cursor = '';
+            const pos = posToNote(mx, my);
+            if (pos) {
+              if (!this._hoverCell || this._hoverCell.snappedStart !== pos.snappedStart || this._hoverCell.rowIdx !== pos.rowIdx) {
+                this._hoverCell = { rowIdx: pos.rowIdx, snappedStart: pos.snappedStart };
+                this.draw();
+              }
+            } else if (this._hoverCell) {
+              this._hoverCell = null;
+              this.draw();
+            }
           }
+        } else if (this._hoverCell) {
+          this._hoverCell = null;
+          this.draw();
         }
         return;
       }
@@ -2621,6 +3047,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
     if (PR._onMouseUp) document.removeEventListener('mouseup', PR._onMouseUp);
     PR._onMouseUp = onCanvasMouseUp;
     document.addEventListener('mouseup', onCanvasMouseUp);
+
+    canvas.addEventListener('mouseleave', () => {
+      if (this._hoverCell) { this._hoverCell = null; this.draw(); }
+    });
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -4379,6 +4809,10 @@ function buildTopBar() {
   document.getElementById('btn-chord').onclick = () => {
     MagicGen.engaged = !MagicGen.engaged;
     document.getElementById('btn-chord').classList.toggle('engaged', MagicGen.engaged);
+    // Sync the PR topbar 3-way toggle if it's been built
+    if (typeof PR._setPRTool === 'function') {
+      PR._setPRTool(MagicGen.engaged ? 'magic' : 'default');
+    }
   };
 
   document.getElementById('btn-add-track').onclick = (e) => {
@@ -7372,6 +7806,164 @@ const ExportEngine = {
     }
   };
 
+  // ── Piano Roll topbar ──────────────────────────────────────────────────────
+
+  function stepByScale(pitch, steps) {
+    const inScale = Scales.getInScalePitches(ProjectState.key, ProjectState.scale);
+    const scalePitches = [];
+    for (let p = 0; p <= 127; p++) {
+      if (inScale.has(p % 12)) scalePitches.push(p);
+    }
+    const snapped = Scales.snapToScale(pitch, ProjectState.key, ProjectState.scale);
+    const idx = scalePitches.indexOf(snapped);
+    const base = idx === -1 ? 0 : idx;
+    const newIdx = Math.max(0, Math.min(scalePitches.length - 1, base + steps));
+    return scalePitches[newIdx];
+  }
+
+  function buildPRTopbar() {
+    const bar = document.getElementById('pr-topbar');
+    if (!bar) return;
+    const selStyle = `font-size:7px;height:24px;font-family:'Press Start 2P',monospace;background:#46425e;color:#ffeecc;border:1px solid #15788c;`;
+    bar.innerHTML = `
+      <!-- 3-way tool toggle: no gap, equal width -->
+      <div style="display:flex;flex-shrink:0;">
+        <button id="pr-tool-default" class="nes-btn pr-topbar-btn engaged" style="width:58px;">DEFAULT</button>
+        <button id="pr-tool-stamp"   class="nes-btn pr-topbar-btn" style="width:58px;margin-left:-2px;">STAMP</button>
+        <button id="pr-tool-magic"   class="nes-btn pr-topbar-btn" style="width:58px;margin-left:-2px;">&#10022; MAGIC</button>
+      </div>
+
+      <!-- STAMP controls (hidden by default) -->
+      <div id="pr-stamp-controls" style="display:none;align-items:center;gap:5px;margin-left:8px;">
+        <span class="pr-topbar-label">COUNT</span>
+        <div style="display:flex;align-items:center;gap:2px;">
+          <span id="pr-stamp-count-val" style="font-size:6px;font-family:'Press Start 2P',monospace;color:#ffeecc;min-width:14px;text-align:center;">4</span>
+          <div style="display:flex;flex-direction:column;gap:1px;">
+            <button class="bpm-arrow" id="pr-stamp-count-up">&#9650;</button>
+            <button class="bpm-arrow" id="pr-stamp-count-dn">&#9660;</button>
+          </div>
+        </div>
+        <span class="pr-topbar-label">LEN</span>
+        <select id="pr-stamp-len" style="${selStyle}">
+          <option value="0.0625">1/16</option>
+          <option value="0.125" selected>1/8</option>
+          <option value="0.25">1/4</option>
+          <option value="0.5">1/2</option>
+          <option value="1">1 BAR</option>
+        </select>
+        <span class="pr-topbar-label">PITCH &#916;</span>
+        <div style="display:flex;align-items:center;gap:2px;">
+          <span id="pr-stamp-pitch-val" style="font-size:6px;font-family:'Press Start 2P',monospace;color:#ffeecc;min-width:20px;text-align:center;">0</span>
+          <div style="display:flex;flex-direction:column;gap:1px;">
+            <button class="bpm-arrow" id="pr-stamp-pitch-up">&#9650;</button>
+            <button class="bpm-arrow" id="pr-stamp-pitch-dn">&#9660;</button>
+          </div>
+        </div>
+        <button id="pr-stamp-mode-btn" class="nes-btn pr-topbar-btn" title="Toggle semitones vs scale steps">SEMI</button>
+        <span class="pr-topbar-label">INTERVAL</span>
+        <select id="pr-stamp-interval" style="${selStyle}">
+          <option value="0.0625" selected>1/16</option>
+          <option value="0.125">1/8</option>
+          <option value="0.25">1/4</option>
+        </select>
+      </div>
+
+      <!-- spacer -->
+      <div style="flex:1;min-width:4px;"></div>
+
+      <!-- SNAP + CLOSE (right-aligned) -->
+      <span class="pr-topbar-label">SNAP</span>
+      <select id="pr-snap-sel" style="${selStyle}">
+        <option value="0.25">1/4</option>
+        <option value="0.125" selected>1/8</option>
+        <option value="0.0625">1/16</option>
+        <option value="0.03125">1/32</option>
+      </select>
+      <button id="pr-close-btn" class="nes-btn pr-topbar-btn"
+        style="color:var(--accent);border-color:var(--accent);">&#10005;</button>
+    `;
+    _wirePRTopbar();
+  }
+
+  function _wirePRTopbar() {
+    if (!PR._tool) PR._tool = 'default';
+    if (PR._snapVal === undefined) PR._snapVal = 0.125;
+    if (!PR._stampPitchMode) PR._stampPitchMode = 'semi';
+    if (PR._stampCount === undefined) PR._stampCount = 4;
+    if (PR._stampPitchDelta === undefined) PR._stampPitchDelta = 0;
+    if (PR._stampInterval === undefined) PR._stampInterval = 0.0625;
+
+    const syncBtnChord = (engaged) => {
+      const bc = document.getElementById('btn-chord');
+      if (bc) bc.classList.toggle('engaged', engaged);
+    };
+
+    const setTool = (t) => {
+      PR._tool = t;
+      document.getElementById('pr-tool-default').classList.toggle('engaged', t === 'default');
+      document.getElementById('pr-tool-stamp').classList.toggle('engaged', t === 'stamp');
+      document.getElementById('pr-tool-magic').classList.toggle('engaged', t === 'magic');
+      const sc = document.getElementById('pr-stamp-controls');
+      if (sc) sc.style.display = t === 'stamp' ? 'flex' : 'none';
+      MagicGen.engaged = (t === 'magic');
+      syncBtnChord(MagicGen.engaged);
+    };
+
+    // Sync initial tool if MagicGen was already engaged (e.g. re-opening panel)
+    if (MagicGen.engaged) PR._tool = 'magic';
+
+    document.getElementById('pr-tool-default').onclick = () => setTool('default');
+    document.getElementById('pr-tool-stamp').onclick   = () => setTool('stamp');
+    document.getElementById('pr-tool-magic').onclick   = () => setTool(PR._tool === 'magic' ? 'default' : 'magic');
+    setTool(PR._tool);
+
+    document.getElementById('pr-snap-sel').value = String(PR._snapVal);
+    document.getElementById('pr-snap-sel').onchange = function() { PR._snapVal = parseFloat(this.value); };
+
+    // COUNT stepper
+    const countEl = document.getElementById('pr-stamp-count-val');
+    countEl.textContent = PR._stampCount;
+    document.getElementById('pr-stamp-count-up').onclick = () => { PR._stampCount = Math.min(16, PR._stampCount + 1); countEl.textContent = PR._stampCount; };
+    document.getElementById('pr-stamp-count-dn').onclick = () => { PR._stampCount = Math.max(2,  PR._stampCount - 1); countEl.textContent = PR._stampCount; };
+
+    // LEN select — sets _stampDuration so single-note placement also benefits
+    const lenSel = document.getElementById('pr-stamp-len');
+    if (PR._stampDuration !== null && PR._stampDuration !== undefined) {
+      lenSel.value = String(PR._stampDuration);
+    }
+    lenSel.onchange = function() { PR._stampDuration = parseFloat(this.value); };
+
+    // PITCH Δ stepper
+    const pitchEl = document.getElementById('pr-stamp-pitch-val');
+    pitchEl.textContent = PR._stampPitchDelta;
+    document.getElementById('pr-stamp-pitch-up').onclick = () => { PR._stampPitchDelta = Math.min(24,  PR._stampPitchDelta + 1); pitchEl.textContent = PR._stampPitchDelta; };
+    document.getElementById('pr-stamp-pitch-dn').onclick = () => { PR._stampPitchDelta = Math.max(-24, PR._stampPitchDelta - 1); pitchEl.textContent = PR._stampPitchDelta; };
+
+    // PITCH mode toggle
+    const modeBtn = document.getElementById('pr-stamp-mode-btn');
+    modeBtn.textContent = PR._stampPitchMode === 'scale' ? 'SCALE' : 'SEMI';
+    modeBtn.onclick = () => {
+      PR._stampPitchMode = PR._stampPitchMode === 'scale' ? 'semi' : 'scale';
+      modeBtn.textContent = PR._stampPitchMode === 'scale' ? 'SCALE' : 'SEMI';
+    };
+
+    // INTERVAL select
+    const intSel = document.getElementById('pr-stamp-interval');
+    intSel.value = String(PR._stampInterval);
+    intSel.onchange = function() { PR._stampInterval = parseFloat(this.value); };
+
+    document.getElementById('pr-close-btn').onclick = () => {
+      document.getElementById('pianoroll-panel').style.display = 'none';
+      document.getElementById('panel-divider').style.display = 'none';
+      PR.activePattern = null;
+      setTool('default');
+      AV.resize();
+    };
+
+    // Expose setTool so btn-chord can sync the toggle
+    PR._setPRTool = setTool;
+  }
+
   // Warn before navigating away so an accidental swipe/back doesn't lose unsaved work
   window.addEventListener('beforeunload', e => {
     e.preventDefault();
@@ -7380,6 +7972,7 @@ const ExportEngine = {
 
   window.addEventListener('DOMContentLoaded', () => {
     buildTopBar();
+    buildPRTopbar();
     wireTransport();
     wireDivider();
     createDemoState();
