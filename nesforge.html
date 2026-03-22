@@ -849,7 +849,11 @@ body.mobile-mode #mobile-app { display: flex !important; }
     for (const track of ProjectState.tracks) {
       for (const entry of track.arrangement) {
         const pat = track.patterns.find(p => p.id === entry.patternId);
-        if (pat) max = Math.max(max, entry.startBar + pat.lengthBars);
+        if (!pat) continue;
+        // Use loopBars when it extends the pattern beyond its editable length
+        const span = (entry.loopBars && entry.loopBars > pat.lengthBars)
+          ? entry.loopBars : pat.lengthBars;
+        max = Math.max(max, entry.startBar + span);
       }
     }
     return max;
@@ -2127,11 +2131,14 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
       // Marquee selection overlay
       if (this._dragState?.type === 'marquee') {
-        const { startX, startY, currentX, currentY } = this._dragState;
-        const rx = Math.min(startX, currentX);
-        const ry = Math.min(startY, currentY);
-        const rw = Math.abs(currentX - startX);
-        const rh = Math.abs(currentY - startY);
+        const { startX, startY, currentX, currentY, startScrollX = this.scrollX, startScrollY = this.scrollY } = this._dragState;
+        // Re-project marquee start to current canvas space (scroll may have changed during drag)
+        const canvasStartX = startX + (startScrollX - this.scrollX);
+        const canvasStartY = startY + (startScrollY - this.scrollY);
+        const rx = Math.min(canvasStartX, currentX);
+        const ry = Math.min(canvasStartY, currentY);
+        const rw = Math.abs(currentX - canvasStartX);
+        const rh = Math.abs(currentY - canvasStartY);
         ctx.fillStyle = 'rgba(0,185,190,0.15)';
         ctx.fillRect(rx, ry, rw, rh);
         ctx.strokeStyle = '#00b9be';
@@ -2366,18 +2373,25 @@ body.mobile-mode #mobile-app { display: flex !important; }
           selMap.set(note, note.duration); // always include dragged note (may already be there)
           dragState = { type: 'resize', note, startX: mx, origDur: note.duration, selMap, snapshot };
         } else if (e.altKey) {
-          // Option+drag: clone note and drag the copy; original stays in place
+          // Option+drag: clone note(s) and drag the copies; originals stay in place.
+          // If the hit note is part of a multi-note selection, clone the whole selection.
+          const selectedNotes = ap.pattern.notes.filter(n => n.selected);
+          const notesToCopy = (note.selected && selectedNotes.length > 1) ? selectedNotes : [note];
           ap.pattern.notes.forEach(n => { n.selected = false; });
-          const clone = { ...note, id: makeId(), selected: true };
-          if (clone.chordId) { delete clone.chordId; delete clone.chordLabel; } // detach from chord group
-          ap.pattern.notes.push(clone);
+          const clones = notesToCopy.map(n => {
+            const c = { ...n, id: makeId(), selected: true };
+            if (c.chordId) { delete c.chordId; delete c.chordLabel; } // detach from chord group
+            return c;
+          });
+          ap.pattern.notes.push(...clones);
+          const hitClone = clones[notesToCopy.indexOf(note)] || clones[0];
           dragState = {
-            type: 'move', note: clone,
+            type: 'move', note: hitClone,
             startX: mx, startY: my,
-            origPitch: clone.pitch, origStart: clone.start,
-            lastPitch: clone.pitch, lastStart: clone.start,
+            origPitch: hitClone.pitch, origStart: hitClone.start,
+            lastPitch: hitClone.pitch, lastStart: hitClone.start,
             hasMoved: false,
-            movingSelection: false,
+            movingSelection: clones.length > 1,
             snapshot
           };
           this.draw();
@@ -2403,7 +2417,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
         ap.pattern.notes.forEach(n => { n.selected = false; });
         const pos = posToNote(mx, my);
         if (pos) this._selectedCell = pos;
-        dragState = { type: 'marquee', startX: mx, startY: my, currentX: mx, currentY: my };
+        dragState = { type: 'marquee', startX: mx, startY: my, currentX: mx, currentY: my, startScrollX: this.scrollX, startScrollY: this.scrollY };
         this._dragState = dragState;
         this.draw();
       }
@@ -2570,22 +2584,28 @@ body.mobile-mode #mobile-app { display: flex !important; }
       } else if (dragState.type === 'marquee') {
         const ap = this.activePattern;
         if (ap) {
-          const { startX, startY, currentX, currentY } = dragState;
-          const rectLeft   = Math.min(startX, currentX);
-          const rectRight  = Math.max(startX, currentX);
-          const rectTop    = Math.min(startY, currentY);
-          const rectBottom = Math.max(startY, currentY);
+          const { startX, startY, currentX, currentY, startScrollX = this.scrollX, startScrollY = this.scrollY } = dragState;
+          // Convert marquee corners to world (scroll-independent) coordinates so notes
+          // scrolled into view during the drag are included in the selection.
           const barW = this.barWidth();
           const isNoise = isDrumChannel(ap.track.channelType);
           const rows = isNoise ? this.DRUM_ROWS : null;
           const drumOffset = isNoise ? this.RULER_HEIGHT : 0;
+          const startWorldX = startX - this.KEY_WIDTH + startScrollX;
+          const startWorldY = startY + startScrollY;
+          const curWorldX   = currentX - this.KEY_WIDTH + this.scrollX;
+          const curWorldY   = currentY + this.scrollY;
+          const rectLeft   = Math.min(startWorldX, curWorldX);
+          const rectRight  = Math.max(startWorldX, curWorldX);
+          const rectTop    = Math.min(startWorldY, curWorldY);
+          const rectBottom = Math.max(startWorldY, curWorldY);
           for (const note of ap.pattern.notes) {
             const rowIdx = isNoise ? rows.indexOf(note.pitch) : (127 - note.pitch);
-            const noteX = this.KEY_WIDTH + note.start * barW - this.scrollX;
-            const noteY = drumOffset + rowIdx * this.ROW_HEIGHT - this.scrollY;
+            const noteWorldX = note.start * barW;
+            const noteWorldY = drumOffset + rowIdx * this.ROW_HEIGHT;
             const noteW = note.duration * barW;
-            if (noteX < rectRight && noteX + noteW > rectLeft &&
-                noteY < rectBottom && noteY + this.ROW_HEIGHT > rectTop) {
+            if (noteWorldX < rectRight && noteWorldX + noteW > rectLeft &&
+                noteWorldY < rectBottom && noteWorldY + this.ROW_HEIGHT > rectTop) {
               note.selected = true;
             }
           }
@@ -3816,6 +3836,8 @@ function showTrackSettings(track, x, y) {
       if (PR.activePattern && PR.activePattern.track === track) {
         PR.activePattern = null;
         document.getElementById('pianoroll-panel').style.display = 'none';
+        document.getElementById('panel-divider').style.display = 'none';
+        AV.resize();
       }
       conf.remove();
       AV.draw();
@@ -4482,9 +4504,9 @@ const MagicGen = (() => {
     ...DEGREE_NAMES.map((label, i) => ({ value: i, label })),
   ];
   const TONE_LABELS = { 0: '1', 1: '3', 2: '5', 3: '7', 4: '8' };
-  const CHROMATIC_LABELS = { 0:'1', 1:'2', 2:'3', 3:'4', 4:'5', 5:'6', 6:'7' };
+  const CHROMATIC_LABELS = { 0:'1', 1:'b2', 2:'2', 3:'b3', 4:'3', 5:'4', 6:'b5', 7:'5', 8:'b6', 9:'6', 10:'b7', 11:'7' };
   const _getToneLabel = (idx) => _state.typeName === 'Chromatic' ? (CHROMATIC_LABELS[idx] || '?') : (TONE_LABELS[idx] || '?');
-  const _maxToneIdx   = ()    => _state.typeName === 'Chromatic' ? 6 : _state.numNotes - 1;
+  const _maxToneIdx   = ()    => _state.typeName === 'Chromatic' ? 11 : _state.numNotes - 1;
 
   // Diatonic quality map from interval set
   function detectQuality(third, fifth) {
@@ -4556,6 +4578,9 @@ const MagicGen = (() => {
   let _arpPreviewLooping = false;
   let _arpLoopTimer = null;          // dedicated handle for the loop iteration timer
   let _arpHighlightTimers = [];      // handles for per-step highlight timeouts
+  let _arpStopFns = [];              // stop closures for currently scheduled audio nodes
+  let _arpCurrentStepIdx = 0;       // step-by-step counter for custom mode
+  let _arpNextStepTime = 0;         // scheduled Web Audio time for the next step
 
   function _getTrack() {
     if (PR.activePattern) return PR.activePattern.track;
@@ -4638,7 +4663,7 @@ const MagicGen = (() => {
   function _buildArpTones() {
     if (_state.typeName === 'Chromatic') {
       const root = _rootMidi() + _state.octave * 12;
-      return [0,1,2,3,4,5,6].map(i => root + i).filter(n => n >= 0 && n <= 127);
+      return [0,1,2,3,4,5,6,7,8,9,10,11].map(i => root + i).filter(n => n >= 0 && n <= 127);
     }
     return buildChordNotes(_rootMidi(), _state.typeName, _state.numNotes, _state.octave, 0);
   }
@@ -4696,6 +4721,7 @@ const MagicGen = (() => {
     _previewPlaying = false;
     clearTimeout(_arpLoopTimer); _arpLoopTimer = null;
     _arpHighlightTimers.forEach(clearTimeout); _arpHighlightTimers = [];
+    _arpStopFns.forEach(fn => { try { fn(); } catch(e) {} }); _arpStopFns = [];
     document.querySelectorAll('.mg-step-tone.preview-active').forEach(el => el.classList.remove('preview-active'));
     _updateArpPreviewBtn();
   }
@@ -4721,42 +4747,75 @@ const MagicGen = (() => {
     const track = _getTrack();
     if (!track) { _stopArpPreview(); return; }
     const ctx = getAudioCtx();
-    const tones = _buildArpTones();
-    const t0 = ctx.currentTime + 0.05;
-    let totalBars = 0;
+
+    // If browser suspended the AudioContext, resume and retry
+    if (ctx.state !== 'running') {
+      ctx.resume().catch(() => {});
+      _arpLoopTimer = setTimeout(_scheduleArpLoop, 150);
+      return;
+    }
 
     if (_state.arpCustom && _state.arpSteps.length > 0) {
-      let pos = 0;
-      _state.arpSteps.forEach((step, stepIdx) => {
-        const lenBars = _noteLenBars(step.len);
-        const startTime = t0 + barToSeconds(pos);
-        if (step.toneIdx >= 0 && tones[step.toneIdx] != null) {
-          const pitch = Math.max(0, Math.min(127, tones[step.toneIdx] + (step.octave || 0) * 12));
-          playNote(track, { pitch, start: 0, duration: lenBars, velocity: 90 }, startTime);
-        }
-        // Light up this step cell when it fires
-        const delayMs = Math.max(0, (startTime - ctx.currentTime) * 1000);
-        _arpHighlightTimers.push(setTimeout(() => {
-          if (!_arpPreviewLooping) return;
-          document.querySelectorAll('.mg-step-tone.preview-active').forEach(el => el.classList.remove('preview-active'));
-          const el = document.querySelector(`.mg-step-tone[data-step="${stepIdx}"]`);
-          if (el) el.classList.add('preview-active');
-        }, delayMs));
-        pos += lenBars;
-      });
-      totalBars = pos;
+      // Step-by-step scheduling: state is read right before each step plays,
+      // so tone/length/octave changes are picked up mid-sequence without restarting.
+      const stepIdx = _arpCurrentStepIdx % _state.arpSteps.length;
+
+      // Clear stale highlight timers at the start of each new cycle
+      if (stepIdx === 0) {
+        _arpHighlightTimers.forEach(clearTimeout);
+        _arpHighlightTimers = [];
+      }
+
+      const step = _state.arpSteps[stepIdx];
+      const tones = _buildArpTones();
+      const lenBars = _noteLenBars(step.len);
+      const lenSecs = barToSeconds(lenBars);
+
+      // Stop any previously scheduled note that hasn't played yet (e.g. from a rapid change)
+      _arpStopFns.forEach(fn => { try { fn(); } catch(e) {} });
+      _arpStopFns = [];
+
+      if (step.toneIdx >= 0 && tones[step.toneIdx] != null) {
+        const pitch = Math.max(0, Math.min(127, tones[step.toneIdx] + (step.octave || 0) * 12));
+        const stopFn = playNote(track, { pitch, start: 0, duration: lenBars, velocity: 90 }, _arpNextStepTime);
+        if (stopFn) _arpStopFns = [stopFn];
+      }
+
+      const delayMs = Math.max(0, (_arpNextStepTime - ctx.currentTime) * 1000);
+      _arpHighlightTimers.push(setTimeout(() => {
+        if (!_arpPreviewLooping) return;
+        document.querySelectorAll('.mg-step-tone.preview-active').forEach(el => el.classList.remove('preview-active'));
+        const el = document.querySelector(`.mg-step-tone[data-step="${stepIdx}"]`);
+        if (el) el.classList.add('preview-active');
+      }, delayMs));
+
+      _arpCurrentStepIdx++;
+      _arpNextStepTime += lenSecs;
+
+      // Fire again just before the next step needs to start (20ms lookahead margin)
+      const msUntilNext = Math.max(0, (_arpNextStepTime - ctx.currentTime) * 1000 - 20);
+      _arpLoopTimer = setTimeout(_scheduleArpLoop, msUntilNext);
+
     } else {
+      // Auto mode: bulk-schedule the whole loop iteration, re-read state each cycle
+      _arpHighlightTimers.forEach(clearTimeout);
+      _arpHighlightTimers = [];
+      _arpStopFns.forEach(fn => { try { fn(); } catch(e) {} });
+      _arpStopFns = [];
+
+      const tones = _buildArpTones();
+      const t0 = ctx.currentTime + 0.05;
       const seq = _buildArpSequence(tones, _state.arpPattern, _state.arpMirror, 1);
       if (!seq.length) { _stopArpPreview(); return; }
       const noteLenBars = _noteLenBars(_state.arpNoteLen);
       seq.forEach((pitch, i) => {
-        playNote(track, { pitch, start: 0, duration: noteLenBars, velocity: 90 }, t0 + barToSeconds(i * noteLenBars));
+        const stopFn = playNote(track, { pitch, start: 0, duration: noteLenBars, velocity: 90 }, t0 + barToSeconds(i * noteLenBars));
+        if (stopFn) _arpStopFns.push(stopFn);
       });
-      totalBars = seq.length * noteLenBars;
+      const totalBars = seq.length * noteLenBars;
+      if (totalBars === 0) { _stopArpPreview(); return; }
+      _arpLoopTimer = setTimeout(_scheduleArpLoop, (t0 - ctx.currentTime + barToSeconds(totalBars)) * 1000);
     }
-
-    if (totalBars === 0) { _stopArpPreview(); return; }
-    _arpLoopTimer = setTimeout(_scheduleArpLoop, (t0 - ctx.currentTime + barToSeconds(totalBars)) * 1000);
   }
 
   function _previewArp() {
@@ -4770,6 +4829,8 @@ const MagicGen = (() => {
     ensureAudioCtxRunning().then(() => {
       _arpPreviewLooping = true;
       _previewPlaying = true;
+      _arpCurrentStepIdx = 0;
+      _arpNextStepTime = getAudioCtx().currentTime + 0.05;
       _updateArpPreviewBtn();
       _scheduleArpLoop();
     });
@@ -4849,6 +4910,15 @@ const MagicGen = (() => {
     });
     _state.arpSteps = steps;
   }
+
+  // Clamp existing step toneIdxes to the current max without wiping the sequence
+  function _clampCustomSteps() {
+    const newMax = _maxToneIdx();
+    _state.arpSteps.forEach(step => {
+      if (step.toneIdx > newMax) step.toneIdx = newMax;
+    });
+  }
+
 
   // ── DRUM MAGIC ──
 
@@ -5332,8 +5402,7 @@ const MagicGen = (() => {
 
     // --- ARPEGGIO-specific params ---
     if (_state.mode === 'ARPEGGIO') {
-      if (_state.typeName !== 'Chromatic') {
-        html += `
+      html += `
         <div class="mg-row">
           <span class="mg-label">NOTES</span>
           <div class="mg-seg" style="width:110px;">
@@ -5342,7 +5411,6 @@ const MagicGen = (() => {
             <button id="mg-notes-5" class="${_state.numNotes===5?'active':''}">5</button>
           </div>
         </div>`;
-      }
       html += `
         <div class="mg-row">
           <span class="mg-label">OCTAVE</span>
@@ -5499,9 +5567,9 @@ const MagicGen = (() => {
     document.getElementById('mg-type').onchange = e => {
       _state.typeName = e.target.value;
       if (_state.mode === 'ARPEGGIO' && _state.arpCustom) {
-        _prefillCustomSteps();
-        _renderModal();
+        _clampCustomSteps();
       }
+      _renderModal();
     };
 
     if (_state.mode === 'CHORD') {
@@ -5521,9 +5589,9 @@ const MagicGen = (() => {
     }
 
     if (_state.mode === 'ARPEGGIO') {
-      document.getElementById('mg-notes-3').onclick = () => { _state.numNotes = 3; if (_state.arpCustom) _prefillCustomSteps(); _renderModal(); };
-      document.getElementById('mg-notes-4').onclick = () => { _state.numNotes = 4; if (_state.arpCustom) _prefillCustomSteps(); _renderModal(); };
-      document.getElementById('mg-notes-5').onclick = () => { _state.numNotes = 5; if (_state.arpCustom) _prefillCustomSteps(); _renderModal(); };
+      document.getElementById('mg-notes-3').onclick = () => { _state.numNotes = 3; if (_state.arpCustom) _clampCustomSteps(); _renderModal(); };
+      document.getElementById('mg-notes-4').onclick = () => { _state.numNotes = 4; if (_state.arpCustom) _clampCustomSteps(); _renderModal(); };
+      document.getElementById('mg-notes-5').onclick = () => { _state.numNotes = 5; if (_state.arpCustom) _clampCustomSteps(); _renderModal(); };
       document.getElementById('mg-oct-dn').onclick = () => {
         if (_state.octave > -2) { _state.octave--; document.getElementById('mg-oct-val').textContent = _state.octave >= 0 ? '+'+_state.octave : _state.octave; }
       };
@@ -6062,7 +6130,7 @@ function wireTransport() {
 // ============================================================
 const ExportEngine = {
 
-  async renderOffline() {
+  async renderOffline(onProgress) {
     const songBars = getSongLengthBars();
     const durationSecs = barToSeconds(songBars) + 0.5; // pad
     // Use real context sample rate — iOS defaults to 48000, not 44100
@@ -6075,20 +6143,44 @@ const ExportEngine = {
     masterGain.node = null;
     _reverbCache['room'] = null; _reverbCache['hall'] = null;
 
-    // Schedule all notes
+    // Schedule all notes, tiling patterns that have loopBars > pat.lengthBars
     for (const track of ProjectState.tracks) {
       for (const entry of track.arrangement) {
         const pat = track.patterns.find(p => p.id === entry.patternId);
         if (!pat) continue;
-        const patStart = barToSeconds(entry.startBar);
+        const totalBars = (entry.loopBars && entry.loopBars > pat.lengthBars)
+          ? entry.loopBars : pat.lengthBars;
         for (const note of pat.notes) {
-          const t = patStart + barToSeconds(note.start);
-          if (t < durationSecs) playNote(track, note, t);
+          for (let rep = 0; ; rep++) {
+            const noteBar = entry.startBar + note.start + rep * pat.lengthBars;
+            if (noteBar >= entry.startBar + totalBars) break;
+            const t = barToSeconds(noteBar);
+            if (t >= durationSecs) break;
+            playNote(track, note, t);
+          }
         }
       }
     }
 
-    const rendered = await offCtx.startRendering();
+    // Poll progress via a timer — OfflineAudioContext has no progress event
+    let pollTimer = null;
+    if (onProgress) {
+      const startWall = performance.now();
+      // Offline rendering is typically ~10-30× faster than real-time; use 15× as estimate
+      const estimatedMs = (durationSecs / 15) * 1000;
+      pollTimer = setInterval(() => {
+        const elapsed = performance.now() - startWall;
+        onProgress(Math.min(0.95, elapsed / estimatedMs));
+      }, 80);
+    }
+
+    let rendered;
+    try {
+      rendered = await offCtx.startRendering();
+    } finally {
+      if (pollTimer) clearInterval(pollTimer);
+    }
+    if (onProgress) onProgress(1);
 
     // Restore real context. Clear reverb cache — offline ConvolverNodes cannot be
     // reused in a different AudioContext and would throw NotSupportedError.
@@ -6137,15 +6229,33 @@ const ExportEngine = {
 
   async exportWAV() {
     const btn = document.getElementById('exp-wav');
+
+    // Build inline progress bar
+    let progressEl = document.getElementById('exp-wav-progress');
+    if (!progressEl) {
+      progressEl = document.createElement('div');
+      progressEl.id = 'exp-wav-progress';
+      progressEl.style.cssText = 'margin-top:8px;height:6px;background:#1a1a2e;border:1px solid #15788c;border-radius:0;overflow:hidden;';
+      const fill = document.createElement('div');
+      fill.id = 'exp-wav-progress-fill';
+      fill.style.cssText = 'height:100%;width:0%;background:#00b9be;transition:width 0.1s linear;';
+      progressEl.appendChild(fill);
+      if (btn) btn.parentNode.insertBefore(progressEl, btn.nextSibling);
+    }
+    const fill = document.getElementById('exp-wav-progress-fill');
+    const setProgress = (p) => { if (fill) fill.style.width = Math.round(p * 100) + '%'; };
+
     if (btn) btn.textContent = 'RENDERING...';
+    setProgress(0);
     try {
-      const buf = await this.renderOffline();
+      const buf = await this.renderOffline(setProgress);
       const wav = this.encodeWAV(buf);
       this.downloadBlob(wav, 'nesforge-export.wav', 'audio/wav');
     } catch(e) {
       alert('WAV export failed: ' + e.message);
     } finally {
       if (btn) btn.textContent = 'EXPORT WAV';
+      setTimeout(() => { if (progressEl) progressEl.remove(); }, 800);
     }
   },
 
@@ -6695,9 +6805,9 @@ const ExportEngine = {
       });
       document.getElementById('mob-exp-wav').addEventListener('click', async () => {
         document.getElementById('mob-export-dialog').classList.remove('open');
-        this._showToast('RENDERING...');
+        this._showToast('RENDERING... 0%');
         try {
-          const buf = await ExportEngine.renderOffline();
+          const buf = await ExportEngine.renderOffline(p => this._showToast('RENDERING... ' + Math.round(p * 100) + '%'));
           const wav = ExportEngine.encodeWAV(buf);
           ExportEngine.downloadBlob(wav, 'nesforge-' + Date.now() + '.wav', 'audio/wav');
         } catch (err) {
@@ -7217,9 +7327,9 @@ const ExportEngine = {
     },
 
     async _shareAudio() {
-      this._showToast('RENDERING...');
+      this._showToast('RENDERING... 0%');
       try {
-        const buf = await ExportEngine.renderOffline();
+        const buf = await ExportEngine.renderOffline(p => this._showToast('RENDERING... ' + Math.round(p * 100) + '%'));
         const wavData = ExportEngine.encodeWAV(buf);
         const fileName = 'nesforge-' + Date.now() + '.wav';
 
@@ -7261,6 +7371,12 @@ const ExportEngine = {
       }
     }
   };
+
+  // Warn before navigating away so an accidental swipe/back doesn't lose unsaved work
+  window.addEventListener('beforeunload', e => {
+    e.preventDefault();
+    e.returnValue = '';
+  });
 
   window.addEventListener('DOMContentLoaded', () => {
     buildTopBar();
