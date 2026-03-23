@@ -769,7 +769,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   padding: 2px 3px; width: 100%; box-sizing: border-box; border-radius: 0;
 }
 .pr-topbar-label {
-  font-size: 5px; color: var(--text2); letter-spacing: 0.05rem;
+  font-size: 8px; color: var(--text2); letter-spacing: 0.05rem;
   white-space: nowrap; flex-shrink: 0;
 }
 .pr-topbar-btn {
@@ -1875,7 +1875,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
         if (panel) panel.style.display = 'none';
         const div = document.getElementById('panel-divider');
         if (div) div.style.display = 'none';
-        AV.resize();
+        requestAnimationFrame(() => { AV.resize(); AV.draw(); });
+        return;
       }
       AV.draw();
     },
@@ -2284,47 +2285,40 @@ body.mobile-mode #mobile-app { display: flex !important; }
         ? Math.round(selected.reduce((s, n) => s + n.velocity, 0) / selected.length)
         : note.velocity;
       const pitchName = multi ? null : NOTE_NAMES[note.pitch % 12] + Math.floor(note.pitch / 12);
-      const startStr = multi ? null
-        : 'B' + (Math.floor(note.start) + 1) + ' S' + (Math.round((note.start % 1) * 16) + 1);
       const isChromatic = ProjectState.scale === 'Chromatic';
       const selStyle = `font-size:8px;width:100%;font-family:'Press Start 2P',monospace;background:#46425e;color:#ffeecc;border:1px solid #15788c;box-sizing:border-box;`;
+      const lblStyle = `font-size:8px;color:#ffb0a3;font-family:'Press Start 2P',monospace;letter-spacing:0.05rem;flex-shrink:0;`;
+      const rowStyle = `display:flex;align-items:center;gap:5px;padding:2px 0;`;
+      const valStyle = `font-size:8px;color:#ffeecc;font-family:'Press Start 2P',monospace;background:#46425e;border:1px solid #15788c;padding:2px 4px;flex:1;`;
 
       el.innerHTML = `
         ${multi ? `<div style="font-size:5px;color:var(--text2);margin-bottom:3px;">${selected.length} NOTES</div>` : ''}
         ${!multi ? `
-        <div class="pr-info-row">
-          <span class="pr-info-label">PITCH</span>
-          <span class="pr-info-value">${pitchName}</span>
-        </div>
-        <div class="pr-info-row">
-          <span class="pr-info-label">START</span>
-          <span class="pr-info-value">${startStr}</span>
+        <div style="display:flex;align-items:center;gap:5px;padding:2px 0;">
+          <span style="font-size:8px;color:#ffb0a3;font-family:'Press Start 2P',monospace;letter-spacing:0.05rem;">PITCH</span>
+          <span style="font-size:8px;color:#ffeecc;font-family:'Press Start 2P',monospace;">${pitchName}</span>
         </div>` : ''}
-        <div class="pr-info-row">
-          <span class="pr-info-label">LEN</span>
-          <div style="display:flex;align-items:center;gap:2px;">
-            <span class="pr-info-value" style="flex:1;">${lenStr}</span>
-            <div style="display:flex;flex-direction:column;gap:1px;">
-              <button class="bpm-arrow" id="pr-len-up">&#9650;</button>
-              <button class="bpm-arrow" id="pr-len-dn">&#9660;</button>
-            </div>
+        <div style="${rowStyle}">
+          <span style="${lblStyle}">LEN</span>
+          <span style="${valStyle}">${lenStr}</span>
+          <div style="display:flex;flex-direction:column;gap:1px;">
+            <button class="bpm-arrow" id="pr-len-up">&#9650;</button>
+            <button class="bpm-arrow" id="pr-len-dn">&#9660;</button>
           </div>
         </div>
-        <div class="pr-info-row">
-          <span class="pr-info-label">VEL</span>
-          <div style="display:flex;align-items:center;gap:2px;">
-            <span class="pr-info-value" style="flex:1;" id="pr-vel-display">${displayVel}</span>
-            <div style="display:flex;flex-direction:column;gap:1px;">
-              <button class="bpm-arrow" id="pr-vel-up">&#9650;</button>
-              <button class="bpm-arrow" id="pr-vel-dn">&#9660;</button>
-            </div>
+        <div style="${rowStyle}">
+          <span style="${lblStyle}">VEL</span>
+          <span style="${valStyle}" id="pr-vel-display">${displayVel}</span>
+          <div style="display:flex;flex-direction:column;gap:1px;">
+            <button class="bpm-arrow" id="pr-vel-up">&#9650;</button>
+            <button class="bpm-arrow" id="pr-vel-dn">&#9660;</button>
           </div>
         </div>
 
         <div class="pr-section-divider"></div>
         <div class="pr-side-title" style="margin-top:2px;">RHYTHM</div>
-        <div class="pr-info-row">
-          <span class="pr-info-label">GRID</span>
+        <div style="${rowStyle}">
+          <span style="${lblStyle}">GRID</span>
           <select id="pr-rhythm-grid" style="${selStyle}">
             <option value="0.25">1/4</option>
             <option value="0.125">1/8</option>
@@ -2335,13 +2329,13 @@ body.mobile-mode #mobile-app { display: flex !important; }
             <option value="triplet-16th">&#9836;3 (16th triplet)</option>
           </select>
         </div>
-        <div style="display:flex;gap:3px;margin-top:3px;">
-          <button class="nes-btn" id="pr-quantize-btn" style="flex:1;font-size:7px;">QUANTIZE</button>
-          <button class="nes-btn" id="pr-redist-btn"   style="flex:1;font-size:7px;">REDISTRIBUTE</button>
+        <div style="display:flex;flex-direction:column;gap:3px;margin-top:3px;">
+          <button class="nes-btn" id="pr-quantize-btn" style="width:100%;font-size:7px;">QUANTIZE</button>
+          <button class="nes-btn" id="pr-redist-btn"   style="width:100%;font-size:7px;">REDISTRIBUTE</button>
         </div>
 
         <div class="pr-section-divider"></div>
-        <div class="pr-side-title" style="margin-top:2px;">PITCH</div>
+        <div class="pr-side-title" style="margin-top:2px;">SHIFT PITCH</div>
         <div style="display:flex;gap:2px;justify-content:space-between;">
           <button class="nes-btn" id="pr-pitch-oct-dn"  style="flex:1;font-size:7px;padding:0;">-8VA</button>
           <button class="nes-btn" id="pr-pitch-semi-dn" style="flex:1;font-size:7px;padding:0;">-ST</button>
@@ -2349,17 +2343,17 @@ body.mobile-mode #mobile-app { display: flex !important; }
           <button class="nes-btn" id="pr-pitch-oct-up"  style="flex:1;font-size:7px;padding:0;">+8VA</button>
         </div>
         ${!isChromatic ? `
-        <div style="display:flex;gap:2px;justify-content:space-between;margin-top:3px;">
-          <button class="nes-btn" id="pr-pitch-step-dn" style="flex:1;font-size:7px;padding:0;">-STEP</button>
-          <button class="nes-btn" id="pr-pitch-step-up" style="flex:1;font-size:7px;padding:0;">+STEP</button>
+        <div style="${rowStyle}margin-top:3px;">
+          <span style="${lblStyle}">SCALE STEP</span>
+          <button class="nes-btn" id="pr-pitch-step-dn" style="font-size:8px;padding:0 6px;">-</button>
+          <button class="nes-btn" id="pr-pitch-step-up" style="font-size:8px;padding:0 6px;">+</button>
         </div>
-        <span class="pr-info-label" style="margin-top:2px;display:block;">SCALE STEP</span>
         ` : ''}
 
         <div class="pr-section-divider"></div>
         <div class="pr-side-title" style="margin-top:2px;">HARMONIZE</div>
-        <div class="pr-info-row">
-          <span class="pr-info-label">INTERVAL</span>
+        <div style="${rowStyle}">
+          <span style="${lblStyle}">INTV</span>
           <select id="pr-harm-interval" style="${selStyle}">
             <option value="2">3rd &#8593;</option>
             <option value="3">4th &#8593;</option>
@@ -3408,6 +3402,7 @@ const AV = {
   NOTE_COLORS: PR.NOTE_COLORS,
   _selEntries: new Set(),   // selected arrangement entry objects
   _avMarquee: null,         // { startX, startY, currentX, currentY }
+  _hoverHit: null,          // hit object under cursor for hover highlights
 
   getCanvas() { return document.getElementById('arrangement-canvas'); },
 
@@ -3464,6 +3459,12 @@ const AV = {
     ctx.strokeStyle = '#15788c';
     ctx.beginPath(); ctx.moveTo(0, RULER_HEIGHT); ctx.lineTo(W, RULER_HEIGHT); ctx.stroke();
 
+    // Clip all timeline content to the right of the header so it never bleeds over the buttons
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(HEADER_WIDTH, 0, W - HEADER_WIDTH, RULER_HEIGHT);
+    ctx.clip();
+
     const barW = this.barWidth();
     const songLen = getSongLengthBars() + 4;
     for (let b = 0; b <= songLen; b++) {
@@ -3491,6 +3492,31 @@ const AV = {
     const px = HEADER_WIDTH + ProjectState.playheadBar * barW - scrollX;
     ctx.strokeStyle = '#ffeecc';
     ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, RULER_HEIGHT); ctx.stroke();
+
+    ctx.restore();
+
+    // Draw buttons last so they always appear on top of any timeline overflow
+    const hz = this._hoverHit?.zone;
+    // Add track (+)
+    ctx.fillStyle = hz === 'add-track' ? '#00b9be' : '#15788c';
+    ctx.fillRect(4, 4, 26, 28);
+    ctx.fillStyle = '#ffeecc';
+    ctx.fillRect(10, 16, 14, 4);   // horizontal bar
+    ctx.fillRect(15, 11, 4, 14);   // vertical bar
+
+    // Clear all (trash can)
+    const clearColor = hz === 'clear-all' ? '#00b9be' : '#15788c';
+    ctx.fillStyle = clearColor;
+    ctx.fillRect(34, 4, 26, 28);
+    ctx.fillStyle = '#ffeecc';
+    ctx.fillRect(43, 7, 6, 2);     // handle top
+    ctx.fillRect(41, 9, 10, 2);    // handle arch
+    ctx.fillRect(39, 11, 16, 2);   // lid
+    ctx.fillRect(40, 13, 14, 13);  // body
+    ctx.fillStyle = clearColor;    // slot cutouts
+    ctx.fillRect(43, 15, 2, 9);
+    ctx.fillRect(47, 15, 2, 9);
+    ctx.fillRect(51, 15, 2, 9);
   },
 
   _drawTracks(ctx, W, H) {
@@ -3516,16 +3542,31 @@ const AV = {
       ctx.fillText(track.name.slice(0, 10), 8, y + 20);
 
       // M / S buttons
-      ctx.fillStyle = track.muted ? '#ff6973' : '#15788c';
+      const _hh = this._hoverHit;
+      const _ht = _hh?.track === track;
+      ctx.fillStyle = track.muted ? '#ff6973' : (_ht && _hh.zone === 'mute' ? '#00b9be' : '#15788c');
       ctx.fillRect(8, y + 38, 20, 14);
       ctx.fillStyle = '#ffeecc';
       ctx.font = '5px "Press Start 2P"';
       ctx.fillText('M', 14, y + 49);
 
-      ctx.fillStyle = track.soloed ? '#ff6973' : '#15788c';
+      ctx.fillStyle = track.soloed ? '#ff6973' : (_ht && _hh.zone === 'solo' ? '#00b9be' : '#15788c');
       ctx.fillRect(34, y + 38, 20, 14);
       ctx.fillStyle = '#ffeecc';
       ctx.fillText('S', 40, y + 49);
+
+      // Mixer icon button (right of S, left of VOL)
+      ctx.fillStyle = _ht && _hh.zone === 'settings' ? '#00b9be' : '#15788c';
+      ctx.fillRect(58, y + 38, 14, 14);
+      ctx.fillStyle = '#ffeecc';
+      // Three vertical slider tracks
+      ctx.fillRect(61, y + 40, 1, 10);
+      ctx.fillRect(64, y + 40, 1, 10);
+      ctx.fillRect(67, y + 40, 1, 10);
+      // Handles staggered at different heights
+      ctx.fillRect(60, y + 42, 3, 2);
+      ctx.fillRect(63, y + 47, 3, 2);
+      ctx.fillRect(66, y + 44, 3, 2);
 
       if (track.channelType === 'dpcm') {
         const isArmed = ProjectState.armedTrackId === track.id;
@@ -3536,17 +3577,17 @@ const AV = {
         ctx.fillText('REC', 66, y + 67);
       }
 
-      // Volume bar slider — bottom aligned to y+52 (matches M/S buttons)
+      // Volume bar slider
       ctx.fillStyle = '#ffb0a3';
       ctx.font = '5px "Press Start 2P"';
-      ctx.fillText('VOL', 64, y + 35);
+      ctx.fillText('VOL', 76, y + 35);
       ctx.fillStyle = '#2a2845';
-      ctx.fillRect(64, y + 40, 80, 12);
+      ctx.fillRect(76, y + 40, 76, 12);
       ctx.fillStyle = '#00b9be';
-      ctx.fillRect(64, y + 40, track.volume * 0.8, 12);
+      ctx.fillRect(76, y + 40, track.volume * 0.76, 12);
 
       // Pan knob
-      drawPanKnob(ctx, 168, y + 42, 12, track.pan, '#00b9be');
+      drawPanKnob(ctx, 184, y + 42, 12, track.pan, '#00b9be');
 
       // Timeline area
       ctx.fillStyle = '#46425e';
@@ -3688,7 +3729,11 @@ AV.initEvents = function() {
   const getHit = (mx, my) => {
     const { HEADER_WIDTH, TRACK_HEIGHT, RULER_HEIGHT, scrollX, scrollY } = this;
     const barW = this.barWidth();
-    if (my < RULER_HEIGHT) return { zone: 'ruler' };
+    if (my < RULER_HEIGHT) {
+      if (mx >= 4 && mx <= 30) return { zone: 'add-track' };
+      if (mx >= 34 && mx <= 60) return { zone: 'clear-all' };
+      return { zone: 'ruler' };
+    }
     const trackIdx = Math.floor((my - RULER_HEIGHT + scrollY) / TRACK_HEIGHT);
     if (trackIdx < 0 || trackIdx >= ProjectState.tracks.length) return null;
     const track = ProjectState.tracks[trackIdx];
@@ -3696,6 +3741,7 @@ AV.initEvents = function() {
     if (mx < HEADER_WIDTH) {
       if (mx >= 8 && mx <= 28 && my >= ty+38 && my <= ty+52) return { zone:'mute', track };
       if (mx >= 34 && mx <= 54 && my >= ty+38 && my <= ty+52) return { zone:'solo', track };
+      if (mx >= 58 && mx <= 72 && my >= ty+38 && my <= ty+52) return { zone:'settings', track };
       return { zone: 'header', track, trackIdx };
     }
     const bar = Math.floor((mx - HEADER_WIDTH + scrollX) / barW);
@@ -3770,6 +3816,50 @@ AV.initEvents = function() {
       AV.draw();
       return;
     }
+    if (hit.zone === 'add-track') {
+      showContextMenu(e.clientX, e.clientY, [
+        { label: 'LEAD  (Pulse)',    action: () => { addTrack('pulse50',   'LEAD');  AV.resize(); AV.draw(); } },
+        { label: 'BASS  (Triangle)', action: () => { addTrack('triangle',  'BASS');  AV.resize(); AV.draw(); } },
+        { label: 'DRUMS (PCM7)',     action: () => { addTrack('pcm7',      'DRUMS'); AV.resize(); AV.draw(); } },
+      ]);
+      return;
+    }
+    if (hit.zone === 'clear-all') {
+      const conf = document.createElement('div');
+      conf.style.cssText = `position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+        background:#46425e;border:2px solid #ff4444;z-index:501;padding:14px 16px 12px;min-width:260px;`;
+      const confTitle = document.createElement('div');
+      confTitle.style.cssText = 'font:7px "Press Start 2P";color:#ff4444;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #ff4444;letter-spacing:1px;';
+      confTitle.textContent = 'CLEAR ALL?';
+      const confMsg = document.createElement('div');
+      confMsg.style.cssText = 'font:6px "Press Start 2P";color:#ffeecc;margin-bottom:14px;line-height:1.8;';
+      confMsg.textContent = 'This will delete all note containers across all tracks.';
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;gap:8px;';
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'nes-btn'; cancelBtn.textContent = 'CANCEL'; cancelBtn.style.cssText = 'flex:1;';
+      cancelBtn.onclick = () => conf.remove();
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'nes-btn'; confirmBtn.textContent = 'CLEAR ALL';
+      confirmBtn.style.cssText = 'flex:1;color:#ff4444;border-color:#ff4444;';
+      confirmBtn.onclick = () => {
+        History.push();
+        for (const track of ProjectState.tracks) { track.patterns = []; track.arrangement = []; }
+        if (PR.activePattern) {
+          PR.activePattern = null;
+          document.getElementById('pianoroll-panel').style.display = 'none';
+          document.getElementById('panel-divider').style.display = 'none';
+        }
+        conf.remove();
+        requestAnimationFrame(() => { AV.resize(); AV.draw(); });
+      };
+      btnRow.appendChild(cancelBtn); btnRow.appendChild(confirmBtn);
+      conf.appendChild(confTitle); conf.appendChild(confMsg); conf.appendChild(btnRow);
+      document.body.appendChild(conf);
+      conf.addEventListener('mousedown', ev => ev.stopPropagation());
+      setTimeout(() => document.addEventListener('mousedown', () => conf.remove(), { once: true }), 100);
+      return;
+    }
     if (hit.track) {
       const track = hit.track;
       const trackIdx = ProjectState.tracks.indexOf(track);
@@ -3787,14 +3877,14 @@ AV.initEvents = function() {
       if (hit.zone === 'header') {
         const { RULER_HEIGHT, TRACK_HEIGHT, scrollY } = this;
         const ty = RULER_HEIGHT + trackIdx * TRACK_HEIGHT - scrollY;
-        if (mx >= 64 && mx <= 144 && my >= ty+40 && my <= ty+52) {
+        if (mx >= 76 && mx <= 152 && my >= ty+40 && my <= ty+52) {
           // Direct x-position to volume mapping
-          track.volume = Math.max(0, Math.min(100, Math.round((mx - 64) / 0.8)));
+          track.volume = Math.max(0, Math.min(100, Math.round((mx - 76) / 0.76)));
           AV.draw();
           const onMove = (ev) => {
             const rect = canvas.getBoundingClientRect();
             const cmx = ev.clientX - rect.left;
-            track.volume = Math.max(0, Math.min(100, Math.round((cmx - 64) / 0.8)));
+            track.volume = Math.max(0, Math.min(100, Math.round((cmx - 76) / 0.76)));
             AV.draw();
           };
           const onUp = () => { document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); };
@@ -3803,7 +3893,7 @@ AV.initEvents = function() {
           return;
         }
         // Pan knob drag
-        if (mx >= 154 && mx <= 182 && my >= ty+29 && my <= ty+56) {
+        if (mx >= 170 && mx <= 198 && my >= ty+29 && my <= ty+56) {
           const onMove = (ev) => {
             track.pan = Math.max(-1, Math.min(1, track.pan - ev.movementY * 0.02));
             AV.draw();
@@ -3846,8 +3936,6 @@ AV.initEvents = function() {
               tracks.splice(dest, 0, moved);
               AV.draw();
             }
-          } else {
-            showTrackSettings(track, ev.clientX, ev.clientY);
           }
           this._trackDrag = null;
           AV.draw();
@@ -3859,6 +3947,7 @@ AV.initEvents = function() {
     }
     if (hit.zone === 'mute') { hit.track.muted = !hit.track.muted; AV.draw(); return; }
     if (hit.zone === 'solo') { hit.track.soloed = !hit.track.soloed; AV.draw(); return; }
+    if (hit.zone === 'settings') { showTrackSettings(hit.track, e.clientX, e.clientY); return; }
     if (hit.zone === 'empty') {
       AV._selEntries.clear();
       ProjectState.selectedPatternId = null;
@@ -3918,6 +4007,44 @@ AV.initEvents = function() {
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     const hit = getHit(mx, my);
     if (!hit) return;
+    if (hit.zone === 'header') {
+      // Double-click in track name area → inline rename
+      const trackIdx = ProjectState.tracks.indexOf(hit.track);
+      const ty = AV.RULER_HEIGHT + trackIdx * AV.TRACK_HEIGHT - AV.scrollY;
+      if (mx < 160 && my >= ty && my <= ty + 30) {
+        const inputEl = document.createElement('input');
+        inputEl.type = 'text';
+        inputEl.value = hit.track.name;
+        inputEl.style.cssText = `
+          position:fixed;
+          left:${rect.left + 5}px; top:${rect.top + ty + 7}px;
+          width:148px; height:16px;
+          background:#2a2845; color:#ffeecc;
+          border:1px solid #00ccaa; outline:none;
+          font:7px "Press Start 2P"; padding:2px 4px;
+          z-index:600; box-sizing:border-box;
+        `;
+        document.body.appendChild(inputEl);
+        inputEl.focus();
+        inputEl.select();
+        let committed = false;
+        const commit = () => {
+          if (committed) return;
+          committed = true;
+          const v = inputEl.value.trim();
+          if (v) hit.track.name = v;
+          inputEl.remove();
+          AV.draw();
+        };
+        inputEl.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') commit();
+          if (ev.key === 'Escape') { committed = true; inputEl.remove(); }
+          ev.stopPropagation();
+        });
+        inputEl.addEventListener('blur', commit);
+      }
+      return;
+    }
     if (hit.zone === 'empty') {
       // Only create a pattern if the first click of this double-click also
       // landed on empty space. If the first click hit a header, pattern block,
@@ -3980,7 +4107,7 @@ AV.initEvents = function() {
       AV.draw();
       return;
     }
-    // Cursor feedback when not dragging
+    // Cursor feedback + hover highlights when not dragging
     if (!dragState) {
       if (my < this.RULER_HEIGHT && ProjectState.loopEnabled) {
         const barW = this.barWidth();
@@ -3995,6 +4122,12 @@ AV.initEvents = function() {
       else if (hit?.zone === 'loop-pattern') canvas.style.cursor = 'col-resize';
       else if (hit?.zone === 'pattern') canvas.style.cursor = e.altKey ? 'copy' : 'grab';
       else canvas.style.cursor = '';
+      // Update hover hit — only redraw if something changed
+      const prev = this._hoverHit;
+      const hoverZones = new Set(['add-track','clear-all','mute','solo','settings']);
+      const newHit = hoverZones.has(hit?.zone) ? hit : null;
+      const changed = newHit?.zone !== prev?.zone || newHit?.track !== prev?.track;
+      if (changed) { this._hoverHit = newHit; AV.draw(); }
       return;
     }
     const barW = this.barWidth();
@@ -4093,6 +4226,10 @@ AV.initEvents = function() {
       AV.draw();
     }
     dragState = null; playheadDrag = false;
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    if (this._hoverHit) { this._hoverHit = null; AV.draw(); }
   });
 
   canvas.addEventListener('wheel', (e) => {
@@ -4209,11 +4346,22 @@ function showTrackSettings(track, x, y) {
     box-shadow:none; border-radius:0;
   `;
 
+  // X close button (top-right corner)
+  const xBtn = document.createElement('button');
+  xBtn.style.cssText = `
+    position:absolute; top:6px; right:8px;
+    background:none; border:none; color:#00b9be;
+    font:8px "Press Start 2P"; cursor:pointer; padding:2px 4px; line-height:1;
+  `;
+  xBtn.textContent = '✕';
+  xBtn.onclick = () => el.remove();
+  el.appendChild(xBtn);
+
   // Title
   const title = document.createElement('div');
   title.style.cssText = `
     font:7px "Press Start 2P"; color:#00b9be;
-    margin-bottom:12px; padding-bottom:8px;
+    margin-bottom:12px; padding-bottom:8px; padding-right:20px;
     border-bottom:1px solid #15788c; letter-spacing:1px;
   `;
   title.textContent = track.name;
@@ -4267,10 +4415,9 @@ function showTrackSettings(track, x, y) {
         PR.activePattern = null;
         document.getElementById('pianoroll-panel').style.display = 'none';
         document.getElementById('panel-divider').style.display = 'none';
-        AV.resize();
       }
       conf.remove();
-      AV.draw();
+      requestAnimationFrame(() => { AV.resize(); AV.draw(); });
     };
     btnRow.appendChild(cancelBtn);
     btnRow.appendChild(confirmBtn);
@@ -4333,12 +4480,6 @@ function showTrackSettings(track, x, y) {
   el.appendChild(row('REVERB', ['off','room','hall'], track.reverb,
     v => { track.reverb = v; }));
 
-  const close = document.createElement('button');
-  close.className = 'nes-btn';
-  close.textContent = 'CLOSE';
-  close.style.cssText = 'margin-top:4px; width:100%;';
-  close.onclick = () => el.remove();
-  el.appendChild(close);
   el.appendChild(trashBtn);
 
   document.body.appendChild(el);
@@ -4541,29 +4682,11 @@ function showMidiImportDialog(midiData, filename) {
     const maxEnd = notes.reduce((m, n) => Math.max(m, n.start + n.duration), 0);
     const patternBars = Math.max(1, Math.ceil(maxEnd));
 
-    // Create track + pattern
-    const newTrack = {
-      id:          makeId(),
-      name:        trackName,
-      channelType,
-      volume:      80,
-      pan:         0,
-      muted:       false,
-      soloed:      false,
-      patterns:    [],
-      arrangement: [],
-    };
-    const newPattern = {
-      id:         makeId(),
-      name:       'Pattern 1',
-      lengthBars: patternBars,
-      notes,
-    };
-    newTrack.patterns.push(newPattern);
-    newTrack.arrangement.push({ patternId: newPattern.id, startBar: 0 });
-
+    // Use proper helpers so all track fields (volume, fuzz, delay, etc.) are initialised
     History.push();
-    ProjectState.tracks.push(newTrack);
+    const newTrack = addTrack(channelType, trackName);
+    const newPattern = addPattern(newTrack.id, 0, patternBars);
+    newPattern.notes = notes;
     AV.draw();
     el.remove();
   };
@@ -4718,9 +4841,6 @@ function buildTopBar() {
     </div>
     <div class="tb-spacer"></div>
     <div class="tb-group">
-      <button class="nes-btn" id="btn-add-track" title="Add a new track">${ADD_TRACK}</button>
-      <button class="nes-btn" id="btn-chord" title="Use Magic (chord / arpeggio generator)">${CHORD}</button>
-      <div class="tb-vdivider"></div>
       <button class="nes-btn" id="btn-export" title="Export audio (WAV / MIDI / stems)">${EXPORT}</button>
       <button class="nes-btn" id="btn-save" title="Save project as JSON">${SAVE}</button>
       <input type="file" id="load-input" accept=".json" style="display:none">
@@ -4806,24 +4926,6 @@ function buildTopBar() {
   };
 
   // Open MagicGen chord/arpeggio generator
-  document.getElementById('btn-chord').onclick = () => {
-    MagicGen.engaged = !MagicGen.engaged;
-    document.getElementById('btn-chord').classList.toggle('engaged', MagicGen.engaged);
-    // Sync the PR topbar 3-way toggle if it's been built
-    if (typeof PR._setPRTool === 'function') {
-      PR._setPRTool(MagicGen.engaged ? 'magic' : 'default');
-    }
-  };
-
-  document.getElementById('btn-add-track').onclick = (e) => {
-    const btn = e.currentTarget;
-    const rect = btn.getBoundingClientRect();
-    showContextMenu(rect.left, rect.bottom + 4, [
-      { label: 'LEAD  (Pulse)', action: () => { addTrack('pulse50', 'LEAD'); AV.resize(); AV.draw(); } },
-      { label: 'BASS  (Triangle)', action: () => { addTrack('triangle', 'BASS'); AV.resize(); AV.draw(); } },
-      { label: 'DRUMS (PCM7)', action: () => { addTrack('pcm7', 'DRUMS'); AV.resize(); AV.draw(); } },
-    ]);
-  };
 
   document.getElementById('btn-save').onclick = () => { if (typeof ExportEngine !== 'undefined') ExportEngine.saveProject(); };
   document.getElementById('btn-load').onclick = () => document.getElementById('load-input').click();
@@ -6539,7 +6641,7 @@ function wireTransport() {
               document.getElementById('pianoroll-panel').style.display = 'none';
               document.getElementById('panel-divider').style.display = 'none';
               PR.activePattern = null;
-              AV.resize();
+              requestAnimationFrame(() => { AV.resize(); AV.draw(); });
             }
           }
         }
@@ -6865,132 +6967,13 @@ const ExportEngine = {
 };
 
   function createDemoState() {
-    // "Lair of Shadows" — neoclassical metal · Castlevania 3 style
-    // 174 BPM · D harmonic minor (D E F G A Bb C#) · 4 bars · looped
-    ProjectState.bpm = 174;
-    ProjectState.key = 'D';
-    ProjectState.scale = 'Minor';
-    ProjectState.loopStart = 0;
-    ProjectState.loopEnd = 4;
-    ProjectState.loopEnabled = true;
-
-    // Update LCD displays (buildTopBar already ran)
-    const _bi = document.getElementById('bpm-input');   if (_bi) _bi.value = 174;
-    const _bd = document.getElementById('bpm-display'); if (_bd) _bd.textContent = 174;
-    const _ks = document.getElementById('key-sel');     if (_ks) _ks.value = 'D';
-    const _ss = document.getElementById('scale-sel');   if (_ss) _ss.value = 'Minor';
-
-    // Note constructor (no id — not needed for demo notes)
-    const n = (pitch, start, dur, vel) => ({ pitch, start, duration: dur, velocity: vel });
-    const SX = 0.0625; // 16th note
-    const EI = 0.125;  // 8th note
-    const QT = 0.25;   // quarter note
-
-    // MIDI constants — D harmonic minor: D E F G A Bb C# (raised 7th)
-    const A1=33, D2=38, E2=40, A2=45,
-          A3=57, Bb3=58,
-          C4=60, Cs4=61, D4=62, E4=64, F4=65, G4=67, Ab4=68, A4=69, Bb4=70, B4=71,
-          Cs5=73, D5=74, E5=76, F5=77;
-
-    // ── Track 1: Lead (Pulse 25% · Fuzz Med · Vibrato Low) ──────────────────
-    // Yngwie-style: singable hook (QT/EI) + melodic runs, not a wall of 16ths
-    const lead = addTrack('pulse25', 'Lead');
-    lead.fuzz = 'med'; lead.vibrato = 'low';
-    const leadPat = addPattern(lead.id, 0, 4);
-
-    leadPat.notes.push(
-      // Bar 0: D5 hook (QT), quick descent C#→Bb→A, ascending run A→Bb→C#→D, land A4
-      n(D5,  0.0000, QT, 118),
-      n(Cs5, 0.2500, SX, 108), n(Bb4, 0.3125, SX, 103), n(A4,  0.3750, EI, 110),
-      n(G4,  0.5000, SX,  98), n(A4,  0.5625, SX,  98), n(Bb4, 0.6250, SX, 103), n(Cs5, 0.6875, SX, 108),
-      n(D5,  0.7500, EI, 115), n(A4,  0.8750, EI, 105),
-
-      // Bar 1: F4 contrast (lower register), E4/D4 bounce, rising to C#5 peak (QT held)
-      n(F4,  1.0000, QT, 110),
-      n(E4,  1.2500, SX,  98), n(D4,  1.3125, SX,  93), n(E4,  1.3750, EI,  98),
-      n(F4,  1.5000, SX,  98), n(G4,  1.5625, SX, 100), n(A4,  1.6250, SX, 105), n(Bb4, 1.6875, SX, 110),
-      n(Cs5, 1.7500, QT, 122),
-
-      // Bar 2: sequenced 4-note turn figure × 4 — Yngwie "Far Beyond the Sun" style
-      // Turn 1 (A): A Bb A G  |  Turn 2 (Bb): Bb C# Bb A  [aug-2nd!]
-      // Turn 3 (C#): C# D C# Bb  |  Turn 4 (D): D E D C#
-      n(A4,  2.0000, SX, 105), n(Bb4, 2.0625, SX, 112), n(A4,  2.1250, SX, 105), n(G4,  2.1875, SX, 100),
-      n(Bb4, 2.2500, SX, 112), n(Cs5, 2.3125, SX, 120), n(Bb4, 2.3750, SX, 112), n(A4,  2.4375, SX, 105),
-      n(Cs5, 2.5000, SX, 120), n(D5,  2.5625, SX, 123), n(Cs5, 2.6250, SX, 118), n(Bb4, 2.6875, SX, 110),
-      n(D5,  2.7500, SX, 123), n(E5,  2.8125, SX, 127), n(D5,  2.8750, SX, 120), n(Cs5, 2.9375, SX, 115),
-
-      // Bar 3: D5 hook returns (QT), same descent, ascending run + peak E5 → C#5 into loop
-      n(D5,  3.0000, QT, 118),
-      n(Cs5, 3.2500, SX, 108), n(Bb4, 3.3125, SX, 103), n(A4,  3.3750, EI, 110),
-      n(G4,  3.5000, SX,  98), n(A4,  3.5625, SX, 100), n(Bb4, 3.6250, SX, 108), n(Cs5, 3.6875, SX, 113),
-      n(D5,  3.7500, SX, 118), n(E5,  3.8125, SX, 127), n(D5,  3.8750, SX, 120), n(Cs5, 3.9375, SX, 115)
-    );
-
-    // ── Track 2: Harmony (Pulse 50% · Vibrato Low) — parallel diatonic 3rds ─
-    // Every note is the diatonic 3rd below the lead in D harmonic minor
-    const harm = addTrack('pulse50', 'Harmony');
-    harm.vibrato = 'low';
-    const harmPat = addPattern(harm.id, 0, 4);
-
-    harmPat.notes.push(
-      // Bar 0: diatonic 3rds below lead (D harmonic minor), mirrors phrasing exactly
-      n(Bb4, 0.0000, QT,  85),
-      n(A4,  0.2500, SX,  78), n(G4,  0.3125, SX,  75), n(F4,  0.3750, EI,  78),
-      n(E4,  0.5000, SX,  72), n(F4,  0.5625, SX,  72), n(G4,  0.6250, SX,  75), n(A4,  0.6875, SX,  80),
-      n(Bb4, 0.7500, EI,  85), n(F4,  0.8750, EI,  78),
-
-      // Bar 1: 3rds below (C4/Bb3 in the lower phrase add depth)
-      n(D4,  1.0000, QT,  80),
-      n(C4,  1.2500, SX,  70), n(Bb3, 1.3125, SX,  68), n(C4,  1.3750, EI,  70),
-      n(D4,  1.5000, SX,  72), n(E4,  1.5625, SX,  75), n(F4,  1.6250, SX,  78), n(G4,  1.6875, SX,  83),
-      n(A4,  1.7500, QT,  90),
-
-      // Bar 2: 3rds below each turn note — aug-2nd turn appears in both voices simultaneously
-      n(F4,  2.0000, SX,  78), n(G4,  2.0625, SX,  85), n(F4,  2.1250, SX,  78), n(E4,  2.1875, SX,  75),
-      n(G4,  2.2500, SX,  85), n(A4,  2.3125, SX,  90), n(G4,  2.3750, SX,  85), n(F4,  2.4375, SX,  78),
-      n(A4,  2.5000, SX,  90), n(Bb4, 2.5625, SX,  93), n(A4,  2.6250, SX,  88), n(G4,  2.6875, SX,  82),
-      n(Bb4, 2.7500, SX,  93), n(Cs5, 2.8125, SX,  97), n(Bb4, 2.8750, SX,  90), n(A4,  2.9375, SX,  85),
-
-      // Bar 3: mirrors bar 0 hook return, ends on A4 (3rd below C#5 leading tone)
-      n(Bb4, 3.0000, QT,  85),
-      n(A4,  3.2500, SX,  78), n(G4,  3.3125, SX,  75), n(F4,  3.3750, EI,  78),
-      n(E4,  3.5000, SX,  72), n(F4,  3.5625, SX,  75), n(G4,  3.6250, SX,  80), n(A4,  3.6875, SX,  85),
-      n(Bb4, 3.7500, SX,  88), n(Cs5, 3.8125, SX,  93), n(Bb4, 3.8750, SX,  88), n(A4,  3.9375, SX,  83)
-    );
-
-    // ── Track 3: Bass (Triangle) — driving 8th-note root/fifth, i–V–i–V ─────
-    const bass = addTrack('triangle', 'Bass');
-    const bassPat = addPattern(bass.id, 0, 4);
-    [[D2, A2], [A1, E2], [D2, A2], [A1, E2]].forEach(([root, fifth], bar) => {
-      for (let e = 0; e < 8; e++)
-        bassPat.notes.push(n(e % 2 === 0 ? root : fifth, bar + e * EI, EI, 105));
-    });
-
-    // ── Track 4: Arp (Chord · 8th-note Dm/A arpeggio bed) ───────────────────
-    const arp = addTrack('chord', 'Arp');
-    const arpPat = addPattern(arp.id, 0, 4);
-    [[D4, F4, A4, D5], [A3, Cs4, E4, A4], [D4, F4, A4, D5], [A3, Cs4, E4, A4]].forEach((chord, bar) => {
-      for (let i = 0; i < 8; i++)
-        arpPat.notes.push(n(chord[i % 4], bar + i * EI, EI, 62));
-    });
-
-    // ── Track 5: Drums (PCM7 · aggressive double-kick metal) ────────────────
-    const drums = addTrack('pcm7', 'Drums');
-    const drumPat = addPattern(drums.id, 0, 4);
-    const KICK=36, SNARE=38, HAT=42;
-    for (let bar = 0; bar < 4; bar++) {
-      // 16th-note hi-hats
-      for (let s = 0; s < 16; s++)
-        drumPat.notes.push(n(HAT, bar + s * SX, SX, 70));
-      // Double-kick feel: beat 1, and-of-2, beat 3, and-of-4
-      drumPat.notes.push(n(KICK, bar + 0.000, SX, 120));
-      drumPat.notes.push(n(KICK, bar + 0.375, SX, 110));
-      drumPat.notes.push(n(KICK, bar + 0.500, SX, 120));
-      drumPat.notes.push(n(KICK, bar + 0.875, SX, 110));
-      // Snare on beats 2 and 4
-      drumPat.notes.push(n(SNARE, bar + 0.250, SX, 115));
-      drumPat.notes.push(n(SNARE, bar + 0.750, SX, 115));
-    }
+    // "Kites" by Geographer — 90 BPM · F Major
+    const state = {"bpm":90,"timeSignature":[4,4],"key":"F","scale":"Major","tracks":[{"id":"i3mcu3j","name":"Lead","channelType":"pulse50","volume":58,"pan":-0.4400000000000001,"fuzz":"off","vibrato":"off","delay":"off","reverb":"off","muted":false,"soloed":false,"sample":null,"patterns":[{"id":"rko1h2v","name":"Pat","lengthBars":12,"notes":[{"pitch":77,"start":0,"duration":0.0625,"velocity":100},{"pitch":81,"start":0.0625,"duration":0.0625,"velocity":100},{"pitch":84,"start":0.125,"duration":0.0625,"velocity":100},{"pitch":77,"start":0.1875,"duration":0.0625,"velocity":100},{"pitch":89,"start":0.25,"duration":0.0625,"velocity":100},{"pitch":84,"start":0.3125,"duration":0.0625,"velocity":100},{"pitch":81,"start":0.375,"duration":0.0625,"velocity":100},{"pitch":84,"start":0.4375,"duration":0.0625,"velocity":100},{"pitch":77,"start":0.5,"duration":0.0625,"velocity":100},{"pitch":93,"start":0.5625,"duration":0.0625,"velocity":100},{"pitch":89,"start":0.625,"duration":0.0625,"velocity":100},{"pitch":84,"start":0.6875,"duration":0.0625,"velocity":100},{"pitch":77,"start":0.75,"duration":0.0625,"velocity":100},{"pitch":84,"start":0.8125,"duration":0.0625,"velocity":100},{"pitch":77,"start":0.875,"duration":0.0625,"velocity":100},{"pitch":81,"start":0.9375,"duration":0.0625,"velocity":100},{"pitch":76,"start":1,"duration":0.0625,"velocity":100},{"pitch":81,"start":1.0625,"duration":0.0625,"velocity":100},{"pitch":84,"start":1.125,"duration":0.0625,"velocity":100},{"pitch":76,"start":1.1875,"duration":0.0625,"velocity":100},{"pitch":88,"start":1.25,"duration":0.0625,"velocity":100},{"pitch":84,"start":1.3125,"duration":0.0625,"velocity":100},{"pitch":81,"start":1.375,"duration":0.0625,"velocity":100},{"pitch":84,"start":1.4375,"duration":0.0625,"velocity":100},{"pitch":76,"start":1.5,"duration":0.0625,"velocity":100},{"pitch":91,"start":1.5625,"duration":0.0625,"velocity":100},{"pitch":88,"start":1.625,"duration":0.0625,"velocity":100},{"pitch":84,"start":1.6875,"duration":0.0625,"velocity":100},{"pitch":76,"start":1.75,"duration":0.0625,"velocity":100},{"pitch":84,"start":1.8125,"duration":0.0625,"velocity":100},{"pitch":76,"start":1.875,"duration":0.0625,"velocity":100},{"pitch":81,"start":1.9375,"duration":0.0625,"velocity":100},{"pitch":74,"start":2,"duration":0.0625,"velocity":100},{"pitch":77,"start":2.0625,"duration":0.0625,"velocity":100},{"pitch":81,"start":2.125,"duration":0.0625,"velocity":100},{"pitch":74,"start":2.1875,"duration":0.0625,"velocity":100},{"pitch":86,"start":2.25,"duration":0.0625,"velocity":100},{"pitch":81,"start":2.3125,"duration":0.0625,"velocity":100},{"pitch":77,"start":2.375,"duration":0.0625,"velocity":100},{"pitch":81,"start":2.4375,"duration":0.0625,"velocity":100},{"pitch":74,"start":2.5,"duration":0.0625,"velocity":100},{"pitch":89,"start":2.5625,"duration":0.0625,"velocity":100},{"pitch":86,"start":2.625,"duration":0.0625,"velocity":100},{"pitch":81,"start":2.6875,"duration":0.0625,"velocity":100},{"pitch":74,"start":2.75,"duration":0.0625,"velocity":100},{"pitch":81,"start":2.8125,"duration":0.0625,"velocity":100},{"pitch":74,"start":2.875,"duration":0.0625,"velocity":100},{"pitch":77,"start":2.9375,"duration":0.0625,"velocity":100},{"pitch":72,"start":3,"duration":0.0625,"velocity":100},{"pitch":76,"start":3.0625,"duration":0.0625,"velocity":100},{"pitch":79,"start":3.125,"duration":0.0625,"velocity":100},{"pitch":72,"start":3.1875,"duration":0.0625,"velocity":100},{"pitch":84,"start":3.25,"duration":0.0625,"velocity":100},{"pitch":79,"start":3.3125,"duration":0.0625,"velocity":100},{"pitch":76,"start":3.375,"duration":0.0625,"velocity":100},{"pitch":79,"start":3.4375,"duration":0.0625,"velocity":100},{"pitch":72,"start":3.5,"duration":0.0625,"velocity":100},{"pitch":88,"start":3.5625,"duration":0.0625,"velocity":100},{"pitch":84,"start":3.625,"duration":0.0625,"velocity":100},{"pitch":79,"start":3.6875,"duration":0.0625,"velocity":100},{"pitch":72,"start":3.75,"duration":0.0625,"velocity":100},{"pitch":79,"start":3.8125,"duration":0.0625,"velocity":100},{"pitch":72,"start":3.875,"duration":0.0625,"velocity":100},{"pitch":76,"start":3.9375,"duration":0.0625,"velocity":100},{"pitch":77,"start":4,"duration":0.0625,"velocity":100},{"pitch":81,"start":4.0625,"duration":0.0625,"velocity":100},{"pitch":84,"start":4.125,"duration":0.0625,"velocity":100},{"pitch":77,"start":4.1875,"duration":0.0625,"velocity":100},{"pitch":89,"start":4.25,"duration":0.0625,"velocity":100},{"pitch":84,"start":4.3125,"duration":0.0625,"velocity":100},{"pitch":81,"start":4.375,"duration":0.0625,"velocity":100},{"pitch":84,"start":4.4375,"duration":0.0625,"velocity":100},{"pitch":77,"start":4.5,"duration":0.0625,"velocity":100},{"pitch":93,"start":4.5625,"duration":0.0625,"velocity":100},{"pitch":89,"start":4.625,"duration":0.0625,"velocity":100},{"pitch":84,"start":4.6875,"duration":0.0625,"velocity":100},{"pitch":77,"start":4.75,"duration":0.0625,"velocity":100},{"pitch":84,"start":4.8125,"duration":0.0625,"velocity":100},{"pitch":77,"start":4.875,"duration":0.0625,"velocity":100},{"pitch":81,"start":4.9375,"duration":0.0625,"velocity":100},{"pitch":76,"start":5,"duration":0.0625,"velocity":100},{"pitch":81,"start":5.0625,"duration":0.0625,"velocity":100},{"pitch":84,"start":5.125,"duration":0.0625,"velocity":100},{"pitch":76,"start":5.1875,"duration":0.0625,"velocity":100},{"pitch":88,"start":5.25,"duration":0.0625,"velocity":100},{"pitch":84,"start":5.3125,"duration":0.0625,"velocity":100},{"pitch":81,"start":5.375,"duration":0.0625,"velocity":100},{"pitch":84,"start":5.4375,"duration":0.0625,"velocity":100},{"pitch":76,"start":5.5,"duration":0.0625,"velocity":100},{"pitch":91,"start":5.5625,"duration":0.0625,"velocity":100},{"pitch":88,"start":5.625,"duration":0.0625,"velocity":100},{"pitch":84,"start":5.6875,"duration":0.0625,"velocity":100},{"pitch":76,"start":5.75,"duration":0.0625,"velocity":100},{"pitch":84,"start":5.8125,"duration":0.0625,"velocity":100},{"pitch":76,"start":5.875,"duration":0.0625,"velocity":100},{"pitch":81,"start":5.9375,"duration":0.0625,"velocity":100},{"pitch":74,"start":6,"duration":0.0625,"velocity":100},{"pitch":77,"start":6.0625,"duration":0.0625,"velocity":100},{"pitch":81,"start":6.125,"duration":0.0625,"velocity":100},{"pitch":74,"start":6.1875,"duration":0.0625,"velocity":100},{"pitch":86,"start":6.25,"duration":0.0625,"velocity":100},{"pitch":81,"start":6.3125,"duration":0.0625,"velocity":100},{"pitch":77,"start":6.375,"duration":0.0625,"velocity":100},{"pitch":81,"start":6.4375,"duration":0.0625,"velocity":100},{"pitch":74,"start":6.5,"duration":0.0625,"velocity":100},{"pitch":89,"start":6.5625,"duration":0.0625,"velocity":100},{"pitch":86,"start":6.625,"duration":0.0625,"velocity":100},{"pitch":81,"start":6.6875,"duration":0.0625,"velocity":100},{"pitch":74,"start":6.75,"duration":0.0625,"velocity":100},{"pitch":81,"start":6.8125,"duration":0.0625,"velocity":100},{"pitch":74,"start":6.875,"duration":0.0625,"velocity":100},{"pitch":77,"start":6.9375,"duration":0.0625,"velocity":100},{"pitch":72,"start":7,"duration":0.0625,"velocity":100},{"pitch":76,"start":7.0625,"duration":0.0625,"velocity":100},{"pitch":79,"start":7.125,"duration":0.0625,"velocity":100},{"pitch":72,"start":7.1875,"duration":0.0625,"velocity":100},{"pitch":84,"start":7.25,"duration":0.0625,"velocity":100},{"pitch":79,"start":7.3125,"duration":0.0625,"velocity":100},{"pitch":76,"start":7.375,"duration":0.0625,"velocity":100},{"pitch":79,"start":7.4375,"duration":0.0625,"velocity":100},{"pitch":72,"start":7.5,"duration":0.0625,"velocity":100},{"pitch":88,"start":7.5625,"duration":0.0625,"velocity":100},{"pitch":84,"start":7.625,"duration":0.0625,"velocity":100},{"pitch":79,"start":7.6875,"duration":0.0625,"velocity":100},{"pitch":72,"start":7.75,"duration":0.0625,"velocity":100},{"pitch":79,"start":7.8125,"duration":0.0625,"velocity":100},{"pitch":72,"start":7.875,"duration":0.0625,"velocity":100},{"pitch":76,"start":7.9375,"duration":0.0625,"velocity":100},{"pitch":77,"start":8,"duration":0.0625,"velocity":100},{"pitch":81,"start":8.0625,"duration":0.0625,"velocity":100},{"pitch":84,"start":8.125,"duration":0.0625,"velocity":100},{"pitch":77,"start":8.1875,"duration":0.0625,"velocity":100},{"pitch":89,"start":8.25,"duration":0.0625,"velocity":100},{"pitch":84,"start":8.3125,"duration":0.0625,"velocity":100},{"pitch":81,"start":8.375,"duration":0.0625,"velocity":100},{"pitch":84,"start":8.4375,"duration":0.0625,"velocity":100},{"pitch":77,"start":8.5,"duration":0.0625,"velocity":100},{"pitch":93,"start":8.5625,"duration":0.0625,"velocity":100},{"pitch":89,"start":8.625,"duration":0.0625,"velocity":100},{"pitch":84,"start":8.6875,"duration":0.0625,"velocity":100},{"pitch":77,"start":8.75,"duration":0.0625,"velocity":100},{"pitch":84,"start":8.8125,"duration":0.0625,"velocity":100},{"pitch":77,"start":8.875,"duration":0.0625,"velocity":100},{"pitch":81,"start":8.9375,"duration":0.0625,"velocity":100},{"pitch":76,"start":9,"duration":0.0625,"velocity":100},{"pitch":81,"start":9.0625,"duration":0.0625,"velocity":100},{"pitch":84,"start":9.125,"duration":0.0625,"velocity":100},{"pitch":76,"start":9.1875,"duration":0.0625,"velocity":100},{"pitch":88,"start":9.25,"duration":0.0625,"velocity":100},{"pitch":84,"start":9.3125,"duration":0.0625,"velocity":100},{"pitch":81,"start":9.375,"duration":0.0625,"velocity":100},{"pitch":84,"start":9.4375,"duration":0.0625,"velocity":100},{"pitch":76,"start":9.5,"duration":0.0625,"velocity":100},{"pitch":91,"start":9.5625,"duration":0.0625,"velocity":100},{"pitch":88,"start":9.625,"duration":0.0625,"velocity":100},{"pitch":84,"start":9.6875,"duration":0.0625,"velocity":100},{"pitch":76,"start":9.75,"duration":0.0625,"velocity":100},{"pitch":84,"start":9.8125,"duration":0.0625,"velocity":100},{"pitch":76,"start":9.875,"duration":0.0625,"velocity":100},{"pitch":81,"start":9.9375,"duration":0.0625,"velocity":100},{"pitch":74,"start":10,"duration":0.0625,"velocity":100},{"pitch":77,"start":10.0625,"duration":0.0625,"velocity":100},{"pitch":81,"start":10.125,"duration":0.0625,"velocity":100},{"pitch":74,"start":10.1875,"duration":0.0625,"velocity":100},{"pitch":86,"start":10.25,"duration":0.0625,"velocity":100},{"pitch":81,"start":10.3125,"duration":0.0625,"velocity":100},{"pitch":77,"start":10.375,"duration":0.0625,"velocity":100},{"pitch":81,"start":10.4375,"duration":0.0625,"velocity":100},{"pitch":74,"start":10.5,"duration":0.0625,"velocity":100},{"pitch":89,"start":10.5625,"duration":0.0625,"velocity":100},{"pitch":86,"start":10.625,"duration":0.0625,"velocity":100},{"pitch":81,"start":10.6875,"duration":0.0625,"velocity":100},{"pitch":74,"start":10.75,"duration":0.0625,"velocity":100},{"pitch":81,"start":10.8125,"duration":0.0625,"velocity":100},{"pitch":74,"start":10.875,"duration":0.0625,"velocity":100},{"pitch":77,"start":10.9375,"duration":0.0625,"velocity":100},{"pitch":72,"start":11,"duration":0.0625,"velocity":100},{"pitch":76,"start":11.0625,"duration":0.0625,"velocity":100},{"pitch":79,"start":11.125,"duration":0.0625,"velocity":100},{"pitch":72,"start":11.1875,"duration":0.0625,"velocity":100},{"pitch":84,"start":11.25,"duration":0.0625,"velocity":100},{"pitch":79,"start":11.3125,"duration":0.0625,"velocity":100},{"pitch":76,"start":11.375,"duration":0.0625,"velocity":100},{"pitch":79,"start":11.4375,"duration":0.0625,"velocity":100},{"pitch":72,"start":11.5,"duration":0.0625,"velocity":100},{"pitch":88,"start":11.5625,"duration":0.0625,"velocity":100},{"pitch":84,"start":11.625,"duration":0.0625,"velocity":100},{"pitch":79,"start":11.6875,"duration":0.0625,"velocity":100},{"pitch":72,"start":11.75,"duration":0.0625,"velocity":100},{"pitch":79,"start":11.8125,"duration":0.0625,"velocity":100},{"pitch":72,"start":11.875,"duration":0.0625,"velocity":100},{"pitch":76,"start":11.9375,"duration":0.0625,"velocity":100}]}],"arrangement":[{"patternId":"rko1h2v","startBar":0}]},{"id":"khgdif2","name":"Bass","channelType":"triangle","volume":100,"pan":0,"fuzz":"off","vibrato":"off","delay":"off","reverb":"off","muted":false,"soloed":false,"sample":null,"patterns":[{"id":"b3d4jxb","name":"Pat","lengthBars":12,"notes":[{"pitch":41,"start":0,"duration":1,"velocity":100},{"pitch":45,"start":1,"duration":0.375,"velocity":100},{"pitch":50,"start":1.375,"duration":0.0625,"velocity":100},{"pitch":45,"start":1.4375,"duration":0.0625,"velocity":100},{"pitch":48,"start":1.5,"duration":0.5,"velocity":100},{"pitch":50,"start":2,"duration":1,"velocity":100},{"pitch":45,"start":3,"duration":0.375,"velocity":100},{"pitch":50,"start":3.375,"duration":0.0625,"velocity":100},{"pitch":45,"start":3.4375,"duration":0.0625,"velocity":100},{"pitch":48,"start":3.5,"duration":0.5,"velocity":100},{"pitch":41,"start":4,"duration":1,"velocity":100},{"pitch":45,"start":5,"duration":0.375,"velocity":100},{"pitch":50,"start":5.375,"duration":0.0625,"velocity":100},{"pitch":45,"start":5.4375,"duration":0.0625,"velocity":100},{"pitch":48,"start":5.5,"duration":0.5,"velocity":100},{"pitch":50,"start":6,"duration":1,"velocity":100},{"pitch":45,"start":7,"duration":0.375,"velocity":100},{"pitch":50,"start":7.375,"duration":0.0625,"velocity":100},{"pitch":45,"start":7.4375,"duration":0.0625,"velocity":100},{"pitch":48,"start":7.5,"duration":0.5,"velocity":100},{"pitch":41,"start":8,"duration":1,"velocity":100},{"pitch":45,"start":9,"duration":0.375,"velocity":100},{"pitch":50,"start":9.375,"duration":0.0625,"velocity":100},{"pitch":45,"start":9.4375,"duration":0.0625,"velocity":100},{"pitch":48,"start":9.5,"duration":0.5,"velocity":100},{"pitch":50,"start":10,"duration":1,"velocity":100},{"pitch":45,"start":11,"duration":0.375,"velocity":100},{"pitch":50,"start":11.375,"duration":0.0625,"velocity":100},{"pitch":45,"start":11.4375,"duration":0.0625,"velocity":100},{"pitch":48,"start":11.5,"duration":0.5,"velocity":100}]}],"arrangement":[{"patternId":"b3d4jxb","startBar":0}]},{"id":"4vmp02z","name":"Drums","channelType":"noise","volume":100,"pan":0,"fuzz":"off","vibrato":"off","delay":"off","reverb":"off","muted":false,"soloed":false,"sample":null,"patterns":[{"id":"exnx95h","name":"Pat","lengthBars":12,"notes":[{"pitch":42,"start":0,"duration":0.0625,"velocity":70},{"pitch":36,"start":0,"duration":0.0625,"velocity":120},{"pitch":42,"start":0.0625,"duration":0.0625,"velocity":70},{"pitch":36,"start":0.0625,"duration":0.0625,"velocity":115},{"pitch":42,"start":0.125,"duration":0.0625,"velocity":70},{"pitch":42,"start":0.1875,"duration":0.0625,"velocity":70},{"pitch":36,"start":0.1875,"duration":0.0625,"velocity":110},{"pitch":42,"start":0.25,"duration":0.0625,"velocity":70},{"pitch":38,"start":0.25,"duration":0.0625,"velocity":120},{"pitch":42,"start":0.3125,"duration":0.0625,"velocity":70},{"pitch":42,"start":0.375,"duration":0.0625,"velocity":70},{"pitch":42,"start":0.4375,"duration":0.0625,"velocity":70},{"pitch":42,"start":0.5,"duration":0.0625,"velocity":70},{"pitch":42,"start":0.5625,"duration":0.0625,"velocity":70},{"pitch":36,"start":0.5625,"duration":0.0625,"velocity":100},{"pitch":42,"start":0.625,"duration":0.0625,"velocity":70},{"pitch":36,"start":0.625,"duration":0.0625,"velocity":100},{"pitch":42,"start":0.6875,"duration":0.0625,"velocity":70},{"pitch":42,"start":0.75,"duration":0.0625,"velocity":70},{"pitch":38,"start":0.75,"duration":0.0625,"velocity":115},{"pitch":42,"start":0.8125,"duration":0.0625,"velocity":70},{"pitch":42,"start":0.875,"duration":0.0625,"velocity":70},{"pitch":36,"start":0.875,"duration":0.0625,"velocity":110},{"pitch":42,"start":0.9375,"duration":0.0625,"velocity":70},{"pitch":42,"start":1,"duration":0.0625,"velocity":70},{"pitch":36,"start":1,"duration":0.0625,"velocity":120},{"pitch":42,"start":1.0625,"duration":0.0625,"velocity":70},{"pitch":36,"start":1.0625,"duration":0.0625,"velocity":115},{"pitch":42,"start":1.125,"duration":0.0625,"velocity":70},{"pitch":42,"start":1.1875,"duration":0.0625,"velocity":70},{"pitch":36,"start":1.1875,"duration":0.0625,"velocity":110},{"pitch":42,"start":1.25,"duration":0.0625,"velocity":70},{"pitch":38,"start":1.25,"duration":0.0625,"velocity":120},{"pitch":42,"start":1.3125,"duration":0.0625,"velocity":70},{"pitch":42,"start":1.375,"duration":0.0625,"velocity":70},{"pitch":42,"start":1.4375,"duration":0.0625,"velocity":70},{"pitch":42,"start":1.5,"duration":0.0625,"velocity":70},{"pitch":42,"start":1.5625,"duration":0.0625,"velocity":70},{"pitch":36,"start":1.5625,"duration":0.0625,"velocity":100},{"pitch":42,"start":1.625,"duration":0.0625,"velocity":70},{"pitch":36,"start":1.625,"duration":0.0625,"velocity":100},{"pitch":42,"start":1.6875,"duration":0.0625,"velocity":70},{"pitch":42,"start":1.75,"duration":0.0625,"velocity":70},{"pitch":38,"start":1.75,"duration":0.0625,"velocity":115},{"pitch":36,"start":1.75,"duration":0.0625,"velocity":120},{"pitch":42,"start":1.8125,"duration":0.0625,"velocity":70},{"pitch":36,"start":1.875,"duration":0.03125,"velocity":110},{"pitch":42,"start":1.875,"duration":0.0625,"velocity":70},{"pitch":42,"start":1.9375,"duration":0.0625,"velocity":70},{"pitch":36,"start":1.9375,"duration":0.0625,"velocity":110},{"pitch":42,"start":2,"duration":0.0625,"velocity":70},{"pitch":36,"start":2,"duration":0.0625,"velocity":120},{"pitch":42,"start":2.0625,"duration":0.0625,"velocity":70},{"pitch":36,"start":2.0625,"duration":0.0625,"velocity":115},{"pitch":42,"start":2.125,"duration":0.0625,"velocity":70},{"pitch":42,"start":2.1875,"duration":0.0625,"velocity":70},{"pitch":36,"start":2.1875,"duration":0.0625,"velocity":110},{"pitch":42,"start":2.25,"duration":0.0625,"velocity":70},{"pitch":38,"start":2.25,"duration":0.0625,"velocity":120},{"pitch":42,"start":2.3125,"duration":0.0625,"velocity":70},{"pitch":42,"start":2.375,"duration":0.0625,"velocity":70},{"pitch":42,"start":2.4375,"duration":0.0625,"velocity":70},{"pitch":42,"start":2.5,"duration":0.0625,"velocity":70},{"pitch":42,"start":2.5625,"duration":0.0625,"velocity":70},{"pitch":36,"start":2.5625,"duration":0.0625,"velocity":100},{"pitch":42,"start":2.625,"duration":0.0625,"velocity":70},{"pitch":36,"start":2.625,"duration":0.0625,"velocity":100},{"pitch":42,"start":2.6875,"duration":0.0625,"velocity":70},{"pitch":42,"start":2.75,"duration":0.0625,"velocity":70},{"pitch":38,"start":2.75,"duration":0.0625,"velocity":115},{"pitch":42,"start":2.8125,"duration":0.0625,"velocity":70},{"pitch":42,"start":2.875,"duration":0.0625,"velocity":70},{"pitch":36,"start":2.875,"duration":0.0625,"velocity":110},{"pitch":42,"start":2.9375,"duration":0.0625,"velocity":70},{"pitch":42,"start":3,"duration":0.0625,"velocity":70},{"pitch":36,"start":3,"duration":0.0625,"velocity":120},{"pitch":42,"start":3.0625,"duration":0.0625,"velocity":70},{"pitch":36,"start":3.0625,"duration":0.0625,"velocity":115},{"pitch":42,"start":3.125,"duration":0.0625,"velocity":70},{"pitch":42,"start":3.1875,"duration":0.0625,"velocity":70},{"pitch":36,"start":3.1875,"duration":0.0625,"velocity":110},{"pitch":42,"start":3.25,"duration":0.0625,"velocity":70},{"pitch":38,"start":3.25,"duration":0.0625,"velocity":120},{"pitch":42,"start":3.3125,"duration":0.0625,"velocity":70},{"pitch":42,"start":3.375,"duration":0.0625,"velocity":70},{"pitch":42,"start":3.4375,"duration":0.0625,"velocity":70},{"pitch":42,"start":3.5,"duration":0.0625,"velocity":70},{"pitch":42,"start":3.5625,"duration":0.0625,"velocity":70},{"pitch":36,"start":3.5625,"duration":0.0625,"velocity":100},{"pitch":42,"start":3.625,"duration":0.0625,"velocity":70},{"pitch":36,"start":3.625,"duration":0.0625,"velocity":100},{"pitch":42,"start":3.6875,"duration":0.0625,"velocity":70},{"pitch":42,"start":3.75,"duration":0.0625,"velocity":70},{"pitch":38,"start":3.75,"duration":0.0625,"velocity":115},{"pitch":42,"start":3.8125,"duration":0.0625,"velocity":70},{"pitch":36,"start":3.8125,"duration":0.0625,"velocity":110},{"pitch":42,"start":3.875,"duration":0.0625,"velocity":70},{"pitch":38,"start":3.875,"duration":0.0625,"velocity":100},{"pitch":42,"start":3.9375,"duration":0.0625,"velocity":70},{"pitch":42,"start":4,"duration":0.0625,"velocity":70},{"pitch":36,"start":4,"duration":0.0625,"velocity":120},{"pitch":42,"start":4.0625,"duration":0.0625,"velocity":70},{"pitch":36,"start":4.0625,"duration":0.0625,"velocity":115},{"pitch":42,"start":4.125,"duration":0.0625,"velocity":70},{"pitch":42,"start":4.1875,"duration":0.0625,"velocity":70},{"pitch":36,"start":4.1875,"duration":0.0625,"velocity":110},{"pitch":42,"start":4.25,"duration":0.0625,"velocity":70},{"pitch":38,"start":4.25,"duration":0.0625,"velocity":120},{"pitch":42,"start":4.3125,"duration":0.0625,"velocity":70},{"pitch":42,"start":4.375,"duration":0.0625,"velocity":70},{"pitch":42,"start":4.4375,"duration":0.0625,"velocity":70},{"pitch":42,"start":4.5,"duration":0.0625,"velocity":70},{"pitch":42,"start":4.5625,"duration":0.0625,"velocity":70},{"pitch":36,"start":4.5625,"duration":0.0625,"velocity":100},{"pitch":42,"start":4.625,"duration":0.0625,"velocity":70},{"pitch":36,"start":4.625,"duration":0.0625,"velocity":100},{"pitch":42,"start":4.6875,"duration":0.0625,"velocity":70},{"pitch":42,"start":4.75,"duration":0.0625,"velocity":70},{"pitch":38,"start":4.75,"duration":0.0625,"velocity":115},{"pitch":42,"start":4.8125,"duration":0.0625,"velocity":70},{"pitch":42,"start":4.875,"duration":0.0625,"velocity":70},{"pitch":36,"start":4.875,"duration":0.0625,"velocity":110},{"pitch":42,"start":4.9375,"duration":0.0625,"velocity":70},{"pitch":42,"start":5,"duration":0.0625,"velocity":70},{"pitch":36,"start":5,"duration":0.0625,"velocity":120},{"pitch":42,"start":5.0625,"duration":0.0625,"velocity":70},{"pitch":36,"start":5.0625,"duration":0.0625,"velocity":115},{"pitch":42,"start":5.125,"duration":0.0625,"velocity":70},{"pitch":42,"start":5.1875,"duration":0.0625,"velocity":70},{"pitch":36,"start":5.1875,"duration":0.0625,"velocity":110},{"pitch":42,"start":5.25,"duration":0.0625,"velocity":70},{"pitch":38,"start":5.25,"duration":0.0625,"velocity":120},{"pitch":42,"start":5.3125,"duration":0.0625,"velocity":70},{"pitch":42,"start":5.375,"duration":0.0625,"velocity":70},{"pitch":42,"start":5.4375,"duration":0.0625,"velocity":70},{"pitch":42,"start":5.5,"duration":0.0625,"velocity":70},{"pitch":42,"start":5.5625,"duration":0.0625,"velocity":70},{"pitch":36,"start":5.5625,"duration":0.0625,"velocity":100},{"pitch":42,"start":5.625,"duration":0.0625,"velocity":70},{"pitch":36,"start":5.625,"duration":0.0625,"velocity":100},{"pitch":42,"start":5.6875,"duration":0.0625,"velocity":70},{"pitch":42,"start":5.75,"duration":0.0625,"velocity":70},{"pitch":38,"start":5.75,"duration":0.0625,"velocity":115},{"pitch":36,"start":5.75,"duration":0.0625,"velocity":120},{"pitch":42,"start":5.8125,"duration":0.0625,"velocity":70},{"pitch":36,"start":5.875,"duration":0.03125,"velocity":110},{"pitch":42,"start":5.875,"duration":0.0625,"velocity":70},{"pitch":42,"start":5.9375,"duration":0.0625,"velocity":70},{"pitch":36,"start":5.9375,"duration":0.0625,"velocity":110},{"pitch":42,"start":6,"duration":0.0625,"velocity":70},{"pitch":36,"start":6,"duration":0.0625,"velocity":120},{"pitch":42,"start":6.0625,"duration":0.0625,"velocity":70},{"pitch":36,"start":6.0625,"duration":0.0625,"velocity":115},{"pitch":42,"start":6.125,"duration":0.0625,"velocity":70},{"pitch":42,"start":6.1875,"duration":0.0625,"velocity":70},{"pitch":36,"start":6.1875,"duration":0.0625,"velocity":110},{"pitch":42,"start":6.25,"duration":0.0625,"velocity":70},{"pitch":38,"start":6.25,"duration":0.0625,"velocity":120},{"pitch":42,"start":6.3125,"duration":0.0625,"velocity":70},{"pitch":42,"start":6.375,"duration":0.0625,"velocity":70},{"pitch":42,"start":6.4375,"duration":0.0625,"velocity":70},{"pitch":42,"start":6.5,"duration":0.0625,"velocity":70},{"pitch":42,"start":6.5625,"duration":0.0625,"velocity":70},{"pitch":36,"start":6.5625,"duration":0.0625,"velocity":100},{"pitch":42,"start":6.625,"duration":0.0625,"velocity":70},{"pitch":36,"start":6.625,"duration":0.0625,"velocity":100},{"pitch":42,"start":6.6875,"duration":0.0625,"velocity":70},{"pitch":42,"start":6.75,"duration":0.0625,"velocity":70},{"pitch":38,"start":6.75,"duration":0.0625,"velocity":115},{"pitch":42,"start":6.8125,"duration":0.0625,"velocity":70},{"pitch":42,"start":6.875,"duration":0.0625,"velocity":70},{"pitch":36,"start":6.875,"duration":0.0625,"velocity":110},{"pitch":42,"start":6.9375,"duration":0.0625,"velocity":70},{"pitch":42,"start":7,"duration":0.0625,"velocity":70},{"pitch":36,"start":7,"duration":0.0625,"velocity":120},{"pitch":42,"start":7.0625,"duration":0.0625,"velocity":70},{"pitch":36,"start":7.0625,"duration":0.0625,"velocity":115},{"pitch":42,"start":7.125,"duration":0.0625,"velocity":70},{"pitch":42,"start":7.1875,"duration":0.0625,"velocity":70},{"pitch":36,"start":7.1875,"duration":0.0625,"velocity":110},{"pitch":42,"start":7.25,"duration":0.0625,"velocity":70},{"pitch":38,"start":7.25,"duration":0.0625,"velocity":120},{"pitch":42,"start":7.3125,"duration":0.0625,"velocity":70},{"pitch":42,"start":7.375,"duration":0.0625,"velocity":70},{"pitch":42,"start":7.4375,"duration":0.0625,"velocity":70},{"pitch":42,"start":7.5,"duration":0.0625,"velocity":70},{"pitch":42,"start":7.5625,"duration":0.0625,"velocity":70},{"pitch":36,"start":7.5625,"duration":0.0625,"velocity":100},{"pitch":42,"start":7.625,"duration":0.0625,"velocity":70},{"pitch":36,"start":7.625,"duration":0.0625,"velocity":100},{"pitch":42,"start":7.6875,"duration":0.0625,"velocity":70},{"pitch":42,"start":7.75,"duration":0.0625,"velocity":70},{"pitch":38,"start":7.75,"duration":0.0625,"velocity":115},{"pitch":42,"start":7.8125,"duration":0.0625,"velocity":70},{"pitch":36,"start":7.8125,"duration":0.0625,"velocity":110},{"pitch":42,"start":7.875,"duration":0.0625,"velocity":70},{"pitch":38,"start":7.875,"duration":0.0625,"velocity":100},{"pitch":42,"start":7.9375,"duration":0.0625,"velocity":70},{"pitch":42,"start":8,"duration":0.0625,"velocity":70},{"pitch":36,"start":8,"duration":0.0625,"velocity":120},{"pitch":42,"start":8.0625,"duration":0.0625,"velocity":70},{"pitch":36,"start":8.0625,"duration":0.0625,"velocity":115},{"pitch":42,"start":8.125,"duration":0.0625,"velocity":70},{"pitch":42,"start":8.1875,"duration":0.0625,"velocity":70},{"pitch":36,"start":8.1875,"duration":0.0625,"velocity":110},{"pitch":42,"start":8.25,"duration":0.0625,"velocity":70},{"pitch":38,"start":8.25,"duration":0.0625,"velocity":120},{"pitch":42,"start":8.3125,"duration":0.0625,"velocity":70},{"pitch":42,"start":8.375,"duration":0.0625,"velocity":70},{"pitch":42,"start":8.4375,"duration":0.0625,"velocity":70},{"pitch":42,"start":8.5,"duration":0.0625,"velocity":70},{"pitch":42,"start":8.5625,"duration":0.0625,"velocity":70},{"pitch":36,"start":8.5625,"duration":0.0625,"velocity":100},{"pitch":42,"start":8.625,"duration":0.0625,"velocity":70},{"pitch":36,"start":8.625,"duration":0.0625,"velocity":100},{"pitch":42,"start":8.6875,"duration":0.0625,"velocity":70},{"pitch":42,"start":8.75,"duration":0.0625,"velocity":70},{"pitch":38,"start":8.75,"duration":0.0625,"velocity":115},{"pitch":42,"start":8.8125,"duration":0.0625,"velocity":70},{"pitch":42,"start":8.875,"duration":0.0625,"velocity":70},{"pitch":36,"start":8.875,"duration":0.0625,"velocity":110},{"pitch":42,"start":8.9375,"duration":0.0625,"velocity":70},{"pitch":42,"start":9,"duration":0.0625,"velocity":70},{"pitch":36,"start":9,"duration":0.0625,"velocity":120},{"pitch":42,"start":9.0625,"duration":0.0625,"velocity":70},{"pitch":36,"start":9.0625,"duration":0.0625,"velocity":115},{"pitch":42,"start":9.125,"duration":0.0625,"velocity":70},{"pitch":42,"start":9.1875,"duration":0.0625,"velocity":70},{"pitch":36,"start":9.1875,"duration":0.0625,"velocity":110},{"pitch":42,"start":9.25,"duration":0.0625,"velocity":70},{"pitch":38,"start":9.25,"duration":0.0625,"velocity":120},{"pitch":42,"start":9.3125,"duration":0.0625,"velocity":70},{"pitch":42,"start":9.375,"duration":0.0625,"velocity":70},{"pitch":42,"start":9.4375,"duration":0.0625,"velocity":70},{"pitch":42,"start":9.5,"duration":0.0625,"velocity":70},{"pitch":42,"start":9.5625,"duration":0.0625,"velocity":70},{"pitch":36,"start":9.5625,"duration":0.0625,"velocity":100},{"pitch":42,"start":9.625,"duration":0.0625,"velocity":70},{"pitch":36,"start":9.625,"duration":0.0625,"velocity":100},{"pitch":42,"start":9.6875,"duration":0.0625,"velocity":70},{"pitch":42,"start":9.75,"duration":0.0625,"velocity":70},{"pitch":38,"start":9.75,"duration":0.0625,"velocity":115},{"pitch":36,"start":9.75,"duration":0.0625,"velocity":120},{"pitch":42,"start":9.8125,"duration":0.0625,"velocity":70},{"pitch":36,"start":9.875,"duration":0.03125,"velocity":110},{"pitch":42,"start":9.875,"duration":0.0625,"velocity":70},{"pitch":42,"start":9.9375,"duration":0.0625,"velocity":70},{"pitch":36,"start":9.9375,"duration":0.0625,"velocity":110},{"pitch":42,"start":10,"duration":0.0625,"velocity":70},{"pitch":36,"start":10,"duration":0.0625,"velocity":120},{"pitch":42,"start":10.0625,"duration":0.0625,"velocity":70},{"pitch":36,"start":10.0625,"duration":0.0625,"velocity":115},{"pitch":42,"start":10.125,"duration":0.0625,"velocity":70},{"pitch":42,"start":10.1875,"duration":0.0625,"velocity":70},{"pitch":36,"start":10.1875,"duration":0.0625,"velocity":110},{"pitch":42,"start":10.25,"duration":0.0625,"velocity":70},{"pitch":38,"start":10.25,"duration":0.0625,"velocity":120},{"pitch":42,"start":10.3125,"duration":0.0625,"velocity":70},{"pitch":42,"start":10.375,"duration":0.0625,"velocity":70},{"pitch":42,"start":10.4375,"duration":0.0625,"velocity":70},{"pitch":42,"start":10.5,"duration":0.0625,"velocity":70},{"pitch":42,"start":10.5625,"duration":0.0625,"velocity":70},{"pitch":36,"start":10.5625,"duration":0.0625,"velocity":100},{"pitch":42,"start":10.625,"duration":0.0625,"velocity":70},{"pitch":36,"start":10.625,"duration":0.0625,"velocity":100},{"pitch":42,"start":10.6875,"duration":0.0625,"velocity":70},{"pitch":42,"start":10.75,"duration":0.0625,"velocity":70},{"pitch":38,"start":10.75,"duration":0.0625,"velocity":115},{"pitch":42,"start":10.8125,"duration":0.0625,"velocity":70},{"pitch":42,"start":10.875,"duration":0.0625,"velocity":70},{"pitch":36,"start":10.875,"duration":0.0625,"velocity":110},{"pitch":42,"start":10.9375,"duration":0.0625,"velocity":70},{"pitch":42,"start":11,"duration":0.0625,"velocity":70},{"pitch":36,"start":11,"duration":0.0625,"velocity":120},{"pitch":42,"start":11.0625,"duration":0.0625,"velocity":70},{"pitch":36,"start":11.0625,"duration":0.0625,"velocity":115},{"pitch":42,"start":11.125,"duration":0.0625,"velocity":70},{"pitch":42,"start":11.1875,"duration":0.0625,"velocity":70},{"pitch":36,"start":11.1875,"duration":0.0625,"velocity":110},{"pitch":42,"start":11.25,"duration":0.0625,"velocity":70},{"pitch":38,"start":11.25,"duration":0.0625,"velocity":120},{"pitch":42,"start":11.3125,"duration":0.0625,"velocity":70},{"pitch":42,"start":11.375,"duration":0.0625,"velocity":70},{"pitch":42,"start":11.4375,"duration":0.0625,"velocity":70},{"pitch":42,"start":11.5,"duration":0.0625,"velocity":70},{"pitch":42,"start":11.5625,"duration":0.0625,"velocity":70},{"pitch":36,"start":11.5625,"duration":0.0625,"velocity":100},{"pitch":42,"start":11.625,"duration":0.0625,"velocity":70},{"pitch":36,"start":11.625,"duration":0.0625,"velocity":100},{"pitch":42,"start":11.6875,"duration":0.0625,"velocity":70},{"pitch":42,"start":11.75,"duration":0.0625,"velocity":70},{"pitch":38,"start":11.75,"duration":0.0625,"velocity":115},{"pitch":42,"start":11.8125,"duration":0.0625,"velocity":70},{"pitch":36,"start":11.8125,"duration":0.0625,"velocity":110},{"pitch":42,"start":11.875,"duration":0.0625,"velocity":70},{"pitch":38,"start":11.875,"duration":0.0625,"velocity":100},{"pitch":42,"start":11.9375,"duration":0.0625,"velocity":70}]}],"arrangement":[{"patternId":"exnx95h","startBar":0}]}],"loopStart":0,"loopEnd":4,"loopEnabled":false,"selectedTrackId":"4vmp02z","selectedPatternId":"exnx95h","playheadBar":0,"armedTrackId":null};
+    Object.assign(ProjectState, state);
+    const _bi = document.getElementById('bpm-input');   if (_bi) _bi.value = state.bpm;
+    const _bd = document.getElementById('bpm-display'); if (_bd) _bd.textContent = state.bpm;
+    const _ks = document.getElementById('key-sel');     if (_ks) _ks.value = state.key;
+    const _ss = document.getElementById('scale-sel');   if (_ss) _ss.value = state.scale;
   }
 
   // ============================================================
@@ -7826,18 +7809,21 @@ const ExportEngine = {
     if (!bar) return;
     const selStyle = `font-size:7px;height:24px;font-family:'Press Start 2P',monospace;background:#46425e;color:#ffeecc;border:1px solid #15788c;`;
     bar.innerHTML = `
-      <!-- 3-way tool toggle: no gap, equal width -->
-      <div style="display:flex;flex-shrink:0;">
-        <button id="pr-tool-default" class="nes-btn pr-topbar-btn engaged" style="width:58px;">DEFAULT</button>
-        <button id="pr-tool-stamp"   class="nes-btn pr-topbar-btn" style="width:58px;margin-left:-2px;">STAMP</button>
-        <button id="pr-tool-magic"   class="nes-btn pr-topbar-btn" style="width:58px;margin-left:-2px;">&#10022; MAGIC</button>
+      <!-- ADD NOTES label + 3-way tool toggle -->
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+        <span class="pr-topbar-label">ADD NOTES</span>
+        <div style="display:flex;">
+          <button id="pr-tool-default" class="nes-btn pr-topbar-btn engaged" style="width:58px;">SINGLE</button>
+          <button id="pr-tool-stamp"   class="nes-btn pr-topbar-btn" style="width:58px;margin-left:-2px;">MULTI</button>
+          <button id="pr-tool-magic"   class="nes-btn pr-topbar-btn" style="width:58px;margin-left:-2px;">&#10022; MAGIC</button>
+        </div>
       </div>
 
       <!-- STAMP controls (hidden by default) -->
       <div id="pr-stamp-controls" style="display:none;align-items:center;gap:5px;margin-left:8px;">
         <span class="pr-topbar-label">COUNT</span>
         <div style="display:flex;align-items:center;gap:2px;">
-          <span id="pr-stamp-count-val" style="font-size:6px;font-family:'Press Start 2P',monospace;color:#ffeecc;min-width:14px;text-align:center;">4</span>
+          <span id="pr-stamp-count-val" style="font-size:8px;font-family:'Press Start 2P',monospace;color:#ffeecc;min-width:14px;text-align:center;">4</span>
           <div style="display:flex;flex-direction:column;gap:1px;">
             <button class="bpm-arrow" id="pr-stamp-count-up">&#9650;</button>
             <button class="bpm-arrow" id="pr-stamp-count-dn">&#9660;</button>
@@ -7853,7 +7839,7 @@ const ExportEngine = {
         </select>
         <span class="pr-topbar-label">PITCH &#916;</span>
         <div style="display:flex;align-items:center;gap:2px;">
-          <span id="pr-stamp-pitch-val" style="font-size:6px;font-family:'Press Start 2P',monospace;color:#ffeecc;min-width:20px;text-align:center;">0</span>
+          <span id="pr-stamp-pitch-val" style="font-size:8px;font-family:'Press Start 2P',monospace;color:#ffeecc;min-width:20px;text-align:center;">0</span>
           <div style="display:flex;flex-direction:column;gap:1px;">
             <button class="bpm-arrow" id="pr-stamp-pitch-up">&#9650;</button>
             <button class="bpm-arrow" id="pr-stamp-pitch-dn">&#9660;</button>
@@ -7893,11 +7879,6 @@ const ExportEngine = {
     if (PR._stampPitchDelta === undefined) PR._stampPitchDelta = 0;
     if (PR._stampInterval === undefined) PR._stampInterval = 0.0625;
 
-    const syncBtnChord = (engaged) => {
-      const bc = document.getElementById('btn-chord');
-      if (bc) bc.classList.toggle('engaged', engaged);
-    };
-
     const setTool = (t) => {
       PR._tool = t;
       document.getElementById('pr-tool-default').classList.toggle('engaged', t === 'default');
@@ -7906,7 +7887,6 @@ const ExportEngine = {
       const sc = document.getElementById('pr-stamp-controls');
       if (sc) sc.style.display = t === 'stamp' ? 'flex' : 'none';
       MagicGen.engaged = (t === 'magic');
-      syncBtnChord(MagicGen.engaged);
     };
 
     // Sync initial tool if MagicGen was already engaged (e.g. re-opening panel)
@@ -7957,7 +7937,7 @@ const ExportEngine = {
       document.getElementById('panel-divider').style.display = 'none';
       PR.activePattern = null;
       setTool('default');
-      AV.resize();
+      requestAnimationFrame(() => { AV.resize(); AV.draw(); });
     };
 
     // Expose setTool so btn-chord can sync the toggle
@@ -7976,10 +7956,10 @@ const ExportEngine = {
     wireTransport();
     wireDivider();
     createDemoState();
-    AV.resize();
-    AV.draw();
     AV.initEvents();
     PR.initEvents();
+    requestAnimationFrame(() => { AV.resize(); AV.draw(); });
+    document.fonts.ready.then(() => requestAnimationFrame(() => { AV.resize(); AV.draw(); }));
     MobileUI.checkLayout();
     window.addEventListener('resize', () => {
       MobileUI.checkLayout();
