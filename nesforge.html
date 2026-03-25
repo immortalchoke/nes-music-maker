@@ -782,6 +782,84 @@ body.mobile-mode #mobile-app { display: flex !important; }
   font-size: 11px;
 }
 
+/* ProgBuilder */
+#prog-startup-modal,#prog-builder-modal{display:none;position:fixed;
+  inset:0;z-index:8000;background:rgba(10,10,26,.92);align-items:center;
+  justify-content:center;}
+#prog-startup-modal.open,#prog-builder-modal.open{display:flex;}
+#prog-startup-content{background:#1e1c30;border:2px solid #15788c;
+  padding:36px;display:flex;flex-direction:column;align-items:center;
+  gap:24px;max-width:680px;width:92%;}
+#prog-startup-title{font-size:16px;color:var(--hi);letter-spacing:.15rem;
+  font-family:'Press Start 2P',monospace;}
+#prog-startup-sub{font-size:10px;color:var(--text2);letter-spacing:.08rem;
+  font-family:'Press Start 2P',monospace;}
+#prog-startup-cards{display:flex;gap:18px;width:100%;}
+.prog-start-card{flex:1;background:#46425e;border:2px solid #15788c;
+  padding:22px 16px;cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;gap:14px;font-family:'Press Start 2P',monospace;}
+.prog-start-card:hover{border-color:var(--hi);background:#3a384e;}
+.prog-card-icon{font-size:28px;color:var(--hi);}
+.prog-card-label{font-size:10px;color:var(--text);text-align:center;}
+.prog-card-desc{font-size:8px;color:var(--text2);text-align:center;
+  line-height:2;}
+#prog-builder-content{background:#1e1c30;border:2px solid #15788c;
+  padding:24px;width:min(820px,96vw);max-height:92vh;overflow-y:auto;
+  font-family:'Press Start 2P',monospace;}
+.pb-title{font-size:13px;color:var(--hi);margin-bottom:20px;
+  letter-spacing:.1rem;display:flex;align-items:center;
+  justify-content:space-between;}
+.pb-section{margin-bottom:18px;}
+.pb-label{font-size:9px;color:var(--text2);margin-bottom:8px;
+  letter-spacing:.05rem;}
+.pb-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.pb-preset-btn{font-size:9px;padding:5px 8px;}
+.pb-step{display:flex;flex-direction:column;align-items:center;gap:8px;
+  background:#46425e;border:2px solid #15788c;padding:12px 8px;
+  min-width:80px;position:relative;flex-shrink:0;}
+.pb-step:hover{border-color:var(--hi);}
+.pb-step-label{font-size:12px;color:var(--hi);}
+.pb-step-chord{font-size:6px;color:var(--text2);letter-spacing:.03rem;
+  text-align:center;min-height:8px;margin-top:-2px;}
+.pb-step-del{position:absolute;top:2px;right:4px;background:none;
+  border:none;color:var(--accent);font-size:13px;cursor:pointer;
+  font-family:'Press Start 2P',monospace;padding:0;line-height:1;}
+#pb-steps-wrap{display:flex;gap:8px;flex-wrap:wrap;padding:12px;
+  background:#46425e;border:2px solid #15788c;min-height:110px;
+  align-items:flex-start;align-content:flex-start;}
+.pb-add-step{width:56px;height:96px;background:none;
+  border:2px dashed #15788c;color:#15788c;font-size:24px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;}
+.pb-add-step:hover{border-color:var(--hi);color:var(--hi);}
+.pb-tog{font-size:9px;padding:5px 8px;}
+.pb-tog.on{background:var(--hi);color:#1e1c30;border-color:var(--hi);}
+.pb-lib-row{display:flex;align-items:center;gap:8px;padding:6px 10px;
+  background:#46425e;border:1px solid #15788c;font-size:9px;
+  color:var(--text);margin-bottom:6px;}
+.pb-lib-row span{flex:1;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;}
+.pb-lib-row button{font-size:8px;padding:3px 6px;}
+.pb-generate{width:100%;font-size:11px;padding:12px;color:var(--hi);
+  border-color:var(--hi);margin-top:6px;}
+.pb-generate:hover{background:var(--hi);color:#1e1c30;}
+.pb-total{font-size:9px;color:var(--text2);text-align:right;
+  margin-bottom:6px;}
+#pb-track-toggles{display:flex;flex-direction:column;gap:4px;}
+.pb-track-tog-row{display:flex;align-items:center;gap:8px;padding:6px 8px;
+  background:#46425e;border:2px solid #15788c;cursor:pointer;
+  font-family:'Press Start 2P',monospace;}
+.pb-track-tog-row:hover{border-color:var(--hi);}
+.pb-track-tog-row input[type="checkbox"]{width:14px;height:14px;
+  accent-color:var(--hi);flex-shrink:0;cursor:pointer;}
+.pb-track-tog-icon{font-size:10px;color:var(--hi);width:14px;
+  text-align:center;flex-shrink:0;}
+.pb-track-tog-label{font-size:8px;color:var(--text);flex-shrink:0;
+  letter-spacing:.05rem;}
+.pb-track-tog-sub{font-size:6px;color:var(--text2);letter-spacing:.03rem;}
+.pb-track-tog-row:has(input:not(:checked)) .pb-track-tog-label,
+.pb-track-tog-row:has(input:not(:checked)) .pb-track-tog-icon{opacity:.4;}
+
   </style>
 </head>
 <body>
@@ -1916,6 +1994,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
     scrollX: 0,
     scrollY: 480, // start near middle C
     activePattern: null, // { track, pattern }
+    _hoverPitch: null,
+    _pitchLocked: false,
     _dragState: null,
     _onMouseUp: null,
     _stampDuration: null, // duration inherited from last selected note (null = use default)
@@ -2265,7 +2345,16 @@ body.mobile-mode #mobile-app { display: flex !important; }
       if (!ap) { el.innerHTML = ''; return; }
       const selected = ap.pattern.notes.filter(n => n.selected);
       if (selected.length === 0) {
-        el.innerHTML = `<div style="font-size:5px;color:var(--text2);line-height:1.8;">SELECT<br>A NOTE</div>`;
+        const NOTE_NAMES_H = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+        const hp = this._hoverPitch;
+        const pitchLabel = hp !== null
+          ? NOTE_NAMES_H[hp % 12] + Math.floor(hp / 12)
+          : '—';
+        const pitchColor = hp !== null ? '#ffeecc' : '#555577';
+        el.innerHTML = `<div style="display:flex;align-items:center;gap:5px;padding:2px 0;">
+          <span style="font-size:8px;color:#ffb0a3;font-family:'Press Start 2P',monospace;letter-spacing:0.05rem;">PITCH</span>
+          <span style="font-size:8px;color:${pitchColor};font-family:'Press Start 2P',monospace;">${pitchLabel}</span>
+        </div>`;
         return;
       }
       const multi = selected.length > 1;
@@ -2491,8 +2580,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
       // ── HARMONIZE action ─────────────────────────────────────────
       document.getElementById('pr-harmonize-btn').onclick = () => {
         const steps = parseInt(document.getElementById('pr-harm-interval').value);
-        History.push();
         if (PR._harmTarget === 'this') {
+          History.push();
           const newNotes = selected.map(n => ({
             id: makeId(),
             pitch: Math.max(0, Math.min(127, stepByScale(n.pitch, steps))),
@@ -2503,33 +2592,36 @@ body.mobile-mode #mobile-app { display: flex !important; }
           }));
           ap.pattern.notes.push(...newNotes);
         } else {
-          const tracks = ProjectState.tracks;
-          const sibling = tracks.slice(tracks.indexOf(ap.track) + 1)
-            .find(t => t.channelType === ap.track.channelType);
-          if (!sibling) {
-            const btn = document.getElementById('pr-harmonize-btn');
-            const orig = btn.textContent;
-            btn.textContent = 'NO SIBLING TRACK';
-            btn.style.color = 'var(--accent)';
-            setTimeout(() => { btn.textContent = orig; btn.style.color = 'var(--hi)'; }, 1800);
-            return;
-          }
-          const entry = ap.track.arrangement.find(e => e.patternId === ap.pattern.id);
-          const startBar = entry ? entry.startBar : 0;
-          let sibPat = null;
-          const sibEntry = sibling.arrangement.find(e => e.startBar === startBar);
-          if (sibEntry) sibPat = sibling.patterns.find(p => p.id === sibEntry.patternId);
-          if (!sibPat) sibPat = addPattern(sibling.id, startBar, ap.pattern.lengthBars);
-          const newNotes = selected.map(n => ({
+          const srcEntry = ap.track.arrangement.find(e => e.patternId === ap.pattern.id);
+          const startBar = srcEntry ? srcEntry.startBar : 0;
+          const harmNotes = selected.map(n => ({
             id: makeId(),
             pitch: Math.max(0, Math.min(127, stepByScale(n.pitch, steps))),
             start: n.start,
             duration: n.duration,
             velocity: n.velocity,
-            selected: false
+            selected: true
           }));
-          sibPat.notes.push(...newNotes);
-          AV.draw();
+          showAddTrackModal({
+            defaultType: ap.track.channelType,
+            onConfirm: (channelType, name) => {
+              History.push();
+              const newTrack = addTrack(channelType, name);
+              const newPat = addPattern(newTrack.id, startBar, ap.pattern.lengthBars);
+              newPat.notes.push(...harmNotes);
+              // Select the new pattern in AV
+              const newEntry = newTrack.arrangement.find(e => e.patternId === newPat.id);
+              AV._selEntries.clear();
+              if (newEntry) AV._selEntries.add(newEntry);
+              ProjectState.selectedTrackId = newTrack.id;
+              ProjectState.selectedPatternId = newPat.id;
+              // Open in piano roll
+              PR.open(newTrack, newPat);
+              AV.resize(); AV.draw();
+              PR.draw(); PR.drawVelocity(); PR.updateSidePanel();
+            }
+          });
+          return;
         }
         PR.draw(); PR.drawVelocity(); PR.updateSidePanel();
       };
@@ -2821,7 +2913,12 @@ body.mobile-mode #mobile-app { display: flex !important; }
       } else {
         ap.pattern.notes.forEach(n => { n.selected = false; });
         const pos = posToNote(mx, my);
-        if (pos) this._selectedCell = pos;
+        if (pos) {
+          this._selectedCell = pos;
+          this._hoverPitch = pos.pitch;
+          this._pitchLocked = true;
+          this.updateSidePanel();
+        }
         this._hoverCell = null;
         dragState = { type: 'marquee', startX: mx, startY: my, currentX: mx, currentY: my, startScrollX: this.scrollX, startScrollY: this.scrollY };
         this._dragState = dragState;
@@ -2841,6 +2938,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
             const { x, w } = hit;
             canvas.style.cursor = mx > x + w - 6 ? 'ew-resize' : (e.altKey ? 'copy' : 'grab');
             if (this._hoverCell) { this._hoverCell = null; this.draw(); }
+            if (!this._pitchLocked && this._hoverPitch !== hit.note.pitch) {
+              this._hoverPitch = hit.note.pitch;
+              this.updateSidePanel();
+            }
           } else {
             canvas.style.cursor = '';
             const pos = posToNote(mx, my);
@@ -2848,6 +2949,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
               if (!this._hoverCell || this._hoverCell.snappedStart !== pos.snappedStart || this._hoverCell.rowIdx !== pos.rowIdx) {
                 this._hoverCell = { rowIdx: pos.rowIdx, snappedStart: pos.snappedStart };
                 this.draw();
+              }
+              if (!this._pitchLocked && this._hoverPitch !== pos.pitch) {
+                this._hoverPitch = pos.pitch;
+                this.updateSidePanel();
               }
             } else if (this._hoverCell) {
               this._hoverCell = null;
@@ -2857,6 +2962,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
         } else if (this._hoverCell) {
           this._hoverCell = null;
           this.draw();
+          if (this._hoverPitch !== null) { this._hoverPitch = null; this.updateSidePanel(); }
         }
         return;
       }
@@ -3030,20 +3136,31 @@ body.mobile-mode #mobile-app { display: flex !important; }
             }
           }
           const firstSelected = ap.pattern.notes.find(n => n.selected);
-          if (firstSelected) this._stampDuration = firstSelected.duration;
+          if (firstSelected) {
+            this._stampDuration = firstSelected.duration;
+          } else {
+            const { startX, startY, currentX, currentY } = dragState;
+            const wasDrag = Math.abs(currentX - startX) > 4 || Math.abs(currentY - startY) > 4;
+            if (wasDrag) {
+              this._pitchLocked = false;
+              this._hoverPitch = null;
+            }
+          }
         }
       }
       this._pressedKey = null;
       dragState = null;
       this._dragState = null;
-      if (this.activePattern) { this.draw(); this.drawVelocity(); }
+      if (this.activePattern) { this.draw(); this.drawVelocity(); this.updateSidePanel(); }
     };
     if (PR._onMouseUp) document.removeEventListener('mouseup', PR._onMouseUp);
     PR._onMouseUp = onCanvasMouseUp;
     document.addEventListener('mouseup', onCanvasMouseUp);
 
     canvas.addEventListener('mouseleave', () => {
+      this._pitchLocked = false;
       if (this._hoverCell) { this._hoverCell = null; this.draw(); }
+      if (this._hoverPitch !== null) { this._hoverPitch = null; this.updateSidePanel(); }
     });
 
     canvas.addEventListener('wheel', (e) => {
@@ -3817,11 +3934,7 @@ AV.initEvents = function() {
       return;
     }
     if (hit.zone === 'add-track') {
-      showContextMenu(e.clientX, e.clientY, [
-        { label: 'LEAD  (Pulse)',    action: () => { addTrack('pulse50',   'LEAD');  AV.resize(); AV.draw(); } },
-        { label: 'BASS  (Triangle)', action: () => { addTrack('triangle',  'BASS');  AV.resize(); AV.draw(); } },
-        { label: 'DRUMS (PCM7)',     action: () => { addTrack('pcm7',      'DRUMS'); AV.resize(); AV.draw(); } },
-      ]);
+      showAddTrackModal({ onConfirm: (type, name) => { History.push(); addTrack(type, name); AV.resize(); AV.draw(); } });
       return;
     }
     if (hit.zone === 'clear-all') {
@@ -4305,6 +4418,90 @@ AV.initEvents = function() {
     }
   });
 };
+
+function showAddTrackModal({ defaultType = 'pulse50', onConfirm } = {}) {
+  let el = document.getElementById('add-track-modal');
+  if (el) el.remove();
+
+  const TRACK_TYPES = [
+    { value: 'pulse50',  label: 'Lead',    sub: 'Pulse 50%' },
+    { value: 'pulse25',  label: 'Harmony', sub: 'Pulse 25%' },
+    { value: 'triangle', label: 'Bass',    sub: 'Triangle' },
+    { value: 'chord',    label: 'Chord',   sub: 'Chord' },
+    { value: 'noise',    label: 'Noise',   sub: 'Drums' },
+    { value: 'pcm7',     label: 'PCM',     sub: 'PCM7' },
+  ];
+
+  const DEFAULT_NAMES = { pulse50: 'LEAD', pulse25: 'HARM', triangle: 'BASS', chord: 'CHORD', noise: 'DRUMS', pcm7: 'DRUMS' };
+
+  el = document.createElement('div');
+  el.id = 'add-track-modal';
+  el.style.cssText = `position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    background:#1a1a2e;border:2px solid #00ccaa;z-index:1001;padding:16px;min-width:220px;
+    font:7px "Press Start 2P";color:#e0e0ff;display:flex;flex-direction:column;gap:10px;`;
+
+  let selected = defaultType;
+  let currentName = DEFAULT_NAMES[defaultType] || 'TRACK';
+
+  const render = () => {
+    el.innerHTML = `
+      <div style="color:#00ccaa;font-size:8px;letter-spacing:1px;">NEW TRACK</div>
+      <div>
+        <div style="color:#8888aa;margin-bottom:5px;">NAME</div>
+        <input id="atm-name" type="text" value="${currentName}"
+          style="background:#0d0d1a;border:2px solid #444466;color:#e0e0ff;
+                 font:7px 'Press Start 2P';padding:4px 6px;width:100%;box-sizing:border-box;">
+      </div>
+      <div>
+        <div style="color:#8888aa;margin-bottom:6px;">TYPE</div>
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          ${TRACK_TYPES.map(t => `
+            <div class="atm-type" data-value="${t.value}"
+              style="display:flex;align-items:center;gap:8px;padding:5px 7px;cursor:pointer;
+                     border:2px solid ${t.value === selected ? '#00ccaa' : '#333355'};
+                     background:${t.value === selected ? '#003322' : 'transparent'};">
+              <div style="width:8px;height:8px;border:2px solid ${t.value === selected ? '#00ccaa' : '#555577'};
+                          background:${t.value === selected ? '#00ccaa' : 'transparent'};flex-shrink:0;"></div>
+              <span style="color:${t.value === selected ? '#00ccaa' : '#ffeecc'};font-size:7px;">${t.label}</span>
+              <span style="color:#555577;font-size:5px;margin-left:auto;">${t.sub}</span>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:2px;">
+        <button id="atm-cancel"
+          style="flex:1;background:#1a1a2e;border:2px solid #444466;color:#8888aa;
+                 font:7px 'Press Start 2P';padding:6px;cursor:pointer;">CANCEL</button>
+        <button id="atm-create"
+          style="flex:1;background:#003322;border:2px solid #00ccaa;color:#00ccaa;
+                 font:7px 'Press Start 2P';padding:6px;cursor:pointer;">CREATE</button>
+      </div>
+    `;
+
+    el.querySelectorAll('.atm-type').forEach(row => {
+      row.addEventListener('mouseenter', () => { if (row.dataset.value !== selected) row.style.background = '#111133'; });
+      row.addEventListener('mouseleave', () => { if (row.dataset.value !== selected) row.style.background = 'transparent'; });
+      row.addEventListener('click', () => {
+        const nameEl = el.querySelector('#atm-name');
+        const typedName = nameEl ? nameEl.value.trim().toUpperCase() : '';
+        // Auto-update name only if it's still a default value
+        const isDefault = Object.values(DEFAULT_NAMES).includes(typedName) || typedName === '';
+        selected = row.dataset.value;
+        currentName = isDefault ? (DEFAULT_NAMES[selected] || 'TRACK') : typedName;
+        render();
+      });
+    });
+
+    el.querySelector('#atm-cancel').onclick = () => el.remove();
+    el.querySelector('#atm-create').onclick = () => {
+      const name = (el.querySelector('#atm-name').value.trim() || DEFAULT_NAMES[selected] || 'TRACK').toUpperCase();
+      el.remove();
+      if (onConfirm) onConfirm(selected, name);
+    };
+  };
+
+  render();
+  document.body.appendChild(el);
+}
 
 function showContextMenu(x, y, items) {
   let el = document.getElementById('ctx-menu');
@@ -4798,7 +4995,26 @@ function buildTopBar() {
     `<path d="m30.12 60.24h90.35v30.11h-90.35z"/>` +
     `<path d="m120.47 90.35h30.12v30.12h-30.12z"/>`);
 
+  const PROG = icon(
+    '<rect x="20"  y="420" width="472" height="24"/>' +
+    '<rect x="20"  y="140" width="180" height="56"/>' +
+    '<rect x="216" y="140" width="88"  height="56"/>' +
+    '<rect x="320" y="140" width="88"  height="56"/>' +
+    '<rect x="424" y="140" width="68"  height="56"/>' +
+    '<rect x="20"  y="226" width="180" height="56"/>' +
+    '<rect x="216" y="226" width="88"  height="56"/>' +
+    '<rect x="320" y="226" width="88"  height="56"/>' +
+    '<rect x="424" y="226" width="68"  height="56"/>' +
+    '<rect x="20"  y="312" width="88"  height="56"/>' +
+    '<rect x="124" y="312" width="88"  height="56"/>' +
+    '<rect x="320" y="312" width="88"  height="56"/>' +
+    '<rect x="424" y="312" width="68"  height="56"/>');
+
   document.getElementById('topbar').innerHTML = `
+    <div class="tb-group">
+      <button class="nes-btn" id="btn-prog" title="Progression Builder" style="color:var(--hi);border-color:var(--hi);">${PROG}</button>
+    </div>
+    <div class="tb-vdivider"></div>
     <div class="tb-group">
       <button class="nes-btn" id="btn-undo" disabled title="Undo (⌘Z)">${UNDO}</button>
       <button class="nes-btn" id="btn-redo" disabled title="Redo (⌘⇧Z)">${REDO}</button>
@@ -7845,7 +8061,10 @@ const ExportEngine = {
             <button class="bpm-arrow" id="pr-stamp-pitch-dn">&#9660;</button>
           </div>
         </div>
-        <button id="pr-stamp-mode-btn" class="nes-btn pr-topbar-btn" title="Toggle semitones vs scale steps">SEMI</button>
+        <div style="display:flex;">
+          <button id="pr-stamp-mode-semi"  class="nes-btn pr-topbar-btn" style="width:46px;">SEMI</button>
+          <button id="pr-stamp-mode-scale" class="nes-btn pr-topbar-btn" style="width:46px;margin-left:-2px;">SCALE</button>
+        </div>
         <span class="pr-topbar-label">INTERVAL</span>
         <select id="pr-stamp-interval" style="${selStyle}">
           <option value="0.0625" selected>1/16</option>
@@ -7911,7 +8130,12 @@ const ExportEngine = {
     if (PR._stampDuration !== null && PR._stampDuration !== undefined) {
       lenSel.value = String(PR._stampDuration);
     }
-    lenSel.onchange = function() { PR._stampDuration = parseFloat(this.value); };
+    lenSel.onchange = function() {
+      PR._stampDuration = parseFloat(this.value);
+      PR._stampInterval = PR._stampDuration;
+      const intSel = document.getElementById('pr-stamp-interval');
+      if (intSel) intSel.value = this.value;
+    };
 
     // PITCH Δ stepper
     const pitchEl = document.getElementById('pr-stamp-pitch-val');
@@ -7920,12 +8144,13 @@ const ExportEngine = {
     document.getElementById('pr-stamp-pitch-dn').onclick = () => { PR._stampPitchDelta = Math.max(-24, PR._stampPitchDelta - 1); pitchEl.textContent = PR._stampPitchDelta; };
 
     // PITCH mode toggle
-    const modeBtn = document.getElementById('pr-stamp-mode-btn');
-    modeBtn.textContent = PR._stampPitchMode === 'scale' ? 'SCALE' : 'SEMI';
-    modeBtn.onclick = () => {
-      PR._stampPitchMode = PR._stampPitchMode === 'scale' ? 'semi' : 'scale';
-      modeBtn.textContent = PR._stampPitchMode === 'scale' ? 'SCALE' : 'SEMI';
+    const syncModeToggle = () => {
+      document.getElementById('pr-stamp-mode-semi') .classList.toggle('engaged', PR._stampPitchMode !== 'scale');
+      document.getElementById('pr-stamp-mode-scale').classList.toggle('engaged', PR._stampPitchMode === 'scale');
     };
+    syncModeToggle();
+    document.getElementById('pr-stamp-mode-semi') .onclick = () => { PR._stampPitchMode = 'semi';  syncModeToggle(); };
+    document.getElementById('pr-stamp-mode-scale').onclick = () => { PR._stampPitchMode = 'scale'; syncModeToggle(); };
 
     // INTERVAL select
     const intSel = document.getElementById('pr-stamp-interval');
@@ -7950,12 +8175,628 @@ const ExportEngine = {
     e.returnValue = '';
   });
 
+const DEGREE_NAMES = ['I','II','III','IV','V','VI','VII'];
+const NOTE_NAMES_PB = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+const PB_PRESETS = [
+  // POP
+  { genre:'POP',    title:'Axis',           roman:'I\u2013V\u2013vi\u2013IV',
+    steps:[{d:0,b:1},{d:4,b:1},{d:5,b:1},{d:3,b:1}] },
+  { genre:'POP',    title:'50s Doo-Wop',    roman:'I\u2013vi\u2013IV\u2013V',
+    steps:[{d:0,b:1},{d:5,b:1},{d:3,b:1},{d:4,b:1}] },
+  { genre:'POP',    title:'Dark Anthem',    roman:'vi\u2013IV\u2013I\u2013V',
+    steps:[{d:5,b:1},{d:3,b:1},{d:0,b:1},{d:4,b:1}] },
+  { genre:'POP',    title:'Bittersweet',    roman:'I\u2013iii\u2013IV\u2013V',
+    steps:[{d:0,b:1},{d:2,b:1},{d:3,b:1},{d:4,b:1}] },
+  // BLUES
+  { genre:'BLUES',  title:'Country',        roman:'I\u2013IV\u2013I\u2013V',
+    steps:[{d:0,b:1},{d:3,b:1},{d:0,b:1},{d:4,b:1}] },
+  { genre:'BLUES',  title:'12-Bar',         roman:'I\xd74\u2013IV\xd72\u2013I\xd72\u2013V\u2013IV\u2013I\u2013V',
+    steps:[
+      {d:0,b:1},{d:0,b:1},{d:0,b:1},{d:0,b:1},
+      {d:3,b:1},{d:3,b:1},
+      {d:0,b:1},{d:0,b:1},
+      {d:4,b:1},{d:3,b:1},
+      {d:0,b:1},{d:4,b:1}
+    ] },
+  // CLASSIC
+  { genre:'CLASSIC',title:'Minor Cadence',  roman:'i\u2013iv\u2013V\u2013i',
+    steps:[{d:0,b:1},{d:3,b:1},{d:4,b:1},{d:0,b:1}] },
+  { genre:'CLASSIC',title:'Andalusian',     roman:'i\u2013VI\u2013III\u2013VII',
+    steps:[{d:0,b:1},{d:5,b:1},{d:2,b:1},{d:6,b:1}] },
+  // METAL
+  { genre:'METAL',  title:'Power',          roman:'i\u2013VII\u2013VI\u2013VII',
+    steps:[{d:0,b:1},{d:6,b:1},{d:5,b:1},{d:6,b:1}] },
+  { genre:'METAL',  title:'Heavy Verse',    roman:'i\u2013iv\u2013i\u2013V',
+    steps:[{d:0,b:1},{d:3,b:1},{d:0,b:1},{d:4,b:1}] },
+  { genre:'METAL',  title:'Doom Chorus',    roman:'i\u2013VI\u2013VII\u2013i',
+    steps:[{d:0,b:1},{d:5,b:1},{d:6,b:1},{d:0,b:1}] },
+  // EDM
+  { genre:'EDM',    title:'Drop Zone',      roman:'I\u2013IV\u2013VI\u2013V',
+    steps:[{d:0,b:1},{d:3,b:1},{d:5,b:1},{d:4,b:1}] },
+  { genre:'EDM',    title:'Deep Chill',     roman:'I\u2013I\u2013IV\u2013v',
+    steps:[{d:0,b:2},{d:3,b:1},{d:4,b:1}] },
+  // SOUL
+  { genre:'SOUL',   title:'Jazz Cadence',   roman:'ii\u2013V\u2013I',
+    steps:[{d:1,b:1},{d:4,b:1},{d:0,b:2}] },
+  { genre:'SOUL',   title:'Rhythm Changes', roman:'I\u2013vi\u2013ii\u2013V',
+    steps:[{d:0,b:1},{d:5,b:1},{d:1,b:1},{d:4,b:1}] },
+  { genre:'SOUL',   title:'Mid-Entry',      roman:'IV\u2013I\u2013V\u2013vi',
+    steps:[{d:3,b:1},{d:0,b:1},{d:4,b:1},{d:5,b:1}] },
+  // JAZZ
+  { genre:'JAZZ',   title:'ii\u2013V\u2013I Turn',  roman:'ii\u2013V\u2013I\u2013vi',
+    steps:[{d:1,b:1},{d:4,b:1},{d:0,b:1},{d:5,b:1}] },
+  // EPIC / NES / ROCK
+  { genre:'EPIC',   title:'Triumphant',     roman:'I\u2013II\u2013IV\u2013I',
+    steps:[{d:0,b:1},{d:1,b:1},{d:3,b:1},{d:0,b:1}] },
+  { genre:'NES',    title:'Dungeon Modal',  roman:'i\u2013v\u2013i\u2013VII',
+    steps:[{d:0,b:1},{d:4,b:1},{d:0,b:1},{d:6,b:1}] },
+  { genre:'ROCK',   title:'Anthemic',       roman:'I\u2013bVII\u2013IV\u2013I',
+    steps:[{d:0,b:1},{d:6,b:1},{d:3,b:1},{d:0,b:1}] },
+  { genre:'ROCK',   title:'Stadium',        roman:'I\u2013V\u2013IV\u2013I',
+    steps:[{d:0,b:1},{d:4,b:1},{d:3,b:1},{d:0,b:1}] },
+  // CUSTOM
+  { genre:null, title:'CUSTOM', roman:null,
+    steps:[{d:0,b:1},{d:3,b:1},{d:4,b:1},{d:0,b:1}] },
+];
+
+const ProgBuilder = (() => {
+  let _steps   = PB_PRESETS[0].steps.map(s=>({...s}));
+  let _voicing = 'triad';
+  let _arpPat  = 'up';
+  let _bass    = 'quarter';
+  let _repeat  = 1;
+  let _ctx        = 'startup';
+  let _genTracks  = { bass: true, chords: true, lead: false };
+
+  function _total() {
+    return _steps.reduce((s,x)=>s+x.b,0) * _repeat;
+  }
+
+  function _activePreset() {
+    const cur = JSON.stringify(_steps.map(s=>({d:s.d,b:s.b})));
+    return PB_PRESETS.findIndex(p=>JSON.stringify(p.steps)===cur);
+  }
+
+  function _libLoad() {
+    try { return JSON.parse(localStorage.getItem('nf_prog_library')||'[]'); }
+    catch(e){ return []; }
+  }
+  function _libSave(lib) {
+    try { localStorage.setItem('nf_prog_library',JSON.stringify(lib)); }
+    catch(e){}
+  }
+  function _saveToLib() {
+    const name = prompt('Name this progression:','My Progression');
+    if (!name) return;
+    const lib = _libLoad();
+    lib.push({name, steps:_steps.map(s=>({...s})), voicing:_voicing,
+      bass:_bass, repeat:_repeat,
+      key:ProjectState.key, scale:ProjectState.scale,
+      savedAt:Date.now()});
+    if (lib.length>20) lib.shift();
+    _libSave(lib); _render();
+  }
+  function _loadFromLib(entry) {
+    _steps   = entry.steps.map(s=>({...s}));
+    _voicing = entry.voicing||'triad';
+    _bass    = entry.bass||'quarter';
+    _repeat  = entry.repeat||1;
+    _render();
+  }
+  function _deleteFromLib(idx) {
+    const lib = _libLoad(); lib.splice(idx,1); _libSave(lib); _render();
+  }
+  function _exportNFPROG(data, filename) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(
+      new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+    a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
+  }
+  function _importNFPROG(file) {
+    const r = new FileReader();
+    r.onload = e => {
+      try {
+        const d = JSON.parse(e.target.result);
+        if (d.nfprog!==1){alert('Not a valid .nfprog file.');return;}
+        _steps=d.steps.map(s=>({...s}));
+        _voicing=d.voicing||'triad';
+        _bass=d.bass||'quarter';
+        _repeat=d.repeat||1;
+        _render();
+      } catch(err){alert('Could not read file.');}
+    };
+    r.readAsText(file);
+  }
+
+  function _render() {
+    const el = document.getElementById('prog-builder-content');
+    if (!el) return;
+    const ss = `font-size:9px;font-family:'Press Start 2P',monospace;background:#46425e;color:#ffeecc;border:1px solid #15788c;padding:3px 5px;`;
+    const api = _activePreset();
+    const lib = _libLoad();
+
+    const previewChords = ChordTool.getDiatonicChords(
+      ProjectState.key, ProjectState.scale);
+
+    let stepsHtml = _steps.map((step,i)=>`
+      <div class="pb-step">
+        <button class="pb-step-del" data-si="${i}">×</button>
+        <div class="pb-step-label">${DEGREE_NAMES[step.d]}</div>
+        <div class="pb-step-chord">${
+          previewChords[step.d % previewChords.length]?.triad?.name || ''
+        }</div>
+        <select class="pb-step-deg" data-si="${i}" style="${ss}">
+          ${DEGREE_NAMES.map((n,j)=>
+            `<option value="${j}"${j===step.d?' selected':''}>${n}</option>`
+          ).join('')}
+        </select>
+        <div style="display:flex;gap:2px;">
+          ${[1,2,4].map(v=>`<button class="nes-btn pb-tog pb-step-dur${step.b===v?' on':''}" data-si="${i}" data-dur="${v}" style="font-size:8px;padding:2px 5px;">${v}B</button>`).join('')}
+        </div>
+      </div>`).join('');
+    if (_steps.length<16)
+      stepsHtml += `<button class="pb-add-step" id="pb-add-step">+</button>`;
+
+    const libHtml = lib.length===0
+      ? `<div style="font-size:5px;color:var(--text2);">No saved progressions</div>`
+      : lib.map((e,i)=>`
+          <div class="pb-lib-row">
+            <span>${e.name}</span>
+            <button class="nes-btn pb-lib-load" data-li="${i}" style="font-size:4px;padding:2px 4px;">LOAD</button>
+            <button class="nes-btn pb-lib-exp" data-li="${i}" style="font-size:4px;padding:2px 4px;">&#8595;</button>
+            <button class="nes-btn pb-lib-del" data-li="${i}" style="font-size:4px;padding:2px 4px;color:var(--accent);border-color:var(--accent);">×</button>
+          </div>`).join('');
+
+    el.innerHTML = `
+      <div class="pb-title">
+        <span>&#9636; PROGRESSION BUILDER</span>
+        <button id="pb-close" style="background:none;border:none;color:var(--accent);font:10px 'Press Start 2P',monospace;cursor:pointer;">×</button>
+      </div>
+
+      <div class="pb-section">
+        <div class="pb-label">KEY, SCALE &amp; TEMPO</div>
+        <div class="pb-row" style="flex-wrap:wrap;gap:10px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="pb-label" style="margin-bottom:0;">KEY</span>
+            <select id="pb-key" style="${ss}">
+              ${NOTE_NAMES_PB.map(k=>
+                `<option${k===ProjectState.key?' selected':''}>${k}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="pb-label" style="margin-bottom:0;">SCALE</span>
+            <select id="pb-scale" style="${ss};max-width:110px;">
+              ${Object.keys(Scales.SCALES).map(s=>
+                `<option${s===ProjectState.scale?' selected':''}>${s}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="pb-label" style="margin-bottom:0;">BPM</span>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span id="pb-bpm-display" style="font-family:'Press Start 2P',monospace;font-size:11px;color:#ffeecc;min-width:40px;text-align:center;cursor:pointer;" title="Click to type BPM">${ProjectState.bpm}</span>
+              <div style="display:flex;flex-direction:column;gap:1px;">
+                <button class="bpm-arrow" id="pb-bpm-up">&#9650;</button>
+                <button class="bpm-arrow" id="pb-bpm-down">&#9660;</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pb-section">
+        <div class="pb-label">QUICK START</div>
+        <select id="pb-preset-sel" style="${ss};width:100%;padding:6px 8px;">
+          <option value="-1"${api===-1?' selected':''}>— select a preset —</option>
+          ${PB_PRESETS.map((p,i) => {
+            const label = p.genre ? `${p.genre} \u2014 ${p.title} (${p.roman})` : p.title;
+            return `<option value="${i}"${i===api?' selected':''}>${label}</option>`;
+          }).join('')}
+        </select>
+      </div>
+
+      <div class="pb-section">
+        <div class="pb-label">CHORD SEQUENCE</div>
+        <div id="pb-steps-wrap">${stepsHtml}</div>
+      </div>
+
+      <div class="pb-section">
+        <div class="pb-label">CHORD VOICING</div>
+        <div class="pb-row">
+          ${['triad','seventh','arpeggio'].map(v=>`
+            <button class="nes-btn pb-tog pb-voicing${_voicing===v?' on':''}" data-v="${v}">${v.toUpperCase()}</button>`).join('')}
+        </div>
+        ${_voicing==='arpeggio'?`
+        <div class="pb-row" style="margin-top:5px;">
+          ${['up','down','updown','random'].map(p=>`
+            <button class="nes-btn pb-tog pb-arp${_arpPat===p?' on':''}" data-a="${p}" style="font-size:9px;padding:4px 8px;">${p.toUpperCase()}</button>`).join('')}
+        </div>`:''}
+      </div>
+
+      <div class="pb-section">
+        <div class="pb-label">BASS LINE</div>
+        <div class="pb-row">
+          ${[['quarter','QUARTER \u2669'],['eighth','EIGHTH \u266a'],['rootfifth','ROOT+5TH']].map(([v,l])=>`
+            <button class="nes-btn pb-tog pb-bass${_bass===v?' on':''}" data-b="${v}">${l}</button>`).join('')}
+        </div>
+      </div>
+
+      <div class="pb-section">
+        <div class="pb-label">REPEATS</div>
+        <div class="pb-row">
+          ${[1,2,4].map(v=>`
+            <button class="nes-btn pb-tog pb-rep${_repeat===v?' on':''}" data-r="${v}">&times;${v}</button>`).join('')}
+        </div>
+      </div>
+
+      <div class="pb-section">
+        <div class="pb-label">MY PROGRESSIONS</div>
+        <div class="pb-row" style="margin-bottom:6px;">
+          <button class="nes-btn pb-preset-btn" id="pb-save-lib">SAVE TO LIBRARY</button>
+          <button class="nes-btn pb-preset-btn" id="pb-import-btn">IMPORT .NFPROG</button>
+          <input type="file" id="pb-import-input" accept=".nfprog,.json" style="display:none;">
+          <button class="nes-btn pb-preset-btn" id="pb-export-btn">EXPORT .NFPROG</button>
+        </div>
+        <div id="pb-lib-list">${libHtml}</div>
+      </div>
+
+      <div class="pb-section">
+        <div class="pb-label">GENERATE TRACKS</div>
+        <div id="pb-track-toggles">
+          <label class="pb-track-tog-row">
+            <input type="checkbox" id="pb-gen-bass" ${_genTracks.bass?'checked':''}>
+            <span class="pb-track-tog-icon">&#9650;</span>
+            <span class="pb-track-tog-label">BASS</span>
+            <span class="pb-track-tog-sub">Triangle &middot; root notes</span>
+          </label>
+          <label class="pb-track-tog-row">
+            <input type="checkbox" id="pb-gen-chords" ${_genTracks.chords?'checked':''}>
+            <span class="pb-track-tog-icon">&#9833;</span>
+            <span class="pb-track-tog-label">CHORDS</span>
+            <span class="pb-track-tog-sub">Pulse 50% &middot; ${_voicing}</span>
+          </label>
+          <label class="pb-track-tog-row">
+            <input type="checkbox" id="pb-gen-lead" ${_genTracks.lead?'checked':''}>
+            <span class="pb-track-tog-icon">&mdash;</span>
+            <span class="pb-track-tog-label">LEAD SLOT</span>
+            <span class="pb-track-tog-sub">Pulse 25% &middot; empty</span>
+          </label>
+        </div>
+      </div>
+      <div class="pb-total">TOTAL: ${_total()} BARS</div>
+      <button class="nes-btn pb-generate" id="pb-generate"
+        ${!_genTracks.bass && !_genTracks.chords && !_genTracks.lead ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>
+        GENERATE BACKING TRACK
+      </button>
+    `;
+
+    _wire();
+  }
+
+  function _wire() {
+    const el = document.getElementById('prog-builder-content');
+    if (!el) return;
+
+    document.getElementById('pb-close').onclick = close;
+
+    const keyEl = document.getElementById('pb-key');
+    if (keyEl) keyEl.onchange = () => {
+      ProjectState.key = keyEl.value;
+      const ks = document.getElementById('key-sel');
+      if (ks) ks.value = keyEl.value;
+      _render();
+    };
+    const scaleEl = document.getElementById('pb-scale');
+    if (scaleEl) scaleEl.onchange = () => {
+      ProjectState.scale = scaleEl.value;
+      const ss = document.getElementById('scale-sel');
+      if (ss) ss.value = scaleEl.value;
+      _render();
+    };
+    const _pbSetBpm = (val) => {
+      val = Math.max(40, Math.min(300, Math.round(val) || 120));
+      ProjectState.bpm = val;
+      const disp = document.getElementById('pb-bpm-display');
+      if (disp) disp.textContent = val;
+      const bd = document.getElementById('bpm-display');
+      if (bd) bd.textContent = val;
+      const bi = document.getElementById('bpm-input');
+      if (bi) bi.value = val;
+      if (typeof Sequencer !== 'undefined') Sequencer.updateTiming();
+    };
+    document.getElementById('pb-bpm-up').onclick   = () => _pbSetBpm(ProjectState.bpm + 1);
+    document.getElementById('pb-bpm-down').onclick = () => _pbSetBpm(ProjectState.bpm - 1);
+    const pbDisp = document.getElementById('pb-bpm-display');
+    pbDisp.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      _pbSetBpm(ProjectState.bpm + (e.deltaY < 0 ? 1 : -1));
+    }, { passive: false });
+    pbDisp.addEventListener('click', () => {
+      let popup = document.getElementById('pb-bpm-popup');
+      if (popup) { popup.remove(); return; }
+      popup = document.createElement('div');
+      popup.id = 'pb-bpm-popup';
+      const anchor = pbDisp.getBoundingClientRect();
+      popup.style.cssText = `position:fixed;left:${anchor.left}px;top:${anchor.bottom+4}px;
+        background:#1e1c30;border:2px solid #15788c;padding:8px 10px;z-index:9000;
+        display:flex;flex-direction:column;align-items:center;gap:6px;`;
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.inputMode = 'numeric'; inp.value = ProjectState.bpm;
+      inp.style.cssText = `width:64px;background:#46425e;border:2px solid #00ccaa;color:#ffeecc;
+        font:11px "Press Start 2P",monospace;text-align:center;padding:4px;outline:none;`;
+      const lbl = document.createElement('div');
+      lbl.textContent = 'BPM';
+      lbl.style.cssText = `font:5px "Press Start 2P",monospace;color:#ffb0a3;letter-spacing:0.05rem;`;
+      const confirm = (v) => { const n = parseInt(v,10); if (!isNaN(n)) _pbSetBpm(n); popup.remove(); };
+      inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') confirm(inp.value);
+        if (e.key === 'Escape') popup.remove();
+      });
+      popup.appendChild(lbl); popup.appendChild(inp);
+      document.body.appendChild(popup); inp.select();
+      setTimeout(() => document.addEventListener('mousedown', function _dismiss(ev) {
+        if (!popup.contains(ev.target) && ev.target !== pbDisp) { confirm(inp.value); document.removeEventListener('mousedown', _dismiss); }
+      }), 100);
+    });
+
+    const presetSel = document.getElementById('pb-preset-sel');
+    if (presetSel) presetSel.onchange = () => {
+      const pi = parseInt(presetSel.value);
+      if (pi >= 0) { _steps = PB_PRESETS[pi].steps.map(s=>({...s})); _render(); }
+    };
+
+    el.querySelectorAll('.pb-step-deg').forEach(sel=>{
+      sel.onchange = ()=>{
+        const i = parseInt(sel.dataset.si);
+        _steps[i].d = parseInt(sel.value);
+        const stepEl = sel.closest('.pb-step');
+        const lbl = stepEl?.querySelector('.pb-step-label');
+        if (lbl) lbl.textContent = DEGREE_NAMES[_steps[i].d];
+        const chords = ChordTool.getDiatonicChords(
+          ProjectState.key, ProjectState.scale);
+        const chordEl = stepEl?.querySelector('.pb-step-chord');
+        if (chordEl) chordEl.textContent =
+          chords[_steps[i].d % chords.length]?.triad?.name || '';
+      };
+    });
+
+    el.querySelectorAll('.pb-step-dur').forEach(btn=>{
+      btn.onclick = ()=>{
+        const i = parseInt(btn.dataset.si);
+        _steps[i].b = parseInt(btn.dataset.dur);
+        btn.closest('.pb-step').querySelectorAll('.pb-step-dur')
+          .forEach(b=>b.classList.toggle('on',
+            parseInt(b.dataset.dur)===_steps[i].b));
+        const tot = document.querySelector('.pb-total');
+        if (tot) tot.textContent = `TOTAL: ${_total()} BARS`;
+      };
+    });
+
+    el.querySelectorAll('.pb-step-del').forEach(btn=>{
+      btn.onclick = ()=>{
+        if (_steps.length>1){ _steps.splice(parseInt(btn.dataset.si),1);
+          _render(); }
+      };
+    });
+
+    const addBtn = document.getElementById('pb-add-step');
+    if (addBtn) addBtn.onclick = ()=>{
+      if (_steps.length<16){ _steps.push({d:0,b:1}); _render(); }
+    };
+
+    el.querySelectorAll('.pb-voicing').forEach(btn=>{
+      btn.onclick = ()=>{ _voicing=btn.dataset.v; _render(); };
+    });
+    el.querySelectorAll('.pb-arp').forEach(btn=>{
+      btn.onclick = ()=>{ _arpPat=btn.dataset.a; _render(); };
+    });
+    el.querySelectorAll('.pb-bass').forEach(btn=>{
+      btn.onclick = ()=>{ _bass=btn.dataset.b; _render(); };
+    });
+    el.querySelectorAll('.pb-rep').forEach(btn=>{
+      btn.onclick = ()=>{
+        _repeat=parseInt(btn.dataset.r);
+        el.querySelectorAll('.pb-rep').forEach(b=>
+          b.classList.toggle('on',parseInt(b.dataset.r)===_repeat));
+        const tot = document.querySelector('.pb-total');
+        if (tot) tot.textContent = `TOTAL: ${_total()} BARS`;
+      };
+    });
+
+    document.getElementById('pb-save-lib').onclick = _saveToLib;
+    document.getElementById('pb-export-btn').onclick = ()=>
+      _exportNFPROG({nfprog:1,steps:_steps,voicing:_voicing,
+        bass:_bass,repeat:_repeat,key:ProjectState.key,
+        scale:ProjectState.scale},'progression.nfprog');
+
+    const importBtn = document.getElementById('pb-import-btn');
+    const importInp = document.getElementById('pb-import-input');
+    importBtn.onclick = ()=>importInp.click();
+    importInp.onchange = e=>{
+      if(e.target.files[0]) _importNFPROG(e.target.files[0]);
+    };
+
+    el.querySelectorAll('.pb-lib-load').forEach(btn=>{
+      btn.onclick=()=>_loadFromLib(_libLoad()[parseInt(btn.dataset.li)]);
+    });
+    el.querySelectorAll('.pb-lib-exp').forEach(btn=>{
+      btn.onclick=()=>{
+        const e=_libLoad()[parseInt(btn.dataset.li)];
+        _exportNFPROG({nfprog:1,...e},
+          (e.name||'progression').replace(/\s+/g,'_')+'.nfprog');
+      };
+    });
+    el.querySelectorAll('.pb-lib-del').forEach(btn=>{
+      btn.onclick=()=>{
+        if(confirm('Delete this progression?'))
+          _deleteFromLib(parseInt(btn.dataset.li));
+      };
+    });
+
+    document.getElementById('pb-gen-bass').onchange = e => {
+      _genTracks.bass = e.target.checked; _refreshGenerateBtn(); };
+    document.getElementById('pb-gen-chords').onchange = e => {
+      _genTracks.chords = e.target.checked; _refreshGenerateBtn(); };
+    document.getElementById('pb-gen-lead').onchange = e => {
+      _genTracks.lead = e.target.checked; _refreshGenerateBtn(); };
+    document.getElementById('pb-generate').onclick = _generate;
+  }
+
+  function _refreshGenerateBtn() {
+    const btn = document.getElementById('pb-generate');
+    if (!btn) return;
+    const anyOn = _genTracks.bass || _genTracks.chords || _genTracks.lead;
+    btn.disabled = !anyOn;
+    btn.style.opacity = anyOn ? '1' : '0.4';
+    btn.style.cursor  = anyOn ? 'pointer' : 'not-allowed';
+  }
+
+  function _generate() {
+    if (_ctx==='topbar') {
+      const trackList = [
+        _genTracks.bass   && 'BASS',
+        _genTracks.chords && 'CHORDS',
+        _genTracks.lead   && 'LEAD SLOT',
+      ].filter(Boolean).join(', ');
+      if (!confirm(`Add ${trackList} track(s) to your project?`)) return;
+    }
+
+    const chords = ChordTool.getDiatonicChords(
+      ProjectState.key, ProjectState.scale);
+    const totalBars = _total();
+
+    const timeline = [];
+    let cursor = 0;
+    for (let rep=0; rep<_repeat; rep++) {
+      for (const step of _steps) {
+        const ch = chords[step.d % chords.length];
+        const chordNotes = _voicing==='seventh'
+          ? ch.seventh.notes : ch.triad.notes;
+        timeline.push({
+          chordNotes, rootMidi: chordNotes[0],
+          startBar: cursor, durBars: step.b
+        });
+        cursor += step.b;
+      }
+    }
+
+    // BASS track (Triangle)
+    if (_genTracks.bass) {
+      const bassTrack = addTrack('triangle','BASS');
+      const bassPat   = addPattern(bassTrack.id, 0, totalBars);
+      for (const seg of timeline) {
+        let root = seg.rootMidi - 12;
+        while (root > 48) root -= 12;
+        while (root < 24) root += 12;
+        const fifth = Math.min(127, root+7);
+        const step  = _bass==='eighth' ? 0.125 : 0.25;
+        const beats = Math.round(seg.durBars / step);
+        for (let k=0; k<beats; k++) {
+          const start = seg.startBar + k*step;
+          if (start >= totalBars) break;
+          const pitch = _bass==='rootfifth'
+            ? (k%2===0 ? root : fifth) : root;
+          bassPat.notes.push({id:makeId(), pitch, start,
+            duration:step*0.9, velocity:90, selected:false});
+        }
+      }
+    }
+
+    // CHORD track (Pulse 50%)
+    if (_genTracks.chords) {
+      const chordTrack = addTrack('pulse50','CHORDS');
+      const chordPat   = addPattern(chordTrack.id, 0, totalBars);
+      for (const seg of timeline) {
+        if (_voicing==='arpeggio') {
+          const base = seg.chordNotes.slice();
+          const withOct = [...base, base[0]+12];
+          let seq;
+          if (_arpPat==='up')     seq = withOct;
+          else if (_arpPat==='down')   seq = [...withOct].reverse();
+          else if (_arpPat==='updown') seq = [
+            ...withOct, ...withOct.slice(1,-1).reverse()];
+          else seq = [...withOct].sort(()=>Math.random()-0.5);
+          const sixteenth = 0.0625;
+          const count = Math.round(seg.durBars / sixteenth);
+          for (let k=0; k<count; k++) {
+            const start = seg.startBar + k*sixteenth;
+            if (start >= totalBars) break;
+            chordPat.notes.push({id:makeId(),
+              pitch: seq[k%seq.length], start,
+              duration: sixteenth*0.9, velocity:85, selected:false});
+          }
+        } else {
+          for (const pitch of seg.chordNotes) {
+            chordPat.notes.push({id:makeId(), pitch,
+              start: seg.startBar,
+              duration: seg.durBars - 0.0625,
+              velocity:85, selected:false});
+          }
+        }
+      }
+    }
+
+    // Empty LEAD SLOT (Pulse 25%)
+    if (_genTracks.lead) {
+      addTrack('pulse25','LEAD SLOT');
+    }
+
+    // Set loop region
+    ProjectState.loopStart   = 0;
+    ProjectState.loopEnd     = totalBars;
+    ProjectState.loopEnabled = true;
+    const lb = document.getElementById('btn-loop');
+    if (lb) lb.style.color = '';
+
+    AV.resize(); AV.draw();
+    close();
+  }
+
+  function openStartup() {
+    _ctx = 'startup';
+    document.getElementById('prog-startup-modal')?.classList.add('open');
+  }
+  function openTopbar() {
+    _ctx = 'topbar';
+    document.getElementById('prog-startup-modal')?.classList.remove('open');
+    _render();
+    document.getElementById('prog-builder-modal')?.classList.add('open');
+  }
+  function close() {
+    document.getElementById('prog-startup-modal')?.classList.remove('open');
+    document.getElementById('prog-builder-modal')?.classList.remove('open');
+  }
+
+  return { openStartup, openTopbar, close };
+})();
+
   window.addEventListener('DOMContentLoaded', () => {
+    function clearProjectState() {
+      ProjectState.tracks = [];
+      ProjectState.playheadBar = 0;
+      ProjectState.loopStart = 0;
+      ProjectState.loopEnd = 4;
+      AV.resize(); AV.draw();
+    }
     buildTopBar();
     buildPRTopbar();
     wireTransport();
+    document.getElementById('psc-blank').onclick = () => {
+      ProgBuilder.close(); clearProjectState();
+    };
+    document.getElementById('psc-demo').onclick = () => {
+      ProgBuilder.close(); createDemoState();
+    };
+    document.getElementById('psc-prog').onclick = () => {
+      document.getElementById('prog-startup-modal').classList.remove('open');
+      ProgBuilder.openTopbar();
+    };
     wireDivider();
-    createDemoState();
+    clearProjectState();
     AV.initEvents();
     PR.initEvents();
     requestAnimationFrame(() => { AV.resize(); AV.draw(); });
@@ -8060,8 +8901,36 @@ const ExportEngine = {
       document.addEventListener('touchend',   _relock, { capture: true, passive: true });
       document.addEventListener('click',      _relock, { capture: true, passive: true });
     })();
+    document.getElementById('btn-prog').onclick = () => ProgBuilder.openTopbar();
+    requestAnimationFrame(() => ProgBuilder.openStartup());
   });
 
   </script>
+<div id="prog-startup-modal">
+  <div id="prog-startup-content">
+    <div id="prog-startup-title">NESFORGE</div>
+    <div id="prog-startup-sub">HOW DO YOU WANT TO START?</div>
+    <div id="prog-startup-cards">
+      <div class="prog-start-card" id="psc-blank">
+        <div class="prog-card-icon">▭</div>
+        <div class="prog-card-label">BLANK</div>
+        <div class="prog-card-desc">Empty project, start from scratch</div>
+      </div>
+      <div class="prog-start-card" id="psc-demo">
+        <div class="prog-card-icon">♫</div>
+        <div class="prog-card-label">DEMO SONG</div>
+        <div class="prog-card-desc">Load the Castlevania demo track</div>
+      </div>
+      <div class="prog-start-card" id="psc-prog">
+        <div class="prog-card-icon">▤</div>
+        <div class="prog-card-label">BUILD PROGRESSION</div>
+        <div class="prog-card-desc">Generate a backing track from a chord progression</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="prog-builder-modal">
+  <div id="prog-builder-content"></div>
+</div>
 </body>
 </html>
