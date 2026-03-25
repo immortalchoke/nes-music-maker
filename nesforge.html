@@ -1007,6 +1007,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       channelType,
       volume: 80, pan: 0,
       fuzz: 'off', vibrato: 'off', delay: 'off', reverb: 'off',
+      distortion: 'off', powerchord: false,
       muted: false, soloed: false,
       sample: null,
       patterns: [], arrangement: []
@@ -1382,6 +1383,22 @@ body.mobile-mode #mobile-app { display: flex !important; }
     return _fuzzBitCrushCurve;
   }
 
+  // Distortion: hard symmetric clipping via tanh with very high k.
+  // 'crunch' = classic rock drive, 'heavy' = Mega Man X metal.
+  const _distCurveCache = {};
+  function getDistCurve(level) {
+    if (_distCurveCache[level]) return _distCurveCache[level];
+    const n = 4096;
+    const curve = new Float32Array(n);
+    const k = level === 'heavy' ? 400 : 150;
+    for (let i = 0; i < n; i++) {
+      const x = (i * 2) / n - 1;
+      curve[i] = Math.tanh(k * x) / Math.tanh(k);
+    }
+    _distCurveCache[level] = curve;
+    return curve;
+  }
+
   // Build effect chain. Returns { inputNode, vibratoLFO, stop() }
   // Velocity is applied in playPitchedNote via envGain, not here.
   function buildEffectChain(track) {
@@ -1403,10 +1420,55 @@ body.mobile-mode #mobile-app { display: flex !important; }
     const chanGain = ctx.createGain();
     chanGain.gain.value = track.volume / 100;
 
-    // Fuzz chain: envGain → PreGain → Shaper1 → Shaper2 → HighShelf → PostGain → panner
-    // Oscillator output is ~0.2 peak; PreGain drives it hot so the shaper actually clips
+    // Effect chain input defaults to panner (dry path).
+    // Distortion and fuzz are mutually exclusive — distortion takes priority.
     let chainInput = panner;
-    if (FUZZ_ELIGIBLE.has(track.channelType) && track.fuzz && track.fuzz !== 'off') {
+
+    if (FUZZ_ELIGIBLE.has(track.channelType) &&
+        track.distortion && track.distortion !== 'off') {
+      // Distortion chain: PreGain(8×) → Shaper(hard clip) → MidScoop → Presence → LPF → PostGain → panner
+      // Signal path mimics SNES SPC700 guitar channel: hard clip + scooped mids + 7kHz rolloff
+      const preGain = ctx.createGain();
+      preGain.gain.value = 8.0;
+
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = getDistCurve(track.distortion);
+      shaper.oversample = '4x';
+
+      // Scooped mids — cut ~600 Hz to remove muddiness on power chords
+      const midScoop = ctx.createBiquadFilter();
+      midScoop.type = 'peaking';
+      midScoop.frequency.value = 600;
+      midScoop.Q.value = 1.2;
+      midScoop.gain.value = -8;
+
+      // Presence boost — adds bite/attack around 3 kHz
+      const presence = ctx.createBiquadFilter();
+      presence.type = 'peaking';
+      presence.frequency.value = 3000;
+      presence.Q.value = 1.5;
+      presence.gain.value = track.distortion === 'heavy' ? 7 : 4;
+
+      // Low-pass at 7 kHz — SPC700 had limited HF response; keeps tone from sounding digital
+      const lpf = ctx.createBiquadFilter();
+      lpf.type = 'lowpass';
+      lpf.frequency.value = 7000;
+      lpf.Q.value = 0.5;
+
+      const postGain = ctx.createGain();
+      postGain.gain.value = track.distortion === 'heavy' ? 0.08 : 0.14;
+
+      preGain.connect(shaper);
+      shaper.connect(midScoop);
+      midScoop.connect(presence);
+      presence.connect(lpf);
+      lpf.connect(postGain);
+      postGain.connect(panner);
+      chainInput = preGain;
+
+    } else if (FUZZ_ELIGIBLE.has(track.channelType) && track.fuzz && track.fuzz !== 'off') {
+      // Fuzz chain: envGain → PreGain → Shaper1 → Shaper2 → HighShelf → PostGain → panner
+      // Oscillator output is ~0.2 peak; PreGain drives it hot so the shaper actually clips
       const preGain = ctx.createGain();
       preGain.gain.value = 6.0;
 
@@ -1559,6 +1621,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
     const oscs = [makeOsc(freq)];
     if (extraOscillators) extraOscillators.forEach(f => oscs.push(makeOsc(f)));
+    // Power chord: add a perfect fifth (7 semitones up) when distortion=heavy+powerchord
+    if (track.distortion === 'heavy' && track.powerchord) {
+      oscs.push(makeOsc(freq * Math.pow(2, 7 / 12)));
+    }
 
   // Schedule vibratoLFO to auto-stop so it doesn't leak when stop closure is discarded
   try { chain.vibratoLFO.stop(startTime + durationSecs + 0.1); } catch(e) {}
@@ -3938,36 +4004,81 @@ AV.initEvents = function() {
       return;
     }
     if (hit.zone === 'clear-all') {
+      let clearMode = 'tracks'; // 'tracks' | 'notes'
       const conf = document.createElement('div');
       conf.style.cssText = `position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
-        background:#46425e;border:2px solid #ff4444;z-index:501;padding:14px 16px 12px;min-width:260px;`;
+        background:#46425e;border:2px solid #ff4444;z-index:501;padding:14px 16px 12px;min-width:300px;`;
+
       const confTitle = document.createElement('div');
       confTitle.style.cssText = 'font:7px "Press Start 2P";color:#ff4444;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #ff4444;letter-spacing:1px;';
       confTitle.textContent = 'CLEAR ALL?';
+
+      // Toggle row
+      const toggleRow = document.createElement('div');
+      toggleRow.style.cssText = 'display:flex;gap:0;margin-bottom:10px;';
+      const mkTogBtn = (label, mode) => {
+        const b = document.createElement('button');
+        b.className = 'nes-btn';
+        b.textContent = label;
+        b.style.cssText = `flex:1;font-size:6px;padding:5px 4px;`;
+        b.dataset.mode = mode;
+        b.onclick = () => {
+          clearMode = mode;
+          toggleRow.querySelectorAll('button').forEach(btn => {
+            const active = btn.dataset.mode === clearMode;
+            btn.style.background    = active ? '#ff4444' : '';
+            btn.style.color         = active ? '#1e1c30' : '';
+            btn.style.borderColor   = active ? '#ff4444' : '';
+          });
+          confMsg.textContent = clearMode === 'tracks'
+            ? 'Delete all note containers across all tracks. Tracks remain.'
+            : 'Erase all notes from every pattern. Tracks and patterns stay.';
+          confirmBtn.textContent = clearMode === 'tracks' ? 'DELETE TRACKS' : 'CLEAR NOTES';
+        };
+        return b;
+      };
+      const btnTracks = mkTogBtn('DELETE TRACKS', 'tracks');
+      const btnNotes  = mkTogBtn('CLEAR NOTES',   'notes');
+      // Set initial active state
+      btnTracks.style.background = '#ff4444';
+      btnTracks.style.color      = '#1e1c30';
+      btnTracks.style.borderColor = '#ff4444';
+      toggleRow.appendChild(btnTracks);
+      toggleRow.appendChild(btnNotes);
+
       const confMsg = document.createElement('div');
       confMsg.style.cssText = 'font:6px "Press Start 2P";color:#ffeecc;margin-bottom:14px;line-height:1.8;';
-      confMsg.textContent = 'This will delete all note containers across all tracks.';
+      confMsg.textContent = 'Delete all note containers across all tracks. Tracks remain.';
+
       const btnRow = document.createElement('div');
       btnRow.style.cssText = 'display:flex;gap:8px;';
       const cancelBtn = document.createElement('button');
       cancelBtn.className = 'nes-btn'; cancelBtn.textContent = 'CANCEL'; cancelBtn.style.cssText = 'flex:1;';
       cancelBtn.onclick = () => conf.remove();
       const confirmBtn = document.createElement('button');
-      confirmBtn.className = 'nes-btn'; confirmBtn.textContent = 'CLEAR ALL';
+      confirmBtn.className = 'nes-btn'; confirmBtn.textContent = 'DELETE TRACKS';
       confirmBtn.style.cssText = 'flex:1;color:#ff4444;border-color:#ff4444;';
       confirmBtn.onclick = () => {
         History.push();
-        for (const track of ProjectState.tracks) { track.patterns = []; track.arrangement = []; }
-        if (PR.activePattern) {
-          PR.activePattern = null;
-          document.getElementById('pianoroll-panel').style.display = 'none';
-          document.getElementById('panel-divider').style.display = 'none';
+        if (clearMode === 'tracks') {
+          for (const track of ProjectState.tracks) { track.patterns = []; track.arrangement = []; }
+          if (PR.activePattern) {
+            PR.activePattern = null;
+            document.getElementById('pianoroll-panel').style.display = 'none';
+            document.getElementById('panel-divider').style.display = 'none';
+          }
+        } else {
+          for (const track of ProjectState.tracks) {
+            for (const pat of track.patterns) { pat.notes = []; }
+          }
+          if (PR.activePattern) { PR.draw(); PR.drawVelocity(); }
         }
         conf.remove();
         requestAnimationFrame(() => { AV.resize(); AV.draw(); });
       };
       btnRow.appendChild(cancelBtn); btnRow.appendChild(confirmBtn);
-      conf.appendChild(confTitle); conf.appendChild(confMsg); conf.appendChild(btnRow);
+      conf.appendChild(confTitle); conf.appendChild(toggleRow);
+      conf.appendChild(confMsg);   conf.appendChild(btnRow);
       document.body.appendChild(conf);
       conf.addEventListener('mousedown', ev => ev.stopPropagation());
       setTimeout(() => document.addEventListener('mousedown', () => conf.remove(), { once: true }), 100);
@@ -4653,22 +4764,55 @@ function showTrackSettings(track, x, y) {
     return d;
   };
 
-  // Fuzz row — dropdown for eligible channels, grayed placeholder for drums
-  if (['pulse50','pulse25','triangle','chord'].includes(track.channelType)) {
-    el.appendChild(row('FUZZ', ['off','low','med','high'], track.fuzz || 'off',
-      v => { track.fuzz = v; }));
-  } else {
+  const _grayPlaceholder = (label) => {
     const d = document.createElement('div');
     d.style.cssText = 'margin-bottom:10px;';
     const lbl = document.createElement('div');
     lbl.style.cssText = 'font:6px "Press Start 2P"; color:#ffb0a3; margin-bottom:2px;';
-    lbl.textContent = 'FUZZ';
-    const placeholder = document.createElement('div');
-    placeholder.style.cssText = `font:7px "Press Start 2P"; color:#444466;
-      padding:5px 8px; border:2px solid #2a2840; width:100%; box-sizing:border-box;`;
-    placeholder.textContent = '—';
-    d.appendChild(lbl); d.appendChild(placeholder);
-    el.appendChild(d);
+    lbl.textContent = label;
+    const ph = document.createElement('div');
+    ph.style.cssText = 'font:7px "Press Start 2P"; color:#444466; padding:5px 8px; border:2px solid #2a2840; width:100%; box-sizing:border-box;';
+    ph.textContent = '—';
+    d.appendChild(lbl); d.appendChild(ph);
+    return d;
+  };
+
+  const eligible = ['pulse50','pulse25','triangle','chord'].includes(track.channelType);
+
+  // Distortion row
+  if (eligible) {
+    el.appendChild(row('DISTORTION', ['off','crunch','heavy'], track.distortion || 'off',
+      v => { track.distortion = v; }));
+
+    // Power chord toggle (heavy only hint)
+    const pcRow = document.createElement('div');
+    pcRow.style.cssText = 'margin-bottom:4px;display:flex;align-items:center;gap:8px;';
+    const pcLbl = document.createElement('div');
+    pcLbl.style.cssText = 'font:6px "Press Start 2P";color:#ffb0a3;';
+    pcLbl.textContent = 'POWER CHORD';
+    const pcChk = document.createElement('input');
+    pcChk.type = 'checkbox';
+    pcChk.checked = !!track.powerchord;
+    pcChk.style.cssText = 'width:14px;height:14px;accent-color:#00b9be;cursor:pointer;';
+    pcChk.onchange = e => { track.powerchord = e.target.checked; };
+    pcRow.appendChild(pcLbl);
+    pcRow.appendChild(pcChk);
+    el.appendChild(pcRow);
+    const pcHint = document.createElement('div');
+    pcHint.style.cssText = 'font:5px "Press Start 2P";color:#ffb0a3;margin-top:-2px;margin-bottom:10px;opacity:0.6;';
+    pcHint.textContent = '+5TH · HEAVY ONLY';
+    el.appendChild(pcHint);
+  } else {
+    el.appendChild(_grayPlaceholder('DISTORTION'));
+    el.appendChild(_grayPlaceholder('POWER CHORD'));
+  }
+
+  // Fuzz row — dropdown for eligible channels, grayed placeholder for drums
+  if (eligible) {
+    el.appendChild(row('FUZZ', ['off','low','med','high'], track.fuzz || 'off',
+      v => { track.fuzz = v; }));
+  } else {
+    el.appendChild(_grayPlaceholder('FUZZ'));
   }
   el.appendChild(row('VIBRATO', ['off','low','med','high'], track.vibrato,
     v => { track.vibrato = v; }));
@@ -4803,6 +4947,11 @@ function showMidiImportDialog(midiData, filename) {
         }
       }
     }
+    // Flush any notes that had note-on but no note-off (assume 1-beat duration)
+    for (const [k, v] of Object.entries(openNotes)) {
+      const pitch = parseInt(k.split('-')[1]);
+      rawNotes.push({ pitch, startTick: v.startTick, durationTicks: midiData.ppq || 480, velocity: v.velocity });
+    }
   }
 
   if (rawNotes.length === 0) { alert('No notes found in MIDI file.'); return; }
@@ -4867,10 +5016,15 @@ function showMidiImportDialog(midiData, filename) {
     const beatsPerBar = ProjectState.timeSignature ? ProjectState.timeSignature[0] : 4;
     const ticksPerBar = ppq * beatsPerBar;
 
+    // Normalize: shift all notes so the earliest starts at bar 0
+    const minTick = rawNotes.reduce((m, n) => Math.min(m, n.startTick), Infinity);
+
     // Build notes array
     const notes = rawNotes.map(n => ({
+      id:       makeId(),
+      selected: false,
       pitch:    Math.max(0, Math.min(127, n.pitch)),
-      start:    n.startTick / ticksPerBar,
+      start:    (n.startTick - minTick) / ticksPerBar,
       duration: Math.max(1/32, n.durationTicks / ticksPerBar),
       velocity: Math.max(1, Math.min(127, n.velocity)),
     }));
@@ -4884,6 +5038,7 @@ function showMidiImportDialog(midiData, filename) {
     const newTrack = addTrack(channelType, trackName);
     const newPattern = addPattern(newTrack.id, 0, patternBars);
     newPattern.notes = notes;
+    AV.resize();
     AV.draw();
     el.remove();
   };
@@ -5145,7 +5300,10 @@ function buildTopBar() {
 
   document.getElementById('btn-save').onclick = () => { if (typeof ExportEngine !== 'undefined') ExportEngine.saveProject(); };
   document.getElementById('btn-load').onclick = () => document.getElementById('load-input').click();
-  document.getElementById('load-input').onchange = e => { if (typeof ExportEngine !== 'undefined') ExportEngine.loadProject(e.target.files[0]); };
+  document.getElementById('load-input').onchange = e => {
+    if (typeof ExportEngine !== 'undefined') ExportEngine.loadProject(e.target.files[0]);
+    e.target.value = ''; // reset so the same file can be reloaded
+  };
   document.getElementById('btn-export').onclick = () => { if (typeof ExportEngine !== 'undefined') ExportEngine.showModal(); };
   document.getElementById('btn-midi-import').onclick = () => document.getElementById('midi-input').click();
   document.getElementById('midi-input').onchange = e => {
@@ -6980,35 +7138,38 @@ const ExportEngine = {
   },
 
   async exportWAV() {
-    const btn = document.getElementById('exp-wav');
+    this._promptFilename('nesforge-export', 'EXPORT', async (name) => {
+      const filename = name.endsWith('.wav') ? name : name + '.wav';
+      const btn = document.getElementById('exp-wav');
 
-    // Build inline progress bar
-    let progressEl = document.getElementById('exp-wav-progress');
-    if (!progressEl) {
-      progressEl = document.createElement('div');
-      progressEl.id = 'exp-wav-progress';
-      progressEl.style.cssText = 'margin-top:8px;height:6px;background:#1a1a2e;border:1px solid #15788c;border-radius:0;overflow:hidden;';
-      const fill = document.createElement('div');
-      fill.id = 'exp-wav-progress-fill';
-      fill.style.cssText = 'height:100%;width:0%;background:#00b9be;transition:width 0.1s linear;';
-      progressEl.appendChild(fill);
-      if (btn) btn.parentNode.insertBefore(progressEl, btn.nextSibling);
-    }
-    const fill = document.getElementById('exp-wav-progress-fill');
-    const setProgress = (p) => { if (fill) fill.style.width = Math.round(p * 100) + '%'; };
+      // Build inline progress bar
+      let progressEl = document.getElementById('exp-wav-progress');
+      if (!progressEl) {
+        progressEl = document.createElement('div');
+        progressEl.id = 'exp-wav-progress';
+        progressEl.style.cssText = 'margin-top:8px;height:6px;background:#1a1a2e;border:1px solid #15788c;border-radius:0;overflow:hidden;';
+        const fill = document.createElement('div');
+        fill.id = 'exp-wav-progress-fill';
+        fill.style.cssText = 'height:100%;width:0%;background:#00b9be;transition:width 0.1s linear;';
+        progressEl.appendChild(fill);
+        if (btn) btn.parentNode.insertBefore(progressEl, btn.nextSibling);
+      }
+      const fill = document.getElementById('exp-wav-progress-fill');
+      const setProgress = (p) => { if (fill) fill.style.width = Math.round(p * 100) + '%'; };
 
-    if (btn) btn.textContent = 'RENDERING...';
-    setProgress(0);
-    try {
-      const buf = await this.renderOffline(setProgress);
-      const wav = this.encodeWAV(buf);
-      this.downloadBlob(wav, 'nesforge-export.wav', 'audio/wav');
-    } catch(e) {
-      alert('WAV export failed: ' + e.message);
-    } finally {
-      if (btn) btn.textContent = 'EXPORT WAV';
-      setTimeout(() => { if (progressEl) progressEl.remove(); }, 800);
-    }
+      if (btn) btn.textContent = 'RENDERING...';
+      setProgress(0);
+      try {
+        const buf = await this.renderOffline(setProgress);
+        const wav = this.encodeWAV(buf);
+        this.downloadBlob(wav, filename, 'audio/wav');
+      } catch(e) {
+        alert('WAV export failed: ' + e.message);
+      } finally {
+        if (btn) btn.textContent = 'EXPORT WAV';
+        setTimeout(() => { if (progressEl) progressEl.remove(); }, 800);
+      }
+    });
   },
 
   // --- MIDI Binary Encoding ---
@@ -7115,22 +7276,47 @@ const ExportEngine = {
     this.downloadBlob(blob, 'nesforge-stems.zip', 'application/zip');
   },
 
+  _promptFilename(defaultName, actionLabel, onConfirm) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#1a1a2e;border:2px solid #00ccaa;padding:16px;font:7px 'Press Start 2P';color:#e0e0ff;display:flex;flex-direction:column;gap:10px;min-width:260px;">
+        <div style="color:#00ccaa;font-size:8px;letter-spacing:1px;">FILE NAME</div>
+        <input id="_pfn-inp" type="text" value="${defaultName}"
+          style="background:#0d0d1a;border:2px solid #444466;color:#e0e0ff;font:7px 'Press Start 2P';padding:4px 6px;width:100%;box-sizing:border-box;">
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <button id="_pfn-cancel" style="flex:1;background:#1a1a2e;border:2px solid #444466;color:#8888aa;font:7px 'Press Start 2P';padding:6px;cursor:pointer;">CANCEL</button>
+          <button id="_pfn-ok" style="flex:1;background:#003322;border:2px solid #00ccaa;color:#00ccaa;font:7px 'Press Start 2P';padding:6px;cursor:pointer;">${actionLabel}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const inp = overlay.querySelector('#_pfn-inp');
+    inp.focus(); inp.select();
+    const confirm = () => { const v = inp.value.trim() || defaultName; overlay.remove(); onConfirm(v); };
+    overlay.querySelector('#_pfn-ok').onclick = confirm;
+    overlay.querySelector('#_pfn-cancel').onclick = () => overlay.remove();
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') confirm(); else if (e.key === 'Escape') overlay.remove(); });
+  },
+
   saveProject() {
-    const state = JSON.parse(JSON.stringify(ProjectState));
-    // Serialize Float32Arrays as base64
-    for (const track of state.tracks) {
-      if (track.sample) {
-        const bytes = new Uint8Array(track.sample.buffer);
-        let b64 = '';
-        for (let i = 0; i < bytes.length; i++) b64 += String.fromCharCode(bytes[i]);
-        track.sample = { _base64: btoa(b64) };
+    this._promptFilename('nesforge-project', 'SAVE', (name) => {
+      const filename = name.endsWith('.json') ? name : name + '.json';
+      const state = JSON.parse(JSON.stringify(ProjectState));
+      // Serialize Float32Arrays as base64
+      for (const track of state.tracks) {
+        if (track.sample) {
+          const bytes = new Uint8Array(track.sample.buffer);
+          let b64 = '';
+          for (let i = 0; i < bytes.length; i++) b64 += String.fromCharCode(bytes[i]);
+          track.sample = { _base64: btoa(b64) };
+        }
       }
-    }
-    for (const track of state.tracks)
-      for (const pat of track.patterns)
-        for (const note of pat.notes)
-          delete note.selected;
-    this.downloadBlob(JSON.stringify(state, null, 2), 'nesforge-project.json', 'application/json');
+      for (const track of state.tracks)
+        for (const pat of track.patterns)
+          for (const note of pat.notes)
+            delete note.selected;
+      this.downloadBlob(JSON.stringify(state, null, 2), filename, 'application/json');
+    });
   },
 
   loadProject(file) {
@@ -7146,6 +7332,13 @@ const ExportEngine = {
         }
       }
       Object.assign(ProjectState, state);
+      // Sync topbar controls to loaded state
+      const _bi = document.getElementById('bpm-input');   if (_bi) _bi.value = state.bpm;
+      const _bd = document.getElementById('bpm-display'); if (_bd) _bd.textContent = state.bpm;
+      const _mb = document.getElementById('mob-bpm-display'); if (_mb) _mb.textContent = state.bpm;
+      const _ks = document.getElementById('key-sel');     if (_ks) _ks.value = state.key;
+      const _ss = document.getElementById('scale-sel');   if (_ss) _ss.value = state.scale;
+      Sequencer.updateTiming();
       // Recreate waveform canvas elements for DPCM tracks (EventBus.on('track:added') is not fired during load)
       for (const track of ProjectState.tracks) {
         if (track.channelType === 'dpcm' && !document.getElementById('waveform-' + track.id)) {
@@ -8248,6 +8441,7 @@ const ProgBuilder = (() => {
   let _repeat  = 1;
   let _ctx        = 'startup';
   let _genTracks  = { bass: true, chords: true, lead: false };
+  let _leadStyle  = 'riff'; // 'scale'|'chord-melody'|'riff'|'random'
 
   function _total() {
     return _steps.reduce((s,x)=>s+x.b,0) * _repeat;
@@ -8426,6 +8620,15 @@ const ProgBuilder = (() => {
       </div>
 
       <div class="pb-section">
+        <div class="pb-label">LEAD STYLE</div>
+        <div class="pb-row">
+          ${[['scale','SCALE RUN'],['chord-melody','CHORD MELODY'],['riff','RIFF'],['random','RANDOM WALK']].map(([v,l])=>
+            `<button class="nes-btn pb-tog pb-lead-sty${_leadStyle===v?' on':''}" data-ls="${v}">${l}</button>`
+          ).join('')}
+        </div>
+      </div>
+
+      <div class="pb-section">
         <div class="pb-label">REPEATS</div>
         <div class="pb-row">
           ${[1,2,4].map(v=>`
@@ -8461,9 +8664,9 @@ const ProgBuilder = (() => {
           </label>
           <label class="pb-track-tog-row">
             <input type="checkbox" id="pb-gen-lead" ${_genTracks.lead?'checked':''}>
-            <span class="pb-track-tog-icon">&mdash;</span>
-            <span class="pb-track-tog-label">LEAD SLOT</span>
-            <span class="pb-track-tog-sub">Pulse 25% &middot; empty</span>
+            <span class="pb-track-tog-icon">&#9834;</span>
+            <span class="pb-track-tog-label">LEAD</span>
+            <span class="pb-track-tog-sub">Pulse 25% &middot; ${_leadStyle}</span>
           </label>
         </div>
       </div>
@@ -8643,6 +8846,9 @@ const ProgBuilder = (() => {
       _genTracks.chords = e.target.checked; _refreshGenerateBtn(); };
     document.getElementById('pb-gen-lead').onchange = e => {
       _genTracks.lead = e.target.checked; _refreshGenerateBtn(); };
+    el.querySelectorAll('.pb-lead-sty').forEach(btn => {
+      btn.onclick = () => { _leadStyle = btn.dataset.ls; _render(); };
+    });
     document.getElementById('pb-generate').onclick = _generate;
   }
 
@@ -8740,9 +8946,121 @@ const ProgBuilder = (() => {
       }
     }
 
-    // Empty LEAD SLOT (Pulse 25%)
+    // LEAD track (Pulse 25%)
     if (_genTracks.lead) {
-      addTrack('pulse25','LEAD SLOT');
+      const leadTrack = addTrack('pulse25', 'LEAD');
+      const leadPat   = addPattern(leadTrack.id, 0, totalBars);
+
+      // Build sorted list of in-scale MIDI pitches in NES lead range C3–C6
+      const inScale = Scales.getInScalePitches(ProjectState.key, ProjectState.scale);
+      const scalePitches = [];
+      for (let p = 48; p <= 84; p++) {
+        if (inScale.has(p % 12)) scalePitches.push(p);
+      }
+      if (scalePitches.length === 0) {
+        for (let p = 48; p <= 84; p++) scalePitches.push(p);
+      }
+
+      function nearestScale(target) {
+        return scalePitches.reduce((best, p) =>
+          Math.abs(p - target) < Math.abs(best - target) ? p : best,
+          scalePitches[0]);
+      }
+      function scaleAt(idx) {
+        return scalePitches[Math.max(0, Math.min(scalePitches.length - 1, idx))];
+      }
+
+      if (_leadStyle === 'scale') {
+        // Ascending/descending ping-pong at 8th notes
+        const step = 0.125;
+        const totalSteps = Math.round(totalBars / step);
+        const halfLen = scalePitches.length;
+        const cycle = halfLen > 1 ? (halfLen - 1) * 2 : 1;
+        for (let k = 0; k < totalSteps; k++) {
+          const start = k * step;
+          if (start >= totalBars) break;
+          const pos = k % cycle;
+          const idx = pos < halfLen ? pos : cycle - pos;
+          leadPat.notes.push({ id: makeId(),
+            pitch: scalePitches[idx], start,
+            duration: step * 0.85, velocity: 85, selected: false });
+        }
+
+      } else if (_leadStyle === 'chord-melody') {
+        // Chord tone on downbeats, scale passing tones between
+        for (const seg of timeline) {
+          const chordTones = seg.chordNotes.map(n => nearestScale(n));
+          const rootTone  = chordTones[0];
+          const thirdTone = chordTones[1] || rootTone;
+          const beats = seg.durBars * 4; // 16th note steps
+          for (let k = 0; k < beats; k++) {
+            if (k % 2 !== 0) continue; // only 8th notes
+            const start = seg.startBar + k * 0.0625;
+            if (start >= totalBars) break;
+            let pitch;
+            if (k === 0) {
+              pitch = rootTone;
+            } else if (k % 4 === 0) {
+              pitch = k % 8 === 0 ? rootTone : thirdTone;
+            } else {
+              const prevTone = k % 4 <= 2 ? rootTone : thirdTone;
+              const nextTone = k % 4 <= 2 ? thirdTone : rootTone;
+              const prevIdx  = scalePitches.indexOf(prevTone);
+              const nextIdx  = scalePitches.indexOf(nextTone);
+              const base     = prevIdx === -1 ? Math.floor(scalePitches.length / 2) : prevIdx;
+              const dir      = nextIdx > prevIdx ? 1 : -1;
+              pitch = scaleAt(base + dir * (k % 4));
+            }
+            leadPat.notes.push({ id: makeId(), pitch, start,
+              duration: 0.1, velocity: 90, selected: false });
+          }
+        }
+
+      } else if (_leadStyle === 'riff') {
+        // 4-note motif transposed to each chord root
+        const motifIntervals = [0, 2, -1, 3];
+        const motifRhythm    = [0.125, 0.125, 0.0625, 0.1875];
+        for (const seg of timeline) {
+          const anchorPitch = nearestScale(seg.rootMidi);
+          const anchorIdx   = scalePitches.indexOf(anchorPitch);
+          const base = anchorIdx === -1
+            ? Math.floor(scalePitches.length / 2) : anchorIdx;
+          let cursor = seg.startBar;
+          while (cursor < seg.startBar + seg.durBars - 0.001) {
+            for (let m = 0; m < motifIntervals.length; m++) {
+              if (cursor >= seg.startBar + seg.durBars) break;
+              if (cursor >= totalBars) break;
+              leadPat.notes.push({ id: makeId(),
+                pitch: scaleAt(base + motifIntervals[m]),
+                start: cursor,
+                duration: motifRhythm[m] * 0.85,
+                velocity: m === 0 ? 100 : 80,
+                selected: false });
+              cursor += motifRhythm[m];
+            }
+          }
+        }
+
+      } else { // 'random'
+        // Stepwise random walk with occasional leaps
+        let idx = Math.floor(scalePitches.length * 0.4);
+        const rhythmPool = [0.0625, 0.0625, 0.125, 0.125, 0.125, 0.25];
+        let cursor = 0;
+        while (cursor < totalBars - 0.001) {
+          const dur   = rhythmPool[Math.floor(Math.random() * rhythmPool.length)];
+          const leap  = Math.random() < 0.15;
+          const steps = leap
+            ? (Math.random() < 0.5 ? 3 : -3)
+            : (Math.random() < 0.5 ? 1 : -1);
+          idx = Math.max(0, Math.min(scalePitches.length - 1, idx + steps));
+          leadPat.notes.push({ id: makeId(),
+            pitch: scalePitches[idx], start: cursor,
+            duration: dur * 0.8,
+            velocity: 75 + Math.floor(Math.random() * 20),
+            selected: false });
+          cursor += dur;
+        }
+      }
     }
 
     // Set loop region
