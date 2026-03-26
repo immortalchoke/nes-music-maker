@@ -9,23 +9,49 @@
   <style>/* STYLES */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --bg: #46425e; --bg2: #46425e; --bg3: #15788c;
-  --accent: #ff6973; --accent2: #ffb0a3;
-  --hi: #00b9be; --hi2: #ffeecc;
-  --gray: #15788c; --gray2: #46425e;
-  --text: #ffeecc; --text2: #ffb0a3;
-  --border: 2px solid #15788c;
-  /* ── NESForge Type Scale ──────────────────────────────────────
-     Press Start 2P renders cleanly only at integer px values.
-     All text in the app maps to one of these 6 tokens only.
-     ------------------------------------------------------------ */
-  --t-xs:   8px;   /* minimum readable — hints, sub-labels, kbd */
-  --t-sm:   9px;   /* UI labels, dropdown options, field labels  */
-  --t-base: 10px;  /* body text, button labels, general UI       */
-  --t-md:   12px;  /* section headings, degree labels, emphasis  */
-  --t-lg:   14px;  /* title text, startup screen headings        */
-  --t-xl:   18px;  /* display text, large headers                */
-  --t-input: 10px; /* Minimum for form controls — prevents iOS auto-zoom */
+  /* ── Backgrounds ─────────────────────────────────────────── */
+  --bg:          #46425e;   /* primary app background */
+  --bg-deep:     #1e1c30;   /* modals, panels, deep surfaces */
+  --bg3:         #15788c;   /* teal — borders, headers, controls */
+  --bg-disabled: #444466;   /* inactive/disabled element backgrounds */
+
+  /* ── Accent & Text ───────────────────────────────────────── */
+  --hi:          #00ccaa;   /* primary CTA — insert, generate, engaged */
+  --hi-dim:      #00b9be;   /* hover/focus state, secondary interactive */
+  --accent:      #ff6973;   /* error, delete, warning */
+  --accent2:     #ffb0a3;   /* secondary text, soft labels */
+  --text:        #ffeecc;   /* primary text */
+  --text-dim:    #8888aa;   /* disabled text, hints, sub-labels */
+
+  /* ── Borders ─────────────────────────────────────────────── */
+  --border:      2px solid var(--bg3);
+  --border-thin: 1px solid var(--bg3);
+
+  /* ── Spacing Scale ───────────────────────────────────────── */
+  --space-1: 4px;    /* tight — icon padding, micro gaps */
+  --space-2: 8px;    /* standard — button padding, control gaps */
+  --space-3: 12px;   /* component — input/card internal padding */
+  --space-4: 16px;   /* section — modal content, panel insets */
+  --space-5: 24px;   /* large — modal outer padding, section gaps */
+  --space-6: 36px;   /* screen — startup screen, hero spacing */
+
+  /* ── Z-Index Scale ───────────────────────────────────────── */
+  --z-dropdown:  100;
+  --z-modal:     500;
+  --z-modal-top: 1000;
+  --z-overlay:   8000;
+  --z-system:    99999;
+
+  /* ── Typography Scale ────────────────────────────────────── */
+  --font:    'Press Start 2P', monospace;
+  --t-xs:    8px;    /* sub-labels, canvas overlays, kbd hints */
+  --t-sm:    9px;    /* button labels, dropdowns, field labels */
+  --t-base:  10px;   /* body text, general UI, note info */
+  --t-md:    12px;   /* section headings, emphasis */
+  --t-lg:    14px;   /* title text, modal headers */
+  --t-xl:    18px;   /* display text, startup screen */
+  --t-input: 10px;   /* form controls — prevents iOS auto-zoom */
+  --tracking: 0.05em; /* universal letter-spacing */
 }
 html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text);
   font-family: 'Press Start 2P', monospace; font-size: 14px; overflow: hidden;
