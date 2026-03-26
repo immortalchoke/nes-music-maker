@@ -52,6 +52,13 @@
   --t-xl:    18px;   /* display text, startup screen */
   --t-input: 10px;   /* form controls — prevents iOS auto-zoom */
   --tracking: 0.05em; /* universal letter-spacing */
+
+  /* ── Legacy aliases — removed in Phase 5 after all usages migrated ── */
+  --bg2:   var(--bg);      /* was duplicate of --bg */
+  --gray:  var(--bg3);     /* was duplicate of --bg3 */
+  --gray2: var(--bg);      /* was duplicate of --bg */
+  --hi2:   var(--text);    /* was duplicate of --text (#ffeecc) */
+  --text2: var(--accent2); /* was duplicate of --accent2 (#ffb0a3) */
 }
 html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text);
   font-family: 'Press Start 2P', monospace; font-size: 14px; overflow: hidden;
