@@ -1023,10 +1023,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
 <!-- iOS audio unlock overlay — shown only on touch devices, removed on first tap -->
 <style>@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}</style>
 <div id="audio-unlock-overlay" style="display:none;z-index:var(--z-system);background:rgba(0,0,0,0.92);touch-action:manipulation;" class="modal-overlay col">
-  <div style="font:10px 'Press Start 2P',monospace;color:#00ccaa;letter-spacing:2px;">NESFORGE</div>
-  <div id="auo-prompt" style="font:9px 'Press Start 2P',monospace;color:#ffeecc;animation:blink 1s step-start infinite;">TAP TO START</div>
-  <div id="auo-status" style="font:8px 'Press Start 2P',monospace;color:#8888aa;max-width:260px;text-align:center;line-height:1.8;"></div>
-  <div style="font:8px 'Press Start 2P',monospace;color:#555577;max-width:260px;text-align:center;line-height:1.8;">
+  <div style="font:10px 'Press Start 2P',monospace;color:var(--hi);letter-spacing:2px;">NESFORGE</div>
+  <div id="auo-prompt" style="font:9px 'Press Start 2P',monospace;color:var(--text);animation:blink 1s step-start infinite;">TAP TO START</div>
+  <div id="auo-status" style="font:8px 'Press Start 2P',monospace;color:var(--text-dim);max-width:260px;text-align:center;line-height:1.8;"></div>
+  <div style="font:8px 'Press Start 2P',monospace;color:var(--text-dim);max-width:260px;text-align:center;line-height:1.8;">
     Make sure volume is up &amp; mute switch is off
   </div>
 </div>
@@ -1056,9 +1056,9 @@ body.mobile-mode #mobile-app { display: flex !important; }
       <button id="mob-prev-bar" class="mob-btn btn btn--mob" style="min-width:36px;height:36px;font-size:12px;">◀</button>
       <div id="mob-bar-dots"></div>
       <button id="mob-next-bar" class="mob-btn btn btn--mob" style="min-width:36px;height:36px;font-size:12px;">▶</button>
-      <button id="mob-rem-bar" class="mob-btn btn btn--mob danger" style="min-width:32px;height:36px;">−</button>
+      <button id="mob-rem-bar" class="mob-btn btn btn--mob btn--danger" style="min-width:32px;height:36px;">−</button>
       <button id="mob-add-bar" class="mob-btn btn btn--mob" style="min-width:32px;height:36px;">+</button>
-      <button id="mob-clear-track" class="mob-btn btn btn--mob danger" style="min-width:32px;height:36px;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 512 512" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m210.82 60.24h90.35v30.12h-90.35z"/><path d="m60.24 90.35h391.53v30.12h-391.53z"/><path d="m90.35 120.47h30.12v301.18h-30.12z"/><path d="m391.53 120.47h30.12v301.18h-30.12z"/><path d="m90.35 421.65h331.29v30.12h-331.29z"/><path d="m180.71 150.59h30.12v271.06h-30.12z"/><path d="m301.18 150.59h30.12v271.06h-30.12z"/></svg></button>
+      <button id="mob-clear-track" class="mob-btn btn btn--mob btn--danger" style="min-width:32px;height:36px;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 512 512" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m210.82 60.24h90.35v30.12h-90.35z"/><path d="m60.24 90.35h391.53v30.12h-391.53z"/><path d="m90.35 120.47h30.12v301.18h-30.12z"/><path d="m391.53 120.47h30.12v301.18h-30.12z"/><path d="m90.35 421.65h331.29v30.12h-331.29z"/><path d="m180.71 150.59h30.12v271.06h-30.12z"/><path d="m301.18 150.59h30.12v271.06h-30.12z"/></svg></button>
       <button id="mob-magic-btn" class="mob-btn btn btn--mob" style="min-width:48px;height:36px;">MAGIC</button>
     </div>
     <div id="mob-playhead-bar"><div id="mob-playhead-fill"></div></div>
