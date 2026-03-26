@@ -1022,9 +1022,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
 <!-- iOS audio unlock overlay — shown only on touch devices, removed on first tap -->
 <style>@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}</style>
-<div id="audio-unlock-overlay" style="display:none;position:fixed;inset:0;z-index:99999;
-  background:#1a1a2e;flex-direction:column;align-items:center;
-  justify-content:center;gap:16px;touch-action:manipulation;">
+<div id="audio-unlock-overlay" style="display:none;z-index:var(--z-system);background:rgba(0,0,0,0.92);touch-action:manipulation;" class="modal-overlay col">
   <div style="font:10px 'Press Start 2P',monospace;color:#00ccaa;letter-spacing:2px;">NESFORGE</div>
   <div id="auo-prompt" style="font:9px 'Press Start 2P',monospace;color:#ffeecc;animation:blink 1s step-start infinite;">TAP TO START</div>
   <div id="auo-status" style="font:8px 'Press Start 2P',monospace;color:#8888aa;max-width:260px;text-align:center;line-height:1.8;"></div>
@@ -1038,10 +1036,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
   <!-- Transport bar -->
   <div id="mob-transport">
-    <button id="mob-play-btn" class="mob-btn">▶</button>
-    <button id="mob-tap-btn" class="mob-btn">TAP</button>
+    <button id="mob-play-btn" class="mob-btn btn btn--mob">▶</button>
+    <button id="mob-tap-btn" class="mob-btn btn btn--mob">TAP</button>
     <div id="mob-bpm-display">120</div>
-    <button id="mob-loop-btn" class="mob-btn">LOOP</button>
+    <button id="mob-loop-btn" class="mob-btn btn btn--mob">LOOP</button>
     <div class="mob-transport-spacer"></div>
     <select id="mob-key-sel" class="mob-select"></select>
     <select id="mob-scale-sel" class="mob-select"></select>
@@ -1055,28 +1053,28 @@ body.mobile-mode #mobile-app { display: flex !important; }
     <div id="mob-pitch-label">C4</div>
     <div id="mob-keyboard-wrap"></div>
     <div id="mob-bar-nav">
-      <button id="mob-prev-bar" class="mob-btn" style="min-width:36px;height:36px;font-size:12px;">◀</button>
+      <button id="mob-prev-bar" class="mob-btn btn btn--mob" style="min-width:36px;height:36px;font-size:12px;">◀</button>
       <div id="mob-bar-dots"></div>
-      <button id="mob-next-bar" class="mob-btn" style="min-width:36px;height:36px;font-size:12px;">▶</button>
-      <button id="mob-rem-bar" class="mob-btn danger" style="min-width:32px;height:36px;">−</button>
-      <button id="mob-add-bar" class="mob-btn" style="min-width:32px;height:36px;">+</button>
-      <button id="mob-clear-track" class="mob-btn danger" style="min-width:32px;height:36px;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 512 512" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m210.82 60.24h90.35v30.12h-90.35z"/><path d="m60.24 90.35h391.53v30.12h-391.53z"/><path d="m90.35 120.47h30.12v301.18h-30.12z"/><path d="m391.53 120.47h30.12v301.18h-30.12z"/><path d="m90.35 421.65h331.29v30.12h-331.29z"/><path d="m180.71 150.59h30.12v271.06h-30.12z"/><path d="m301.18 150.59h30.12v271.06h-30.12z"/></svg></button>
-      <button id="mob-magic-btn" class="mob-btn" style="min-width:48px;height:36px;">MAGIC</button>
+      <button id="mob-next-bar" class="mob-btn btn btn--mob" style="min-width:36px;height:36px;font-size:12px;">▶</button>
+      <button id="mob-rem-bar" class="mob-btn btn btn--mob danger" style="min-width:32px;height:36px;">−</button>
+      <button id="mob-add-bar" class="mob-btn btn btn--mob" style="min-width:32px;height:36px;">+</button>
+      <button id="mob-clear-track" class="mob-btn btn btn--mob danger" style="min-width:32px;height:36px;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 512 512" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m210.82 60.24h90.35v30.12h-90.35z"/><path d="m60.24 90.35h391.53v30.12h-391.53z"/><path d="m90.35 120.47h30.12v301.18h-30.12z"/><path d="m391.53 120.47h30.12v301.18h-30.12z"/><path d="m90.35 421.65h331.29v30.12h-331.29z"/><path d="m180.71 150.59h30.12v271.06h-30.12z"/><path d="m301.18 150.59h30.12v271.06h-30.12z"/></svg></button>
+      <button id="mob-magic-btn" class="mob-btn btn btn--mob" style="min-width:48px;height:36px;">MAGIC</button>
     </div>
     <div id="mob-playhead-bar"><div id="mob-playhead-fill"></div></div>
     <div id="mob-grid"></div>
   </div>
 
   <!-- Export button -->
-  <button id="mob-export-btn" class="mob-btn">SHARE / EXPORT</button>
+  <button id="mob-export-btn" class="mob-btn btn btn--mob">SHARE / EXPORT</button>
 
   <!-- Export dialog -->
   <div id="mob-export-dialog">
     <div id="mob-export-sheet">
       <div class="mob-export-title">EXPORT</div>
-      <button id="mob-exp-share" class="mob-btn">SHARE AS WAV</button>
-      <button id="mob-exp-wav" class="mob-btn">DOWNLOAD WAV</button>
-      <button id="mob-exp-midi" class="mob-btn">DOWNLOAD MIDI</button>
+      <button id="mob-exp-share" class="mob-btn btn btn--mob">SHARE AS WAV</button>
+      <button id="mob-exp-wav" class="mob-btn btn btn--mob">DOWNLOAD WAV</button>
+      <button id="mob-exp-midi" class="mob-btn btn btn--mob">DOWNLOAD MIDI</button>
       <div class="mob-export-close" id="mob-export-close-btn">CANCEL</div>
     </div>
   </div>
@@ -1088,7 +1086,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   <div id="mob-vel-picker">
     <div id="mob-vel-picker-label">VELOCITY: 100</div>
     <input id="mob-vel-slider" type="range" min="1" max="127" value="100">
-    <button id="mob-vel-done" class="mob-btn">OK</button>
+    <button id="mob-vel-done" class="mob-btn btn btn--mob">OK</button>
   </div>
 
 </div>
