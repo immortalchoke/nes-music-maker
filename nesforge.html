@@ -4900,7 +4900,7 @@ function showContextMenu(x, y, items) {
   el.id = 'ctx-menu';
   el.className = 'modal modal--sm';
   el.style.cssText = `position:fixed;left:${x}px;top:${y}px;background:var(--bg);
-    border:2px solid var(--bg3);z-index:1000;padding:2px;`;
+    border:2px solid var(--bg3);z-index:1000;padding:2px;width:auto;min-width:120px;`;
   items.forEach(item => {
     const btn = document.createElement('div');
     btn.textContent = item.label;
