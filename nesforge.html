@@ -3713,6 +3713,7 @@ const AV = {
   _selEntries: new Set(),   // selected arrangement entry objects
   _avMarquee: null,         // { startX, startY, currentX, currentY }
   _hoverHit: null,          // hit object under cursor for hover highlights
+  _avTool: 'move',          // 'move' | 'cut'
 
   getCanvas() { return document.getElementById('arrangement-canvas'); },
 
@@ -4399,7 +4400,58 @@ AV.initEvents = function() {
       return;
     }
     if (hit.zone === 'pattern') {
-      // If clicking an unselected pattern, replace selection; if already selected, keep it (multi-drag)
+      // CUT mode: split the clicked container at the click point
+      if (AV._avTool === 'cut') {
+        const barW = AV.barWidth();
+        const barX = (mx - AV.HEADER_WIDTH + AV.scrollX) / barW;
+        const cutOffset = barX - hit.entry.startBar;
+        const beatLen = 1 / ProjectState.timeSignature[0];
+        const snapped = Math.round(cutOffset / beatLen) * beatLen;
+        if (snapped <= 0 || snapped >= hit.pat.lengthBars) return;
+
+        const snapshot = JSON.stringify(ProjectState);
+
+        // Build two new patterns by splitting notes at snapped offset
+        const notesA = [], notesB = [];
+        for (const n of hit.pat.notes) {
+          if (n.start < snapped) {
+            notesA.push({ ...n, duration: Math.min(n.duration, snapped - n.start) });
+          }
+          if (n.start + n.duration > snapped) {
+            const bStart = Math.max(n.start, snapped) - snapped;
+            const bDur = (n.start + n.duration) - Math.max(n.start, snapped);
+            notesB.push({ ...n, start: bStart, duration: bDur });
+          }
+        }
+
+        const newIdA = 'p' + Date.now();
+        const newIdB = 'p' + (Date.now() + 1);
+        const patA = { id: newIdA, name: hit.pat.name + '-A', lengthBars: snapped, notes: notesA };
+        const patB = { id: newIdB, name: hit.pat.name + '-B', lengthBars: hit.pat.lengthBars - snapped, notes: notesB };
+
+        // Replace old pattern with patA+patB in track.patterns
+        const pi = hit.track.patterns.indexOf(hit.pat);
+        hit.track.patterns.splice(pi, 1, patA, patB);
+
+        // Replace old entry with two entries in track.arrangement
+        const ei = hit.track.arrangement.indexOf(hit.entry);
+        const entryA = { patternId: newIdA, startBar: hit.entry.startBar };
+        const entryB = { patternId: newIdB, startBar: hit.entry.startBar + snapped };
+        if (hit.entry.loopBars) {
+          entryA.loopBars = Math.min(hit.entry.loopBars, snapped);
+          entryB.loopBars = Math.max(0, hit.entry.loopBars - snapped);
+          if (entryB.loopBars <= 0) delete entryB.loopBars;
+        }
+        hit.track.arrangement.splice(ei, 1, entryA, entryB);
+
+        AV._selEntries.clear();
+        AV._selEntries.add(entryA);
+        History._pushSnapshot(snapshot);
+        AV.draw();
+        return;
+      }
+
+      // MOVE mode (default): select + drag
       if (!AV._selEntries.has(hit.entry)) {
         AV._selEntries.clear();
         AV._selEntries.add(hit.entry);
@@ -4566,7 +4618,7 @@ AV.initEvents = function() {
       if (hit?.zone === 'resize-pattern') canvas.style.cursor = 'ew-resize';
       else if (hit?.zone === 'loop-pattern') canvas.style.cursor = 'col-resize';
       else if (hit?.zone === 'loop-shorten') canvas.style.cursor = 'col-resize';
-      else if (hit?.zone === 'pattern') canvas.style.cursor = e.altKey ? 'copy' : 'grab';
+      else if (hit?.zone === 'pattern') canvas.style.cursor = AV._avTool === 'cut' ? 'crosshair' : (e.altKey ? 'copy' : 'grab');
       else canvas.style.cursor = '';
       // Update hover hit — only redraw if something changed
       const prev = this._hoverHit;
@@ -5373,6 +5425,10 @@ function buildTopBar() {
   document.getElementById('topbar').innerHTML = `
     <div class="tb-group">
       <button class="btn btn--icon btn--engaged" id="btn-prog" title="Progression Builder">${PROG}</button>
+    </div>
+    <div class="tb-vdivider"></div>
+    <div class="tb-group">
+      <button class="btn btn--sm btn--engaged" id="btn-av-move" title="Move mode — drag note containers" style="height:32px;width:44px;">MOVE</button><button class="btn btn--sm" id="btn-av-cut" title="Cut mode — click to split a note container" style="height:32px;width:44px;margin-left:-2px;">CUT</button>
     </div>
     <div class="tb-vdivider"></div>
     <div class="tb-group">
@@ -9438,6 +9494,15 @@ const ProgBuilder = (() => {
       document.addEventListener('click',      _relock, { capture: true, passive: true });
     })();
     document.getElementById('btn-prog').onclick = () => ProgBuilder.openTopbar();
+
+    // MOVE / CUT tool toggle
+    const _setAvTool = (tool) => {
+      AV._avTool = tool;
+      document.getElementById('btn-av-move').classList.toggle('btn--engaged', tool === 'move');
+      document.getElementById('btn-av-cut').classList.toggle('btn--engaged', tool === 'cut');
+    };
+    document.getElementById('btn-av-move').onclick = () => _setAvTool('move');
+    document.getElementById('btn-av-cut').onclick  = () => _setAvTool('cut');
     requestAnimationFrame(() => ProgBuilder.openStartup());
   });
 
