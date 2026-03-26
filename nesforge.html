@@ -55,12 +55,6 @@
   --t-input: 10px;   /* form controls — prevents iOS auto-zoom */
   --tracking: 0.05em; /* universal letter-spacing */
 
-  /* ── Legacy aliases — removed in Phase 5 after all usages migrated ── */
-  --bg2:   var(--bg);      /* was duplicate of --bg */
-  --gray:  var(--bg3);     /* was duplicate of --bg3 */
-  --gray2: var(--bg);      /* was duplicate of --bg */
-  --hi2:   var(--text);    /* was duplicate of --text (#ffeecc) */
-  --text2: var(--accent2); /* was duplicate of --accent2 (#ffb0a3) */
 }
 html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text);
   font-family: var(--font); font-size: 14px; overflow: hidden;
@@ -75,7 +69,7 @@ html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text
   #main { overflow: visible; }
   #arrangement-panel { overflow: visible; }
 }
-#topbar { height: 64px; background: var(--bg2); border-bottom: var(--border);
+#topbar { height: 64px; background: var(--bg); border-bottom: var(--border);
   display: flex; align-items: center; padding: 0 12px; gap: 6px; flex-shrink: 0; }
 .tb-group { display: flex; align-items: center; gap: 4px; }
 .tb-vdivider { width: 2px; height: 32px; background: var(--bg3); flex-shrink: 0; margin: 0 4px; }
@@ -103,19 +97,7 @@ select.lcd-select { background: transparent !important; border: none !important;
   flex-direction: column; flex-shrink: 0; }
 #pianoroll-canvas { flex: 1; display: block; touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
 #panel-divider { touch-action: none; }
-.nes-btn {
-  background: var(--bg3); color: var(--text); border: 2px solid var(--hi-dim);
-  font-family: var(--font); font-size: var(--t-sm);
-  padding: 4px 6px; cursor: pointer; image-rendering: pixelated;
-  letter-spacing: var(--tracking); border-radius: 0;
-}
-.nes-btn:hover { background: var(--hi-dim); color: var(--bg); border-color: var(--hi-dim); }
-.nes-btn:active { background: var(--accent); color: var(--text); border-color: var(--accent); }
-.nes-btn.engaged { background: var(--hi); color: var(--bg-deep); border-color: #00ffcc; } /* migration note: do not combine .engaged with .btn--engaged on same element */
-/* ── Design System: Button ───────────────────────────────────
-   .btn is the unified button base. .nes-btn is kept as a legacy
-   alias during migration and removed in Phase 5 (Task 6).
-   ------------------------------------------------------------ */
+/* ── Design System: Button ───────────────────────────────────── */
 .btn {
   background: var(--bg3);
   color: var(--text);
@@ -232,16 +214,11 @@ select, input[type=number], input[type=text], input[type=range] {
 input:focus, select:focus { border-color: var(--hi-dim); }
 
 /* Transport button states */
-#btn-play:hover  { color: var(--hi2); }
+#btn-play:hover  { color: var(--text); }
 #btn-rec         { color: var(--accent2); }
 #btn-rec.armed   { color: var(--accent); animation: blink 0.8s step-end infinite; }
 @keyframes blink  { 50% { opacity: 0.3; } }
 
-/* All topbar icon buttons — uniform square */
-.tb-group .nes-btn {
-  width: 32px; height: 32px; padding: 2px;
-  display: inline-flex; align-items: center; justify-content: center;
-}
 
 /* MagicGen modal */
 #magic-modal {
@@ -452,28 +429,6 @@ body.mobile-mode #mobile-app { display: flex !important; }
   flex-wrap: nowrap;
   overflow-x: auto;
 }
-.mob-btn {
-  background: var(--bg3);
-  color: var(--text);
-  border: none;
-  border-radius: 3px;
-  font-family: var(--font);
-  font-size: var(--t-sm);
-  cursor: pointer;
-  padding: 0 8px;
-  height: 44px;
-  min-width: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-.mob-btn:active { background: var(--hi); color: var(--bg-deep); }
-.mob-btn.danger:active { background: var(--accent); }
-/* Migration: when .mob-btn and .btn--mob coexist, ensure .btn--mob values win (higher specificity overrides .mob-btn source-order advantage) */
-.mob-btn.btn--mob { border-width: 1px; border-style: solid; border-color: transparent; border-radius: 2px; padding: 0 var(--space-3); }
 #mob-play-btn { font-size: 14px; }
 #mob-bpm-display {
   background: var(--bg-deep);
@@ -769,7 +724,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   flex-direction: column;
   gap: 10px;
 }
-#mob-export-sheet .mob-btn {
+#mob-export-sheet .btn {
   width: 100%;
   font-size: var(--t-sm);
   height: 48px;
@@ -782,7 +737,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 }
 .mob-export-close {
   font-size: var(--t-sm);
-  color: var(--text2);
+  color: var(--accent2);
   text-align: center;
   cursor: pointer;
   padding: 8px;
@@ -887,7 +842,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   display: flex; flex-direction: column; gap: 2px;
 }
 .pr-info-label {
-  font-size: var(--t-xs); color: var(--text2); letter-spacing: var(--tracking);
+  font-size: var(--t-xs); color: var(--accent2); letter-spacing: var(--tracking);
 }
 .pr-info-value {
   font-size: var(--t-xs); color: var(--text); background: var(--bg);
@@ -899,7 +854,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   padding: 2px 3px; width: 100%; box-sizing: border-box; border-radius: 0;
 }
 .pr-topbar-label {
-  font-size: var(--t-sm); color: var(--text2); letter-spacing: var(--tracking);
+  font-size: var(--t-sm); color: var(--accent2); letter-spacing: var(--tracking);
   white-space: nowrap; flex-shrink: 0;
 }
 .pr-topbar-btn {
@@ -923,7 +878,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   gap:24px;max-width:680px;width:92%;}
 #prog-startup-title{font-size:var(--t-xl);color:var(--hi);letter-spacing:.15rem;
   font-family:var(--font);}
-#prog-startup-sub{font-size:var(--t-base);color:var(--text2);letter-spacing:.08rem;
+#prog-startup-sub{font-size:var(--t-base);color:var(--accent2);letter-spacing:.08rem;
   font-family:var(--font);}
 #prog-startup-cards{display:flex;gap:18px;width:100%;}
 .prog-start-card{flex:1;background:var(--bg);border:2px solid var(--bg3);
@@ -932,7 +887,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 .prog-start-card:hover{border-color:var(--hi);background:var(--bg-hover);}
 .prog-card-icon{font-size:28px;color:var(--hi);}
 .prog-card-label{font-size:var(--t-base);color:var(--text);text-align:center;}
-.prog-card-desc{font-size:var(--t-sm);color:var(--text2);text-align:center;
+.prog-card-desc{font-size:var(--t-sm);color:var(--accent2);text-align:center;
   line-height:2;}
 #prog-builder-content{background:var(--bg-deep);border:2px solid var(--bg3);
   padding:24px;width:min(820px,96vw);max-height:92vh;overflow-y:auto;
@@ -941,7 +896,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   letter-spacing:.1rem;display:flex;align-items:center;
   justify-content:space-between;}
 .pb-section{margin-bottom:18px;}
-.pb-label{font-size:var(--t-sm);color:var(--text2);margin-bottom:8px;
+.pb-label{font-size:var(--t-sm);color:var(--accent2);margin-bottom:8px;
   letter-spacing:var(--tracking);}
 .pb-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .pb-preset-btn{font-size:var(--t-sm);padding:5px 8px;}
@@ -950,7 +905,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   min-width:80px;position:relative;flex-shrink:0;}
 .pb-step:hover{border-color:var(--hi);}
 .pb-step-label{font-size:var(--t-md);color:var(--hi);}
-.pb-step-chord{font-size:var(--t-xs);color:var(--text2);letter-spacing:.03rem;
+.pb-step-chord{font-size:var(--t-xs);color:var(--accent2);letter-spacing:.03rem;
   text-align:center;min-height:8px;margin-top:-2px;}
 .pb-step-del{position:absolute;top:2px;right:4px;background:none;
   border:none;color:var(--accent);font-size:var(--t-md);cursor:pointer;
@@ -974,7 +929,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 .pb-generate{width:100%;font-size:var(--t-base);padding:12px;color:var(--hi);
   border-color:var(--hi);margin-top:6px;}
 .pb-generate:hover{background:var(--hi);color:var(--bg-deep);}
-.pb-total{font-size:var(--t-sm);color:var(--text2);text-align:right;
+.pb-total{font-size:var(--t-sm);color:var(--accent2);text-align:right;
   margin-bottom:6px;}
 #pb-track-toggles{display:flex;flex-direction:column;gap:4px;}
 .pb-track-tog-row{display:flex;align-items:center;gap:8px;padding:6px 8px;
@@ -987,7 +942,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   text-align:center;flex-shrink:0;}
 .pb-track-tog-label{font-size:var(--t-sm);color:var(--text);flex-shrink:0;
   letter-spacing:var(--tracking);}
-.pb-track-tog-sub{font-size:var(--t-xs);color:var(--text2);letter-spacing:.03rem;margin-top:1px;}
+.pb-track-tog-sub{font-size:var(--t-xs);color:var(--accent2);letter-spacing:.03rem;margin-top:1px;}
 .pb-track-tog-row:has(input:not(:checked)) .pb-track-tog-label,
 .pb-track-tog-row:has(input:not(:checked)) .pb-track-tog-icon{opacity:.4;}
 
@@ -1036,10 +991,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
   <!-- Transport bar -->
   <div id="mob-transport">
-    <button id="mob-play-btn" class="mob-btn btn btn--mob">▶</button>
-    <button id="mob-tap-btn" class="mob-btn btn btn--mob">TAP</button>
+    <button id="mob-play-btn" class="btn btn--mob">▶</button>
+    <button id="mob-tap-btn" class="btn btn--mob">TAP</button>
     <div id="mob-bpm-display">120</div>
-    <button id="mob-loop-btn" class="mob-btn btn btn--mob">LOOP</button>
+    <button id="mob-loop-btn" class="btn btn--mob">LOOP</button>
     <div class="mob-transport-spacer"></div>
     <select id="mob-key-sel" class="mob-select"></select>
     <select id="mob-scale-sel" class="mob-select"></select>
@@ -1053,28 +1008,28 @@ body.mobile-mode #mobile-app { display: flex !important; }
     <div id="mob-pitch-label">C4</div>
     <div id="mob-keyboard-wrap"></div>
     <div id="mob-bar-nav">
-      <button id="mob-prev-bar" class="mob-btn btn btn--mob" style="min-width:36px;height:36px;font-size:12px;">◀</button>
+      <button id="mob-prev-bar" class="btn btn--mob" style="min-width:36px;height:36px;font-size:12px;">◀</button>
       <div id="mob-bar-dots"></div>
-      <button id="mob-next-bar" class="mob-btn btn btn--mob" style="min-width:36px;height:36px;font-size:12px;">▶</button>
-      <button id="mob-rem-bar" class="mob-btn btn btn--mob btn--danger" style="min-width:32px;height:36px;">−</button>
-      <button id="mob-add-bar" class="mob-btn btn btn--mob" style="min-width:32px;height:36px;">+</button>
-      <button id="mob-clear-track" class="mob-btn btn btn--mob btn--danger" style="min-width:32px;height:36px;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 512 512" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m210.82 60.24h90.35v30.12h-90.35z"/><path d="m60.24 90.35h391.53v30.12h-391.53z"/><path d="m90.35 120.47h30.12v301.18h-30.12z"/><path d="m391.53 120.47h30.12v301.18h-30.12z"/><path d="m90.35 421.65h331.29v30.12h-331.29z"/><path d="m180.71 150.59h30.12v271.06h-30.12z"/><path d="m301.18 150.59h30.12v271.06h-30.12z"/></svg></button>
-      <button id="mob-magic-btn" class="mob-btn btn btn--mob" style="min-width:48px;height:36px;">MAGIC</button>
+      <button id="mob-next-bar" class="btn btn--mob" style="min-width:36px;height:36px;font-size:12px;">▶</button>
+      <button id="mob-rem-bar" class="btn btn--mob btn--danger" style="min-width:32px;height:36px;">−</button>
+      <button id="mob-add-bar" class="btn btn--mob" style="min-width:32px;height:36px;">+</button>
+      <button id="mob-clear-track" class="btn btn--mob btn--danger" style="min-width:32px;height:36px;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 512 512" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m210.82 60.24h90.35v30.12h-90.35z"/><path d="m60.24 90.35h391.53v30.12h-391.53z"/><path d="m90.35 120.47h30.12v301.18h-30.12z"/><path d="m391.53 120.47h30.12v301.18h-30.12z"/><path d="m90.35 421.65h331.29v30.12h-331.29z"/><path d="m180.71 150.59h30.12v271.06h-30.12z"/><path d="m301.18 150.59h30.12v271.06h-30.12z"/></svg></button>
+      <button id="mob-magic-btn" class="btn btn--mob" style="min-width:48px;height:36px;">MAGIC</button>
     </div>
     <div id="mob-playhead-bar"><div id="mob-playhead-fill"></div></div>
     <div id="mob-grid"></div>
   </div>
 
   <!-- Export button -->
-  <button id="mob-export-btn" class="mob-btn btn btn--mob">SHARE / EXPORT</button>
+  <button id="mob-export-btn" class="btn btn--mob">SHARE / EXPORT</button>
 
   <!-- Export dialog -->
   <div id="mob-export-dialog">
     <div id="mob-export-sheet">
       <div class="mob-export-title">EXPORT</div>
-      <button id="mob-exp-share" class="mob-btn btn btn--mob">SHARE AS WAV</button>
-      <button id="mob-exp-wav" class="mob-btn btn btn--mob">DOWNLOAD WAV</button>
-      <button id="mob-exp-midi" class="mob-btn btn btn--mob">DOWNLOAD MIDI</button>
+      <button id="mob-exp-share" class="btn btn--mob">SHARE AS WAV</button>
+      <button id="mob-exp-wav" class="btn btn--mob">DOWNLOAD WAV</button>
+      <button id="mob-exp-midi" class="btn btn--mob">DOWNLOAD MIDI</button>
       <div class="mob-export-close" id="mob-export-close-btn">CANCEL</div>
     </div>
   </div>
@@ -1086,7 +1041,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   <div id="mob-vel-picker">
     <div id="mob-vel-picker-label">VELOCITY: 100</div>
     <input id="mob-vel-slider" type="range" min="1" max="127" value="100">
-    <button id="mob-vel-done" class="mob-btn btn btn--mob">OK</button>
+    <button id="mob-vel-done" class="btn btn--mob">OK</button>
   </div>
 
 </div>
@@ -2647,23 +2602,23 @@ body.mobile-mode #mobile-app { display: flex !important; }
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:3px;margin-top:3px;">
-          <button class="nes-btn btn btn--sm btn--full" id="pr-quantize-btn">QUANTIZE</button>
-          <button class="nes-btn btn btn--sm btn--full" id="pr-redist-btn">REDISTRIBUTE</button>
+          <button class="btn btn--sm btn--full" id="pr-quantize-btn">QUANTIZE</button>
+          <button class="btn btn--sm btn--full" id="pr-redist-btn">REDISTRIBUTE</button>
         </div>
 
         <div class="pr-section-divider"></div>
         <div class="pr-side-title" style="margin-top:2px;">SHIFT PITCH</div>
         <div style="display:flex;gap:2px;justify-content:space-between;">
-          <button class="nes-btn btn btn--sm" id="pr-pitch-oct-dn"  style="flex:1;">-8VA</button>
-          <button class="nes-btn btn btn--sm" id="pr-pitch-semi-dn" style="flex:1;">-ST</button>
-          <button class="nes-btn btn btn--sm" id="pr-pitch-semi-up" style="flex:1;">+ST</button>
-          <button class="nes-btn btn btn--sm" id="pr-pitch-oct-up"  style="flex:1;">+8VA</button>
+          <button class="btn btn--sm" id="pr-pitch-oct-dn"  style="flex:1;">-8VA</button>
+          <button class="btn btn--sm" id="pr-pitch-semi-dn" style="flex:1;">-ST</button>
+          <button class="btn btn--sm" id="pr-pitch-semi-up" style="flex:1;">+ST</button>
+          <button class="btn btn--sm" id="pr-pitch-oct-up"  style="flex:1;">+8VA</button>
         </div>
         ${!isChromatic ? `
         <div style="${rowStyle}margin-top:3px;">
           <span class="modal-label" style="${lblStyle}">SCALE STEP</span>
-          <button class="nes-btn btn btn--sm" id="pr-pitch-step-dn">-</button>
-          <button class="nes-btn btn btn--sm" id="pr-pitch-step-up">+</button>
+          <button class="btn btn--sm" id="pr-pitch-step-dn">-</button>
+          <button class="btn btn--sm" id="pr-pitch-step-up">+</button>
         </div>
         ` : ''}
 
@@ -2682,15 +2637,15 @@ body.mobile-mode #mobile-app { display: flex !important; }
           </select>
         </div>
         <div style="display:flex;gap:2px;margin-top:3px;">
-          <button class="nes-btn btn btn--sm" id="pr-harm-this" style="flex:1;">THIS TRACK</button>
-          <button class="nes-btn btn btn--sm" id="pr-harm-new"  style="flex:1;">NEW TRACK</button>
+          <button class="btn btn--sm" id="pr-harm-this" style="flex:1;">THIS TRACK</button>
+          <button class="btn btn--sm" id="pr-harm-new"  style="flex:1;">NEW TRACK</button>
         </div>
-        <button class="nes-btn btn btn--sm btn--full btn--engaged" id="pr-harmonize-btn"
+        <button class="btn btn--sm btn--full btn--engaged" id="pr-harmonize-btn"
           style="margin-top:3px;color:var(--hi);border-color:var(--hi);">
           HARMONIZE
         </button>
 
-        <button class="nes-btn btn btn--sm btn--full btn--danger" id="pr-del-note" style="margin-top:auto;">
+        <button class="btn btn--sm btn--full btn--danger" id="pr-del-note" style="margin-top:auto;">
           DELETE${multi ? ' ALL' : ''}
         </button>
       `;
@@ -4235,7 +4190,7 @@ AV.initEvents = function() {
       toggleRow.style.cssText = 'display:flex;gap:0;margin-bottom:10px;';
       const mkTogBtn = (label, mode) => {
         const b = document.createElement('button');
-        b.className = 'nes-btn';
+        b.className = 'btn';
         b.textContent = label;
         b.style.cssText = `flex:1;font-size:8px;padding:5px 4px;`;
         b.dataset.mode = mode;
@@ -4270,10 +4225,10 @@ AV.initEvents = function() {
       const btnRow = document.createElement('div');
       btnRow.style.cssText = 'display:flex;gap:8px;';
       const cancelBtn = document.createElement('button');
-      cancelBtn.className = 'nes-btn'; cancelBtn.textContent = 'CANCEL'; cancelBtn.style.cssText = 'flex:1;';
+      cancelBtn.className = 'btn'; cancelBtn.textContent = 'CANCEL'; cancelBtn.style.cssText = 'flex:1;';
       cancelBtn.onclick = () => conf.remove();
       const confirmBtn = document.createElement('button');
-      confirmBtn.className = 'nes-btn btn btn--danger'; confirmBtn.textContent = 'DELETE TRACKS';
+      confirmBtn.className = 'btn btn--danger'; confirmBtn.textContent = 'DELETE TRACKS';
       confirmBtn.style.cssText = 'flex:1;color:var(--accent);border-color:var(--accent);';
       confirmBtn.onclick = () => {
         History.push();
@@ -5414,18 +5369,18 @@ function buildTopBar() {
 
   document.getElementById('topbar').innerHTML = `
     <div class="tb-group">
-      <button class="nes-btn btn btn--icon" id="btn-prog" title="Progression Builder" style="color:var(--hi);border-color:var(--hi);">${PROG}</button>
+      <button class="btn btn--icon" id="btn-prog" title="Progression Builder" style="color:var(--hi);border-color:var(--hi);">${PROG}</button>
     </div>
     <div class="tb-vdivider"></div>
     <div class="tb-group">
-      <button class="nes-btn btn btn--icon" id="btn-undo" disabled title="Undo (⌘Z)">${UNDO}</button>
-      <button class="nes-btn btn btn--icon" id="btn-redo" disabled title="Redo (⌘⇧Z)">${REDO}</button>
+      <button class="btn btn--icon" id="btn-undo" disabled title="Undo (⌘Z)">${UNDO}</button>
+      <button class="btn btn--icon" id="btn-redo" disabled title="Redo (⌘⇧Z)">${REDO}</button>
     </div>
     <div class="tb-vdivider"></div>
     <div class="tb-group">
-      <button class="nes-btn btn btn--icon" id="btn-play" title="Play / Stop (Space)">${PLAY}</button>
-      <button class="nes-btn btn btn--icon" id="btn-rec" title="Record DPCM sample (select DPCM track first)">${REC}</button>
-      <button class="nes-btn btn btn--icon" id="btn-loop" title="Toggle loop region">${LOOP}</button>
+      <button class="btn btn--icon" id="btn-play" title="Play / Stop (Space)">${PLAY}</button>
+      <button class="btn btn--icon" id="btn-rec" title="Record DPCM sample (select DPCM track first)">${REC}</button>
+      <button class="btn btn--icon" id="btn-loop" title="Toggle loop region">${LOOP}</button>
     </div>
     <div class="tb-spacer"></div>
     <div id="lcd-box">
@@ -5459,12 +5414,12 @@ function buildTopBar() {
     </div>
     <div class="tb-spacer"></div>
     <div class="tb-group">
-      <button class="nes-btn btn btn--icon" id="btn-export" title="Export audio (WAV / MIDI / stems)">${EXPORT}</button>
-      <button class="nes-btn btn btn--icon" id="btn-save" title="Save project as JSON">${SAVE}</button>
+      <button class="btn btn--icon" id="btn-export" title="Export audio (WAV / MIDI / stems)">${EXPORT}</button>
+      <button class="btn btn--icon" id="btn-save" title="Save project as JSON">${SAVE}</button>
       <input type="file" id="load-input" accept=".json" style="display:none">
-      <button class="nes-btn btn btn--icon" id="btn-load" title="Load project from JSON">${LOAD}</button>
+      <button class="btn btn--icon" id="btn-load" title="Load project from JSON">${LOAD}</button>
       <input type="file" id="midi-input" accept=".mid,.midi" style="display:none">
-      <button class="nes-btn btn btn--icon" id="btn-midi-import" title="Import MIDI file">${MIDI_IMPORT}</button>
+      <button class="btn btn--icon" id="btn-midi-import" title="Import MIDI file">${MIDI_IMPORT}</button>
     </div>
   `;
 
@@ -6414,8 +6369,8 @@ const MagicGen = (() => {
     // PREVIEW + INSERT
     html += `
       <div style="display:flex;gap:6px;margin-top:4px;">
-        <button id="mg-drum-preview" class="nes-btn btn" style="flex:1;">▶ PREVIEW</button>
-        <button id="mg-drum-insert"  class="nes-btn btn btn--primary" style="flex:2;">INSERT</button>
+        <button id="mg-drum-preview" class="btn" style="flex:1;">▶ PREVIEW</button>
+        <button id="mg-drum-insert"  class="btn btn--primary" style="flex:2;">INSERT</button>
       </div>
     `;
 
@@ -6688,8 +6643,8 @@ const MagicGen = (() => {
 
     html += `
       <div style="display:flex;gap:6px;margin-top:4px;">
-        <button id="mg-preview" class="nes-btn btn" style="flex:1;">▶ PREVIEW</button>
-        <button id="mg-insert"  class="nes-btn btn btn--primary" style="flex:2;">INSERT</button>
+        <button id="mg-preview" class="btn" style="flex:1;">▶ PREVIEW</button>
+        <button id="mg-insert"  class="btn btn--primary" style="flex:2;">INSERT</button>
       </div>
     `;
 
@@ -7613,9 +7568,9 @@ const ExportEngine = {
       <div class="modal modal--sm" style="min-width:240px;">
         <div class="modal-title">EXPORT</div>
         <div class="modal-section" style="gap:6px;">
-          <button class="nes-btn btn btn--full" id="exp-wav">EXPORT WAV</button>
-          <button class="nes-btn btn btn--full" id="exp-midi">EXPORT MIDI</button>
-          <button class="nes-btn btn btn--full" id="exp-stems">EXPORT STEMS</button>
+          <button class="btn btn--full" id="exp-wav">EXPORT WAV</button>
+          <button class="btn btn--full" id="exp-midi">EXPORT MIDI</button>
+          <button class="btn btn--full" id="exp-stems">EXPORT STEMS</button>
         </div>
         <div class="modal-actions">
           <button class="btn" onclick="document.getElementById('export-modal').style.display='none'">CLOSE</button>
@@ -8476,9 +8431,9 @@ const ExportEngine = {
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
         <span class="pr-topbar-label">ADD NOTES</span>
         <div style="display:flex;">
-          <button id="pr-tool-default" class="nes-btn btn btn--sm pr-topbar-btn engaged">SINGLE</button>
-          <button id="pr-tool-stamp"   class="nes-btn btn btn--sm pr-topbar-btn" style="margin-left:-2px;">MULTI</button>
-          <button id="pr-tool-magic"   class="nes-btn btn btn--sm pr-topbar-btn" style="margin-left:-2px;">&#10022; MAGIC</button>
+          <button id="pr-tool-default" class="btn btn--sm pr-topbar-btn engaged">SINGLE</button>
+          <button id="pr-tool-stamp"   class="btn btn--sm pr-topbar-btn" style="margin-left:-2px;">MULTI</button>
+          <button id="pr-tool-magic"   class="btn btn--sm pr-topbar-btn" style="margin-left:-2px;">&#10022; MAGIC</button>
         </div>
       </div>
 
@@ -8509,8 +8464,8 @@ const ExportEngine = {
           </div>
         </div>
         <div style="display:flex;">
-          <button id="pr-stamp-mode-semi"  class="nes-btn btn btn--sm pr-topbar-btn">SEMI</button>
-          <button id="pr-stamp-mode-scale" class="nes-btn btn btn--sm pr-topbar-btn" style="margin-left:-2px;">SCALE</button>
+          <button id="pr-stamp-mode-semi"  class="btn btn--sm pr-topbar-btn">SEMI</button>
+          <button id="pr-stamp-mode-scale" class="btn btn--sm pr-topbar-btn" style="margin-left:-2px;">SCALE</button>
         </div>
         <span class="pr-topbar-label">INTERVAL</span>
         <select id="pr-stamp-interval" class="field-select">
@@ -8531,7 +8486,7 @@ const ExportEngine = {
         <option value="0.0625">1/16</option>
         <option value="0.03125">1/32</option>
       </select>
-      <button id="pr-close-btn" class="nes-btn btn btn--sm pr-topbar-btn"
+      <button id="pr-close-btn" class="btn btn--sm pr-topbar-btn"
         style="color:var(--accent);border-color:var(--accent);">&#10005;</button>
     `;
     _wirePRTopbar();
@@ -8782,7 +8737,7 @@ const ProgBuilder = (() => {
           ).join('')}
         </select>
         <div style="display:flex;gap:2px;">
-          ${[1,2,4].map(v=>`<button class="nes-btn btn btn--sm pb-tog pb-step-dur${step.b===v?' on':''}" data-si="${i}" data-dur="${v}">${v}B</button>`).join('')}
+          ${[1,2,4].map(v=>`<button class="btn btn--sm pb-tog pb-step-dur${step.b===v?' on':''}" data-si="${i}" data-dur="${v}">${v}B</button>`).join('')}
         </div>
       </div>`).join('');
     if (_steps.length<16)
@@ -8793,9 +8748,9 @@ const ProgBuilder = (() => {
       : lib.map((e,i)=>`
           <div class="pb-lib-row">
             <span>${e.name}</span>
-            <button class="nes-btn btn btn--sm pb-lib-load" data-li="${i}">LOAD</button>
-            <button class="nes-btn btn btn--sm pb-lib-exp" data-li="${i}">&#8595;</button>
-            <button class="nes-btn btn btn--sm btn--danger pb-lib-del" data-li="${i}">×</button>
+            <button class="btn btn--sm pb-lib-load" data-li="${i}">LOAD</button>
+            <button class="btn btn--sm pb-lib-exp" data-li="${i}">&#8595;</button>
+            <button class="btn btn--sm btn--danger pb-lib-del" data-li="${i}">×</button>
           </div>`).join('');
 
     el.innerHTML = `
@@ -8856,12 +8811,12 @@ const ProgBuilder = (() => {
         <div class="pb-label">CHORD VOICING</div>
         <div class="pb-row">
           ${['triad','seventh','arpeggio'].map(v=>`
-            <button class="nes-btn pb-tog pb-voicing${_voicing===v?' on':''}" data-v="${v}">${v.toUpperCase()}</button>`).join('')}
+            <button class="btn pb-tog pb-voicing${_voicing===v?' on':''}" data-v="${v}">${v.toUpperCase()}</button>`).join('')}
         </div>
         ${_voicing==='arpeggio'?`
         <div class="pb-row" style="margin-top:5px;">
           ${['up','down','updown','random'].map(p=>`
-            <button class="nes-btn btn btn--sm pb-tog pb-arp${_arpPat===p?' on':''}" data-a="${p}">${p.toUpperCase()}</button>`).join('')}
+            <button class="btn btn--sm pb-tog pb-arp${_arpPat===p?' on':''}" data-a="${p}">${p.toUpperCase()}</button>`).join('')}
         </div>`:''}
       </div>
 
@@ -8869,7 +8824,7 @@ const ProgBuilder = (() => {
         <div class="pb-label">BASS LINE</div>
         <div class="pb-row">
           ${[['quarter','QUARTER \u2669'],['eighth','EIGHTH \u266a'],['rootfifth','ROOT+5TH']].map(([v,l])=>`
-            <button class="nes-btn pb-tog pb-bass${_bass===v?' on':''}" data-b="${v}">${l}</button>`).join('')}
+            <button class="btn pb-tog pb-bass${_bass===v?' on':''}" data-b="${v}">${l}</button>`).join('')}
         </div>
       </div>
 
@@ -8877,7 +8832,7 @@ const ProgBuilder = (() => {
         <div class="pb-label">LEAD STYLE</div>
         <div class="pb-row">
           ${[['scale','SCALE RUN'],['chord-melody','CHORD MELODY'],['riff','RIFF'],['random','RANDOM WALK']].map(([v,l])=>
-            `<button class="nes-btn pb-tog pb-lead-sty${_leadStyle===v?' on':''}" data-ls="${v}">${l}</button>`
+            `<button class="btn pb-tog pb-lead-sty${_leadStyle===v?' on':''}" data-ls="${v}">${l}</button>`
           ).join('')}
         </div>
       </div>
@@ -8886,17 +8841,17 @@ const ProgBuilder = (() => {
         <div class="pb-label">REPEATS</div>
         <div class="pb-row">
           ${[1,2,4].map(v=>`
-            <button class="nes-btn pb-tog pb-rep${_repeat===v?' on':''}" data-r="${v}">&times;${v}</button>`).join('')}
+            <button class="btn pb-tog pb-rep${_repeat===v?' on':''}" data-r="${v}">&times;${v}</button>`).join('')}
         </div>
       </div>
 
       <div class="pb-section">
         <div class="pb-label">MY PROGRESSIONS</div>
         <div class="pb-row" style="margin-bottom:6px;">
-          <button class="nes-btn pb-preset-btn" id="pb-save-lib">SAVE TO LIBRARY</button>
-          <button class="nes-btn pb-preset-btn" id="pb-import-btn">IMPORT .NFPROG</button>
+          <button class="btn pb-preset-btn" id="pb-save-lib">SAVE TO LIBRARY</button>
+          <button class="btn pb-preset-btn" id="pb-import-btn">IMPORT .NFPROG</button>
           <input type="file" id="pb-import-input" accept=".nfprog,.json" style="display:none;">
-          <button class="nes-btn pb-preset-btn" id="pb-export-btn">EXPORT .NFPROG</button>
+          <button class="btn pb-preset-btn" id="pb-export-btn">EXPORT .NFPROG</button>
         </div>
         <div id="pb-lib-list">${libHtml}</div>
       </div>
@@ -8925,7 +8880,7 @@ const ProgBuilder = (() => {
         </div>
       </div>
       <div class="pb-total">TOTAL: ${_total()} BARS</div>
-      <button class="nes-btn pb-generate" id="pb-generate"
+      <button class="btn pb-generate" id="pb-generate"
         ${!_genTracks.bass && !_genTracks.chords && !_genTracks.lead ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>
         GENERATE BACKING TRACK
       </button>
