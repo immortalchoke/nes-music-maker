@@ -2580,8 +2580,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
           : '—';
         const pitchColor = hp !== null ? '#ffeecc' : '#555577';
         el.innerHTML = `<div style="display:flex;align-items:center;gap:5px;padding:2px 0;">
-          <span style="font-size:9px;color:#ffb0a3;font-family:'Press Start 2P',monospace;letter-spacing:0.05rem;">PITCH</span>
-          <span style="font-size:9px;color:${pitchColor};font-family:'Press Start 2P',monospace;">${pitchLabel}</span>
+          <span class="modal-label">PITCH</span>
+          <span class="modal-label" style="color:${pitchColor};">${pitchLabel}</span>
         </div>`;
         return;
       }
@@ -2603,20 +2603,20 @@ body.mobile-mode #mobile-app { display: flex !important; }
         : note.velocity;
       const pitchName = multi ? null : NOTE_NAMES[note.pitch % 12] + Math.floor(note.pitch / 12);
       const isChromatic = ProjectState.scale === 'Chromatic';
-      const selStyle = `font-size:9px;width:100%;font-family:'Press Start 2P',monospace;background:#46425e;color:#ffeecc;border:1px solid #15788c;box-sizing:border-box;`;
-      const lblStyle = `font-size:9px;color:#ffb0a3;font-family:'Press Start 2P',monospace;letter-spacing:0.05rem;flex-shrink:0;`;
+      const selStyle = `width:100%;box-sizing:border-box;`;
+      const lblStyle = `flex-shrink:0;`;
       const rowStyle = `display:flex;align-items:center;gap:5px;padding:2px 0;`;
-      const valStyle = `font-size:9px;color:#ffeecc;font-family:'Press Start 2P',monospace;background:#46425e;border:1px solid #15788c;padding:2px 4px;flex:1;`;
+      const valStyle = `font-size:9px;color:var(--text1);font-family:'Press Start 2P',monospace;background:var(--bg3);border:1px solid var(--hi-dim);padding:2px 4px;flex:1;`;
 
       el.innerHTML = `
-        ${multi ? `<div style="font-size:8px;color:var(--text2);margin-bottom:3px;">${selected.length} NOTES</div>` : ''}
+        ${multi ? `<div class="modal-label" style="margin-bottom:3px;">${selected.length} NOTES</div>` : ''}
         ${!multi ? `
         <div style="display:flex;align-items:center;gap:5px;padding:2px 0;">
-          <span style="font-size:9px;color:#ffb0a3;font-family:'Press Start 2P',monospace;letter-spacing:0.05rem;">PITCH</span>
-          <span style="font-size:9px;color:#ffeecc;font-family:'Press Start 2P',monospace;">${pitchName}</span>
+          <span class="modal-label">PITCH</span>
+          <span class="modal-label">${pitchName}</span>
         </div>` : ''}
         <div style="${rowStyle}">
-          <span style="${lblStyle}">LEN</span>
+          <span class="modal-label" style="${lblStyle}">LEN</span>
           <span style="${valStyle}">${lenStr}</span>
           <div style="display:flex;flex-direction:column;gap:1px;">
             <button class="bpm-arrow" id="pr-len-up">&#9650;</button>
@@ -2624,7 +2624,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
           </div>
         </div>
         <div style="${rowStyle}">
-          <span style="${lblStyle}">VEL</span>
+          <span class="modal-label" style="${lblStyle}">VEL</span>
           <span style="${valStyle}" id="pr-vel-display">${displayVel}</span>
           <div style="display:flex;flex-direction:column;gap:1px;">
             <button class="bpm-arrow" id="pr-vel-up">&#9650;</button>
@@ -2635,8 +2635,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
         <div class="pr-section-divider"></div>
         <div class="pr-side-title" style="margin-top:2px;">RHYTHM</div>
         <div style="${rowStyle}">
-          <span style="${lblStyle}">GRID</span>
-          <select id="pr-rhythm-grid" style="${selStyle}">
+          <span class="modal-label" style="${lblStyle}">GRID</span>
+          <select id="pr-rhythm-grid" class="field-select" style="${selStyle}">
             <option value="0.25">1/4</option>
             <option value="0.125">1/8</option>
             <option value="0.0625" selected>1/16</option>
@@ -2647,31 +2647,31 @@ body.mobile-mode #mobile-app { display: flex !important; }
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:3px;margin-top:3px;">
-          <button class="nes-btn" id="pr-quantize-btn" style="width:100%;font-size:9px;">QUANTIZE</button>
-          <button class="nes-btn" id="pr-redist-btn"   style="width:100%;font-size:9px;">REDISTRIBUTE</button>
+          <button class="nes-btn btn btn--sm btn--full" id="pr-quantize-btn">QUANTIZE</button>
+          <button class="nes-btn btn btn--sm btn--full" id="pr-redist-btn">REDISTRIBUTE</button>
         </div>
 
         <div class="pr-section-divider"></div>
         <div class="pr-side-title" style="margin-top:2px;">SHIFT PITCH</div>
         <div style="display:flex;gap:2px;justify-content:space-between;">
-          <button class="nes-btn" id="pr-pitch-oct-dn"  style="flex:1;font-size:9px;padding:0;">-8VA</button>
-          <button class="nes-btn" id="pr-pitch-semi-dn" style="flex:1;font-size:9px;padding:0;">-ST</button>
-          <button class="nes-btn" id="pr-pitch-semi-up" style="flex:1;font-size:9px;padding:0;">+ST</button>
-          <button class="nes-btn" id="pr-pitch-oct-up"  style="flex:1;font-size:9px;padding:0;">+8VA</button>
+          <button class="nes-btn btn btn--sm" id="pr-pitch-oct-dn"  style="flex:1;">-8VA</button>
+          <button class="nes-btn btn btn--sm" id="pr-pitch-semi-dn" style="flex:1;">-ST</button>
+          <button class="nes-btn btn btn--sm" id="pr-pitch-semi-up" style="flex:1;">+ST</button>
+          <button class="nes-btn btn btn--sm" id="pr-pitch-oct-up"  style="flex:1;">+8VA</button>
         </div>
         ${!isChromatic ? `
         <div style="${rowStyle}margin-top:3px;">
-          <span style="${lblStyle}">SCALE STEP</span>
-          <button class="nes-btn" id="pr-pitch-step-dn" style="font-size:9px;padding:0 6px;">-</button>
-          <button class="nes-btn" id="pr-pitch-step-up" style="font-size:9px;padding:0 6px;">+</button>
+          <span class="modal-label" style="${lblStyle}">SCALE STEP</span>
+          <button class="nes-btn btn btn--sm" id="pr-pitch-step-dn">-</button>
+          <button class="nes-btn btn btn--sm" id="pr-pitch-step-up">+</button>
         </div>
         ` : ''}
 
         <div class="pr-section-divider"></div>
         <div class="pr-side-title" style="margin-top:2px;">HARMONIZE</div>
         <div style="${rowStyle}">
-          <span style="${lblStyle}">INTV</span>
-          <select id="pr-harm-interval" style="${selStyle}">
+          <span class="modal-label" style="${lblStyle}">INTV</span>
+          <select id="pr-harm-interval" class="field-select" style="${selStyle}">
             <option value="2">3rd &#8593;</option>
             <option value="3">4th &#8593;</option>
             <option value="4">5th &#8593;</option>
@@ -2682,15 +2682,15 @@ body.mobile-mode #mobile-app { display: flex !important; }
           </select>
         </div>
         <div style="display:flex;gap:2px;margin-top:3px;">
-          <button class="nes-btn" id="pr-harm-this" style="flex:1;font-size:9px;padding:0 2px;">THIS TRACK</button>
-          <button class="nes-btn" id="pr-harm-new"  style="flex:1;font-size:9px;padding:0 2px;">NEW TRACK</button>
+          <button class="nes-btn btn btn--sm" id="pr-harm-this" style="flex:1;">THIS TRACK</button>
+          <button class="nes-btn btn btn--sm" id="pr-harm-new"  style="flex:1;">NEW TRACK</button>
         </div>
-        <button class="nes-btn" id="pr-harmonize-btn"
-          style="margin-top:3px;width:100%;font-size:9px;color:var(--hi);border-color:var(--hi);">
+        <button class="nes-btn btn btn--sm btn--full btn--engaged" id="pr-harmonize-btn"
+          style="margin-top:3px;color:var(--hi);border-color:var(--hi);">
           HARMONIZE
         </button>
 
-        <button class="nes-btn" id="pr-del-note" style="margin-top:auto;width:100%;font-size:9px;color:var(--accent);border-color:var(--accent);">
+        <button class="nes-btn btn btn--sm btn--full btn--danger" id="pr-del-note" style="margin-top:auto;">
           DELETE${multi ? ' ALL' : ''}
         </button>
       `;
@@ -4830,24 +4830,21 @@ function showAddTrackModal({ defaultType = 'pulse50', onConfirm } = {}) {
 
   el = document.createElement('div');
   el.id = 'add-track-modal';
-  el.style.cssText = `position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
-    background:#1a1a2e;border:2px solid #00ccaa;z-index:1001;padding:16px;min-width:220px;
-    font:9px "Press Start 2P";color:#e0e0ff;display:flex;flex-direction:column;gap:10px;`;
+  el.className = 'modal modal--sm';
+  el.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1001;min-width:220px;';
 
   let selected = defaultType;
   let currentName = DEFAULT_NAMES[defaultType] || 'TRACK';
 
   const render = () => {
     el.innerHTML = `
-      <div style="color:#00ccaa;font-size:9px;letter-spacing:1px;">NEW TRACK</div>
-      <div>
-        <div style="color:#8888aa;margin-bottom:5px;">NAME</div>
-        <input id="atm-name" type="text" value="${currentName}"
-          style="background:#0d0d1a;border:2px solid #444466;color:#e0e0ff;
-                 font:9px 'Press Start 2P';padding:4px 6px;width:100%;box-sizing:border-box;">
+      <div class="modal-title">NEW TRACK</div>
+      <div class="modal-section">
+        <div class="modal-label" style="margin-bottom:5px;">NAME</div>
+        <input id="atm-name" type="text" value="${currentName}" class="field-input">
       </div>
-      <div>
-        <div style="color:#8888aa;margin-bottom:6px;">TYPE</div>
+      <div class="modal-section">
+        <div class="modal-label" style="margin-bottom:6px;">TYPE</div>
         <div style="display:flex;flex-direction:column;gap:3px;">
           ${TRACK_TYPES.map(t => `
             <div class="atm-type" data-value="${t.value}"
@@ -4857,17 +4854,13 @@ function showAddTrackModal({ defaultType = 'pulse50', onConfirm } = {}) {
               <div style="width:8px;height:8px;border:2px solid ${t.value === selected ? '#00ccaa' : '#555577'};
                           background:${t.value === selected ? '#00ccaa' : 'transparent'};flex-shrink:0;"></div>
               <span style="color:${t.value === selected ? '#00ccaa' : '#ffeecc'};font-size:9px;">${t.label}</span>
-              <span style="color:#555577;font-size:8px;margin-left:auto;">${t.sub}</span>
+              <span class="modal-label" style="margin-left:auto;">${t.sub}</span>
             </div>`).join('')}
         </div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:2px;">
-        <button id="atm-cancel"
-          style="flex:1;background:#1a1a2e;border:2px solid #444466;color:#8888aa;
-                 font:9px 'Press Start 2P';padding:6px;cursor:pointer;">CANCEL</button>
-        <button id="atm-create"
-          style="flex:1;background:#003322;border:2px solid #00ccaa;color:#00ccaa;
-                 font:9px 'Press Start 2P';padding:6px;cursor:pointer;">CREATE</button>
+      <div class="modal-actions">
+        <button id="atm-cancel" class="btn" style="flex:1;">CANCEL</button>
+        <button id="atm-create" class="btn btn--primary" style="flex:1;">CREATE</button>
       </div>
     `;
 
@@ -4930,73 +4923,54 @@ function showTrackSettings(track, x, y) {
   if (el) el.remove();
   el = document.createElement('div');
   el.id = 'track-settings';
-  el.style.cssText = `
-    position:fixed; left:${x}px; top:${y}px;
-    background:#46425e; border:2px solid #15788c;
-    z-index:500; padding:14px 16px 12px; min-width:210px;
-    box-shadow:none; border-radius:0;
-  `;
+  el.className = 'modal modal--sm';
+  el.style.cssText = `position:fixed; left:${x}px; top:${y}px; z-index:500; min-width:210px;`;
 
   // X close button (top-right corner)
   const xBtn = document.createElement('button');
-  xBtn.style.cssText = `
-    position:absolute; top:6px; right:8px;
-    background:none; border:none; color:#00b9be;
-    font:9px "Press Start 2P"; cursor:pointer; padding:2px 4px; line-height:1;
-  `;
+  xBtn.className = 'btn btn--sm';
+  xBtn.style.cssText = 'position:absolute; top:6px; right:8px; background:none; border:none; cursor:pointer; padding:2px 4px; line-height:1;';
   xBtn.textContent = '✕';
   xBtn.onclick = () => el.remove();
   el.appendChild(xBtn);
 
   // Title
   const title = document.createElement('div');
-  title.style.cssText = `
-    font:9px "Press Start 2P"; color:#00b9be;
-    margin-bottom:12px; padding-bottom:8px; padding-right:20px;
-    border-bottom:1px solid #15788c; letter-spacing:1px;
-  `;
+  title.className = 'modal-title';
+  title.style.cssText = 'margin-bottom:12px; padding-bottom:8px; padding-right:20px; border-bottom:1px solid var(--hi-dim); letter-spacing:1px;';
   title.textContent = track.name;
   el.appendChild(title);
 
   // Delete track button (appended after close button below)
   const trashBtn = document.createElement('button');
-  trashBtn.style.cssText = `
-    display:block; box-sizing:border-box;
-    margin-top:6px; width:100%; background:#2a0a0a;
-    border:2px solid #ff4444; color:#ff4444;
-    font:9px "Press Start 2P"; padding:5px 6px;
-    cursor:pointer; letter-spacing:1px;
-  `;
+  trashBtn.className = 'btn btn--danger btn--full';
+  trashBtn.style.cssText = 'display:block; box-sizing:border-box; margin-top:6px; cursor:pointer; letter-spacing:1px;';
   trashBtn.textContent = '[ DELETE TRACK ]';
-  trashBtn.onmouseenter = () => { trashBtn.style.background = '#3a1010'; };
-  trashBtn.onmouseleave = () => { trashBtn.style.background = '#2a0a0a'; };
   trashBtn.onclick = () => {
     el.remove();
     // Confirmation popup
     const conf = document.createElement('div');
-    conf.style.cssText = `
-      position:fixed; left:${x}px; top:${y}px;
-      background:#46425e; border:2px solid #ff4444;
-      z-index:501; padding:14px 16px 12px; min-width:210px;
-      box-shadow:none; border-radius:0;
-    `;
+    conf.className = 'modal modal--sm';
+    conf.style.cssText = `position:fixed; left:${x}px; top:${y}px; z-index:501; min-width:210px;`;
     const confTitle = document.createElement('div');
-    confTitle.style.cssText = 'font:9px "Press Start 2P"; color:#ff4444; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #ff4444; letter-spacing:1px;';
+    confTitle.className = 'modal-title';
+    confTitle.style.cssText = 'color:var(--accent); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--accent); letter-spacing:1px;';
     confTitle.textContent = 'DELETE TRACK?';
     const confMsg = document.createElement('div');
-    confMsg.style.cssText = 'font:8px "Press Start 2P"; color:#ffeecc; margin-bottom:14px; line-height:1.8;';
+    confMsg.className = 'modal-label';
+    confMsg.style.cssText = 'margin-bottom:14px; line-height:1.8;';
     confMsg.textContent = `"${track.name}" and all its patterns will be removed.`;
     const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex; gap:8px;';
+    btnRow.className = 'modal-actions';
     const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'nes-btn';
+    cancelBtn.className = 'btn';
     cancelBtn.textContent = 'CANCEL';
     cancelBtn.style.cssText = 'flex:1;';
     cancelBtn.onclick = () => conf.remove();
     const confirmBtn = document.createElement('button');
-    confirmBtn.className = 'nes-btn';
+    confirmBtn.className = 'btn btn--danger';
     confirmBtn.textContent = 'DELETE';
-    confirmBtn.style.cssText = 'flex:1; color:#ff4444; border-color:#ff4444;';
+    confirmBtn.style.cssText = 'flex:1;';
     confirmBtn.onclick = () => {
       History.push();
       ProjectState.tracks = ProjectState.tracks.filter(t => t !== track);
@@ -5020,22 +4994,15 @@ function showTrackSettings(track, x, y) {
     setTimeout(() => document.addEventListener('mousedown', () => conf.remove(), { once: true }), 100);
   };
 
-  const selStyle = `
-    background:#46425e; color:#ffeecc;
-    border:2px solid #15788c; outline:none;
-    font:9px "Press Start 2P"; padding:5px 8px;
-    width:100%; margin-top:4px; cursor:pointer;
-    appearance:none; -webkit-appearance:none;
-  `;
-
   const row = (label, opts, val, onChange) => {
     const d = document.createElement('div');
     d.style.cssText = 'margin-bottom:10px;';
     const lbl = document.createElement('div');
-    lbl.style.cssText = 'font:8px "Press Start 2P"; color:#ffb0a3; margin-bottom:2px;';
+    lbl.className = 'modal-label';
+    lbl.style.cssText = 'margin-bottom:2px;';
     lbl.textContent = label;
     const sel = document.createElement('select');
-    sel.style.cssText = selStyle;
+    sel.className = 'field-select';
     opts.forEach(o => {
       const opt = document.createElement('option');
       opt.value = o; opt.textContent = o.toUpperCase();
@@ -5051,7 +5018,8 @@ function showTrackSettings(track, x, y) {
     const d = document.createElement('div');
     d.style.cssText = 'margin-bottom:10px;';
     const lbl = document.createElement('div');
-    lbl.style.cssText = 'font:8px "Press Start 2P"; color:#ffb0a3; margin-bottom:2px;';
+    lbl.className = 'modal-label';
+    lbl.style.cssText = 'margin-bottom:2px;';
     lbl.textContent = label;
     const ph = document.createElement('div');
     ph.style.cssText = 'font:9px "Press Start 2P"; color:#444466; padding:5px 8px; border:2px solid #2a2840; width:100%; box-sizing:border-box;';
@@ -5071,7 +5039,7 @@ function showTrackSettings(track, x, y) {
     const pcRow = document.createElement('div');
     pcRow.style.cssText = 'margin-bottom:4px;display:flex;align-items:center;gap:8px;';
     const pcLbl = document.createElement('div');
-    pcLbl.style.cssText = 'font:8px "Press Start 2P";color:#ffb0a3;';
+    pcLbl.className = 'modal-label';
     pcLbl.textContent = 'POWER CHORD';
     const pcChk = document.createElement('input');
     pcChk.type = 'checkbox';
@@ -5082,7 +5050,8 @@ function showTrackSettings(track, x, y) {
     pcRow.appendChild(pcChk);
     el.appendChild(pcRow);
     const pcHint = document.createElement('div');
-    pcHint.style.cssText = 'font:8px "Press Start 2P";color:#ffb0a3;margin-top:-2px;margin-bottom:10px;opacity:0.6;';
+    pcHint.className = 'modal-label';
+    pcHint.style.cssText = 'margin-top:-2px;margin-bottom:10px;opacity:0.6;';
     pcHint.textContent = '+5TH · HEAVY ONLY';
     el.appendChild(pcHint);
   } else {
@@ -5248,36 +5217,26 @@ function showMidiImportDialog(midiData, filename) {
   ];
 
   const el = document.createElement('div');
-  el.style.cssText = `
-    position:fixed; z-index:9999; background:#1a1a2e; border:2px solid #00ccaa;
-    padding:16px; font:9px "Press Start 2P"; color:#e0e0ff;
-    display:flex; flex-direction:column; gap:10px; min-width:240px;
-  `;
+  el.className = 'modal modal--sm';
+  el.style.cssText = 'position:fixed; z-index:9999; min-width:240px;';
   el.innerHTML = `
-    <div style="color:#00ccaa;font-size:9px;letter-spacing:1px">IMPORT MIDI</div>
-    <div style="color:#8888aa;word-break:break-all">${filename.replace(/</g,'&lt;')}</div>
-    <div style="color:#8888aa">${rawNotes.length} notes detected</div>
-    <div>
-      <div style="margin-bottom:5px;color:#8888aa">TRACK NAME</div>
+    <div class="modal-title">IMPORT MIDI</div>
+    <div class="modal-label" style="word-break:break-all">${filename.replace(/</g,'&lt;')}</div>
+    <div class="modal-label">${rawNotes.length} notes detected</div>
+    <div class="modal-section">
+      <div class="modal-label" style="margin-bottom:5px;">TRACK NAME</div>
       <input id="midi-tname" type="text" value="${filename.replace(/\.midi?$/i,'').replace(/</g,'&lt;')}"
-        style="background:#0d0d1a;border:2px solid #444466;color:#e0e0ff;font:9px 'Press Start 2P';
-               padding:4px 6px;width:100%;box-sizing:border-box">
+        class="field-input">
     </div>
-    <div>
-      <div style="margin-bottom:5px;color:#8888aa">TRACK TYPE</div>
-      <select id="midi-ttype"
-        style="background:#0d0d1a;border:2px solid #444466;color:#e0e0ff;font:9px 'Press Start 2P';
-               padding:4px 6px;width:100%;box-sizing:border-box">
+    <div class="modal-section">
+      <div class="modal-label" style="margin-bottom:5px;">TRACK TYPE</div>
+      <select id="midi-ttype" class="field-select">
         ${trackTypes.map(t=>`<option value="${t.value}">${t.label}</option>`).join('')}
       </select>
     </div>
-    <div style="display:flex;gap:8px;margin-top:4px">
-      <button id="midi-cancel"
-        style="flex:1;background:#1a1a2e;border:2px solid #444466;color:#8888aa;
-               font:9px 'Press Start 2P';padding:6px;cursor:pointer">CANCEL</button>
-      <button id="midi-import"
-        style="flex:1;background:#003322;border:2px solid #00ccaa;color:#00ccaa;
-               font:9px 'Press Start 2P';padding:6px;cursor:pointer">IMPORT</button>
+    <div class="modal-actions">
+      <button id="midi-cancel" class="btn" style="flex:1;">CANCEL</button>
+      <button id="midi-import" class="btn btn--primary" style="flex:1;">IMPORT</button>
     </div>
   `;
 
@@ -5450,18 +5409,18 @@ function buildTopBar() {
 
   document.getElementById('topbar').innerHTML = `
     <div class="tb-group">
-      <button class="nes-btn" id="btn-prog" title="Progression Builder" style="color:var(--hi);border-color:var(--hi);">${PROG}</button>
+      <button class="nes-btn btn btn--icon" id="btn-prog" title="Progression Builder" style="color:var(--hi);border-color:var(--hi);">${PROG}</button>
     </div>
     <div class="tb-vdivider"></div>
     <div class="tb-group">
-      <button class="nes-btn" id="btn-undo" disabled title="Undo (⌘Z)">${UNDO}</button>
-      <button class="nes-btn" id="btn-redo" disabled title="Redo (⌘⇧Z)">${REDO}</button>
+      <button class="nes-btn btn btn--icon" id="btn-undo" disabled title="Undo (⌘Z)">${UNDO}</button>
+      <button class="nes-btn btn btn--icon" id="btn-redo" disabled title="Redo (⌘⇧Z)">${REDO}</button>
     </div>
     <div class="tb-vdivider"></div>
     <div class="tb-group">
-      <button class="nes-btn" id="btn-play" title="Play / Stop (Space)">${PLAY}</button>
-      <button class="nes-btn" id="btn-rec" title="Record DPCM sample (select DPCM track first)">${REC}</button>
-      <button class="nes-btn" id="btn-loop" title="Toggle loop region">${LOOP}</button>
+      <button class="nes-btn btn btn--icon" id="btn-play" title="Play / Stop (Space)">${PLAY}</button>
+      <button class="nes-btn btn btn--icon" id="btn-rec" title="Record DPCM sample (select DPCM track first)">${REC}</button>
+      <button class="nes-btn btn btn--icon" id="btn-loop" title="Toggle loop region">${LOOP}</button>
     </div>
     <div class="tb-spacer"></div>
     <div id="lcd-box">
@@ -5479,7 +5438,7 @@ function buildTopBar() {
       <div class="lcd-field">
         <div class="lcd-value">
           <select id="ts-num" class="lcd-select">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option${n===4?' selected':''}>${n}</option>`).join('')}</select>
-          <span style="color:#15788c;font-size:10px;font-family:'Press Start 2P',monospace;">/</span>
+          <span class="modal-label" style="font-size:10px;">/</span>
           <select id="ts-den" class="lcd-select">${[2,4,8,16].map(n=>`<option${n===4?' selected':''}>${n}</option>`).join('')}</select>
         </div>
         <div class="lcd-label">TIME</div>
@@ -5489,18 +5448,18 @@ function buildTopBar() {
         <div class="lcd-label">KEY</div>
       </div>
       <div class="lcd-field">
-        <div class="lcd-value"><select id="scale-sel" class="lcd-select" style="font-size:9px;max-width:80px;">${Object.keys(Scales.SCALES).map(s=>`<option>${s}</option>`).join('')}</select></div>
+        <div class="lcd-value"><select id="scale-sel" class="lcd-select" style="max-width:80px;">${Object.keys(Scales.SCALES).map(s=>`<option>${s}</option>`).join('')}</select></div>
         <div class="lcd-label">SCALE</div>
       </div>
     </div>
     <div class="tb-spacer"></div>
     <div class="tb-group">
-      <button class="nes-btn" id="btn-export" title="Export audio (WAV / MIDI / stems)">${EXPORT}</button>
-      <button class="nes-btn" id="btn-save" title="Save project as JSON">${SAVE}</button>
+      <button class="nes-btn btn btn--icon" id="btn-export" title="Export audio (WAV / MIDI / stems)">${EXPORT}</button>
+      <button class="nes-btn btn btn--icon" id="btn-save" title="Save project as JSON">${SAVE}</button>
       <input type="file" id="load-input" accept=".json" style="display:none">
-      <button class="nes-btn" id="btn-load" title="Load project from JSON">${LOAD}</button>
+      <button class="nes-btn btn btn--icon" id="btn-load" title="Load project from JSON">${LOAD}</button>
       <input type="file" id="midi-input" accept=".mid,.midi" style="display:none">
-      <button class="nes-btn" id="btn-midi-import" title="Import MIDI file">${MIDI_IMPORT}</button>
+      <button class="nes-btn btn btn--icon" id="btn-midi-import" title="Import MIDI file">${MIDI_IMPORT}</button>
     </div>
   `;
 
@@ -5533,16 +5492,16 @@ function buildTopBar() {
     if (popup) { popup.remove(); return; }
     popup = document.createElement('div');
     popup.id = 'bpm-popup';
+    popup.className = 'modal modal--sm';
     const anchor = document.getElementById('bpm-display').getBoundingClientRect();
-    popup.style.cssText = `position:fixed;left:${anchor.left}px;top:${anchor.bottom + 4}px;
-      background:#1e1c30;border:2px solid #15788c;padding:8px 10px;z-index:2000;
-      display:flex;flex-direction:column;align-items:center;gap:6px;`;
+    popup.style.cssText = `position:fixed;left:${anchor.left}px;top:${anchor.bottom + 4}px;z-index:2000;display:flex;flex-direction:column;align-items:center;gap:6px;`;
     const inp = document.createElement('input');
     inp.type = 'text'; inp.inputMode = 'numeric'; inp.value = ProjectState.bpm;
-    inp.style.cssText = `width:64px;background:#46425e;border:2px solid #00ccaa;color:#ffeecc;
-      font:10px "Press Start 2P",monospace;text-align:center;padding:4px;outline:none;`;
+    inp.className = 'field-input';
+    inp.style.cssText = 'width:64px;text-align:center;outline:none;';
     const lbl = document.createElement('div');
-    lbl.textContent = 'BPM'; lbl.style.cssText = `font:8px "Press Start 2P",monospace;color:#ffb0a3;letter-spacing:0.05rem;`;
+    lbl.className = 'modal-label';
+    lbl.textContent = 'BPM';
     const confirm = (v) => {
       const n = parseInt(v, 10);
       if (!isNaN(n)) _setBpm(n);
@@ -6377,10 +6336,10 @@ const MagicGen = (() => {
     // Header — title left, randomize middle, close right
     let html = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div style="font:9px 'Press Start 2P',monospace;color:var(--hi,#00b9be);letter-spacing:0.05rem;">✦ DRUM MAGIC</div>
+        <div class="modal-title" style="margin:0;">✦ DRUM MAGIC</div>
         <div style="display:flex;align-items:center;gap:6px;">
-          <button id="mg-drum-randomize" style="font:8px 'Press Start 2P',monospace;padding:3px 6px;cursor:pointer;background:none;border:1px solid #444466;color:#8888aa;">⚄ RANDOM</button>
-          <button id="mg-close" style="background:none;border:none;color:#ffb0a3;font:10px 'Press Start 2P',monospace;cursor:pointer;">×</button>
+          <button id="mg-drum-randomize" class="btn btn--sm">⚄ RANDOM</button>
+          <button id="mg-close" class="btn btn--sm" style="background:none;border:none;">×</button>
         </div>
       </div>
     `;
@@ -6393,7 +6352,7 @@ const MagicGen = (() => {
         ? 'border:1px solid var(--hi,#00b9be);background:rgba(0,185,190,0.15);color:var(--hi,#00b9be);'
         : 'border:1px solid #444466;background:none;color:#8888aa;';
       const shortName = name.replace('FOUR-ON-FLOOR','4-ON-FLOOR');
-      html += `<button class="mg-drum-preset" data-preset="${name}" style="font:8px 'Press Start 2P',monospace;padding:4px 2px;cursor:pointer;${style}">${shortName}</button>`;
+      html += `<button class="mg-drum-preset btn btn--sm" data-preset="${name}" style="${style}">${shortName}</button>`;
     });
     html += `</div><div class="mg-divider"></div>`;
 
@@ -6406,7 +6365,7 @@ const MagicGen = (() => {
       const style = on
         ? 'background:var(--accent,#ff6600);color:#1e1c30;border-color:var(--accent,#ff6600);'
         : 'background:none;color:#8888aa;border:1px solid #444466;';
-      html += `<button class="mg-drum-layer" data-layer="${layer}" style="font:8px 'Press Start 2P',monospace;padding:4px 6px;cursor:pointer;${style}">${layer.toUpperCase()}</button>`;
+      html += `<button class="mg-drum-layer btn btn--sm" data-layer="${layer}" style="${style}">${layer.toUpperCase()}</button>`;
     });
     html += `</div></div><div class="mg-divider"></div>`;
 
@@ -6430,7 +6389,7 @@ const MagicGen = (() => {
       : 'background:none;color:#8888aa;border:1px solid #444466;';
     html += `<div class="mg-row" style="margin-bottom:6px;">
       <span class="mg-label">HUMANIZE</span>
-      <button id="mg-drum-humanize" style="font:8px 'Press Start 2P',monospace;padding:4px 8px;cursor:pointer;${humStyle}">${humOn ? 'ON' : 'OFF'}</button>
+      <button id="mg-drum-humanize" class="btn btn--sm" style="${humStyle}">${humOn ? 'ON' : 'OFF'}</button>
     </div>`;
 
     // Repeats
@@ -6450,8 +6409,8 @@ const MagicGen = (() => {
     // PREVIEW + INSERT
     html += `
       <div style="display:flex;gap:6px;margin-top:4px;">
-        <button id="mg-drum-preview" class="nes-btn" style="flex:1;">▶ PREVIEW</button>
-        <button id="mg-drum-insert"  class="nes-btn" style="flex:2;background:#00b9be;color:#1e1c30;border-color:#00ccaa;">INSERT</button>
+        <button id="mg-drum-preview" class="nes-btn btn" style="flex:1;">▶ PREVIEW</button>
+        <button id="mg-drum-insert"  class="nes-btn btn btn--primary" style="flex:2;">INSERT</button>
       </div>
     `;
 
@@ -6516,8 +6475,8 @@ const MagicGen = (() => {
     // Header row
     let html = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div style="font:9px 'Press Start 2P',monospace;color:#00b9be;letter-spacing:0.05rem;">USE MAGIC</div>
-        <button id="mg-close" style="background:none;border:none;color:#ffb0a3;font:10px 'Press Start 2P',monospace;cursor:pointer;">×</button>
+        <div class="modal-title" style="margin:0;">USE MAGIC</div>
+        <button id="mg-close" class="btn btn--sm" style="background:none;border:none;">×</button>
       </div>
     `;
 
@@ -6534,7 +6493,7 @@ const MagicGen = (() => {
     html += `
       <div class="mg-row">
         <span class="mg-label">DEGREE</span>
-        <select id="mg-degree" style="font-size:9px;flex:1;max-width:120px;">
+        <select id="mg-degree" class="field-select" style="flex:1;max-width:120px;">
           ${DEGREE_OPTIONS.map(o=>`<option value="${o.value}"${o.value===_state.degreeIdx?' selected':''}>${o.label}</option>`).join('')}
         </select>
       </div>`;
@@ -6544,7 +6503,7 @@ const MagicGen = (() => {
       html += `
         <div class="mg-row">
           <span class="mg-label">ROOT</span>
-          <select id="mg-root" style="font-size:9px;flex:1;max-width:120px;">
+          <select id="mg-root" class="field-select" style="flex:1;max-width:120px;">
             ${NOTE_NAMES.map(n=>`<option${n===_state.root?' selected':''}>${n}</option>`).join('')}
           </select>
         </div>`;
@@ -6554,7 +6513,7 @@ const MagicGen = (() => {
     html += `
       <div class="mg-row">
         <span class="mg-label">TYPE</span>
-        <select id="mg-type" style="font-size:9px;flex:1;max-width:120px;">
+        <select id="mg-type" class="field-select" style="flex:1;max-width:120px;">
           ${TYPE_NAMES.map(t=>`<option${t===_state.typeName?' selected':''}>${t}</option>`).join('')}
         </select>
       </div>`;
@@ -6587,7 +6546,7 @@ const MagicGen = (() => {
       html += `
         <div class="mg-row">
           <span class="mg-label">INVERSION</span>
-          <select id="mg-inv" style="font-size:9px;flex:1;max-width:120px;">
+          <select id="mg-inv" class="field-select" style="flex:1;max-width:120px;">
             ${invOptions.map((v,i)=>`<option value="${i}"${i===_state.inversion?' selected':''}>${v}</option>`).join('')}
           </select>
         </div>`;
@@ -6630,7 +6589,7 @@ const MagicGen = (() => {
         html += `
           <div class="mg-row">
             <span class="mg-label">PATTERN</span>
-            <select id="mg-arp-pattern" style="font-size:9px;flex:1;max-width:140px;">
+            <select id="mg-arp-pattern" class="field-select" style="flex:1;max-width:140px;">
               ${['Up','Down','Up-Down','Down-Up','Random'].map(p=>`<option${p===_state.arpPattern?' selected':''}>${p}</option>`).join('')}
             </select>
           </div>`;
@@ -6657,7 +6616,7 @@ const MagicGen = (() => {
             <span class="mg-label" style="padding-top:4px;">NOTE LEN</span>
             <div class="mg-seg" style="flex-wrap:wrap;gap:2px;justify-content:flex-end;">`;
         _getNoteLengths().forEach(len => {
-          html += `<button class="mg-notelen-btn${_state.arpNoteLen===len?' active':''}" data-len="${len}" style="padding:4px 6px;font-size:8px;">${len}</button>`;
+          html += `<button class="mg-notelen-btn btn btn--sm${_state.arpNoteLen===len?' active':''}" data-len="${len}">${len}</button>`;
         });
         html += `</div></div>`;
       } else {
@@ -6724,8 +6683,8 @@ const MagicGen = (() => {
 
     html += `
       <div style="display:flex;gap:6px;margin-top:4px;">
-        <button id="mg-preview" class="nes-btn" style="flex:1;">▶ PREVIEW</button>
-        <button id="mg-insert"  class="nes-btn" style="flex:2;background:#00b9be;color:#1e1c30;border-color:#00ccaa;">INSERT</button>
+        <button id="mg-preview" class="nes-btn btn" style="flex:1;">▶ PREVIEW</button>
+        <button id="mg-insert"  class="nes-btn btn btn--primary" style="flex:2;">INSERT</button>
       </div>
     `;
 
@@ -7564,15 +7523,15 @@ const ExportEngine = {
 
   _promptFilename(defaultName, actionLabel, onConfirm) {
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;';
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = 'z-index:var(--z-system,10000);';
     overlay.innerHTML = `
-      <div style="background:#1a1a2e;border:2px solid #00ccaa;padding:16px;font:9px 'Press Start 2P';color:#e0e0ff;display:flex;flex-direction:column;gap:10px;min-width:260px;">
-        <div style="color:#00ccaa;font-size:9px;letter-spacing:1px;">FILE NAME</div>
-        <input id="_pfn-inp" type="text" value="${defaultName}"
-          style="background:#0d0d1a;border:2px solid #444466;color:#e0e0ff;font:9px 'Press Start 2P';padding:4px 6px;width:100%;box-sizing:border-box;">
-        <div style="display:flex;gap:8px;margin-top:4px;">
-          <button id="_pfn-cancel" style="flex:1;background:#1a1a2e;border:2px solid #444466;color:#8888aa;font:9px 'Press Start 2P';padding:6px;cursor:pointer;">CANCEL</button>
-          <button id="_pfn-ok" style="flex:1;background:#003322;border:2px solid #00ccaa;color:#00ccaa;font:9px 'Press Start 2P';padding:6px;cursor:pointer;">${actionLabel}</button>
+      <div class="modal modal--sm" style="min-width:260px;">
+        <div class="modal-title">FILE NAME</div>
+        <input id="_pfn-inp" type="text" value="${defaultName}" class="field-input">
+        <div class="modal-actions">
+          <button id="_pfn-cancel" class="btn" style="flex:1;">CANCEL</button>
+          <button id="_pfn-ok" class="btn btn--primary" style="flex:1;">${actionLabel}</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
@@ -7646,12 +7605,16 @@ const ExportEngine = {
     let modal = document.getElementById('export-modal');
     modal.style.display = 'flex';
     modal.innerHTML = `
-      <div style="background:#46425e;border:2px solid #15788c;padding:16px;min-width:240px;border-radius:0;">
-        <div style="font:9px 'Press Start 2P';color:#00b9be;margin-bottom:12px;">EXPORT</div>
-        <button class="nes-btn" id="exp-wav" style="display:block;width:100%;margin-bottom:6px;">EXPORT WAV</button>
-        <button class="nes-btn" id="exp-midi" style="display:block;width:100%;margin-bottom:6px;">EXPORT MIDI</button>
-        <button class="nes-btn" id="exp-stems" style="display:block;width:100%;margin-bottom:12px;">EXPORT STEMS</button>
-        <button class="nes-btn" onclick="document.getElementById('export-modal').style.display='none'">CLOSE</button>
+      <div class="modal modal--sm" style="min-width:240px;">
+        <div class="modal-title">EXPORT</div>
+        <div class="modal-section" style="gap:6px;">
+          <button class="nes-btn btn btn--full" id="exp-wav">EXPORT WAV</button>
+          <button class="nes-btn btn btn--full" id="exp-midi">EXPORT MIDI</button>
+          <button class="nes-btn btn btn--full" id="exp-stems">EXPORT STEMS</button>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="document.getElementById('export-modal').style.display='none'">CLOSE</button>
+        </div>
       </div>`;
     modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.7);' +
       'align-items:center;justify-content:center;z-index:2000;';
@@ -8503,15 +8466,14 @@ const ExportEngine = {
   function buildPRTopbar() {
     const bar = document.getElementById('pr-topbar');
     if (!bar) return;
-    const selStyle = `font-size:9px;height:26px;font-family:'Press Start 2P',monospace;background:#46425e;color:#ffeecc;border:1px solid #15788c;`;
     bar.innerHTML = `
       <!-- ADD NOTES label + 3-way tool toggle -->
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
         <span class="pr-topbar-label">ADD NOTES</span>
         <div style="display:flex;">
-          <button id="pr-tool-default" class="nes-btn pr-topbar-btn engaged">SINGLE</button>
-          <button id="pr-tool-stamp"   class="nes-btn pr-topbar-btn" style="margin-left:-2px;">MULTI</button>
-          <button id="pr-tool-magic"   class="nes-btn pr-topbar-btn" style="margin-left:-2px;">&#10022; MAGIC</button>
+          <button id="pr-tool-default" class="nes-btn btn btn--sm pr-topbar-btn engaged">SINGLE</button>
+          <button id="pr-tool-stamp"   class="nes-btn btn btn--sm pr-topbar-btn" style="margin-left:-2px;">MULTI</button>
+          <button id="pr-tool-magic"   class="nes-btn btn btn--sm pr-topbar-btn" style="margin-left:-2px;">&#10022; MAGIC</button>
         </div>
       </div>
 
@@ -8519,14 +8481,14 @@ const ExportEngine = {
       <div id="pr-stamp-controls" style="display:none;align-items:center;gap:5px;margin-left:8px;">
         <span class="pr-topbar-label">COUNT</span>
         <div style="display:flex;align-items:center;gap:2px;">
-          <span id="pr-stamp-count-val" style="font-size:9px;font-family:'Press Start 2P',monospace;color:#ffeecc;min-width:14px;text-align:center;">4</span>
+          <span id="pr-stamp-count-val" class="modal-label" style="min-width:14px;text-align:center;">4</span>
           <div style="display:flex;flex-direction:column;gap:1px;">
             <button class="bpm-arrow" id="pr-stamp-count-up">&#9650;</button>
             <button class="bpm-arrow" id="pr-stamp-count-dn">&#9660;</button>
           </div>
         </div>
         <span class="pr-topbar-label">LEN</span>
-        <select id="pr-stamp-len" style="${selStyle}">
+        <select id="pr-stamp-len" class="field-select">
           <option value="0.0625">1/16</option>
           <option value="0.125" selected>1/8</option>
           <option value="0.25">1/4</option>
@@ -8535,18 +8497,18 @@ const ExportEngine = {
         </select>
         <span class="pr-topbar-label">PITCH &#916;</span>
         <div style="display:flex;align-items:center;gap:2px;">
-          <span id="pr-stamp-pitch-val" style="font-size:9px;font-family:'Press Start 2P',monospace;color:#ffeecc;min-width:20px;text-align:center;">0</span>
+          <span id="pr-stamp-pitch-val" class="modal-label" style="min-width:20px;text-align:center;">0</span>
           <div style="display:flex;flex-direction:column;gap:1px;">
             <button class="bpm-arrow" id="pr-stamp-pitch-up">&#9650;</button>
             <button class="bpm-arrow" id="pr-stamp-pitch-dn">&#9660;</button>
           </div>
         </div>
         <div style="display:flex;">
-          <button id="pr-stamp-mode-semi"  class="nes-btn pr-topbar-btn">SEMI</button>
-          <button id="pr-stamp-mode-scale" class="nes-btn pr-topbar-btn" style="margin-left:-2px;">SCALE</button>
+          <button id="pr-stamp-mode-semi"  class="nes-btn btn btn--sm pr-topbar-btn">SEMI</button>
+          <button id="pr-stamp-mode-scale" class="nes-btn btn btn--sm pr-topbar-btn" style="margin-left:-2px;">SCALE</button>
         </div>
         <span class="pr-topbar-label">INTERVAL</span>
-        <select id="pr-stamp-interval" style="${selStyle}">
+        <select id="pr-stamp-interval" class="field-select">
           <option value="0.0625" selected>1/16</option>
           <option value="0.125">1/8</option>
           <option value="0.25">1/4</option>
@@ -8558,13 +8520,13 @@ const ExportEngine = {
 
       <!-- SNAP + CLOSE (right-aligned) -->
       <span class="pr-topbar-label">SNAP</span>
-      <select id="pr-snap-sel" style="${selStyle}">
+      <select id="pr-snap-sel" class="field-select">
         <option value="0.25">1/4</option>
         <option value="0.125" selected>1/8</option>
         <option value="0.0625">1/16</option>
         <option value="0.03125">1/32</option>
       </select>
-      <button id="pr-close-btn" class="nes-btn pr-topbar-btn"
+      <button id="pr-close-btn" class="nes-btn btn btn--sm pr-topbar-btn"
         style="color:var(--accent);border-color:var(--accent);">&#10005;</button>
     `;
     _wirePRTopbar();
@@ -8795,7 +8757,7 @@ const ProgBuilder = (() => {
   function _render() {
     const el = document.getElementById('prog-builder-content');
     if (!el) return;
-    const ss = `font-size:9px;font-family:'Press Start 2P',monospace;background:#46425e;color:#ffeecc;border:1px solid #15788c;padding:3px 5px;`;
+    const ss = `font-size:9px;font-family:'Press Start 2P',monospace;background:var(--bg3);color:var(--text1);border:1px solid var(--hi-dim);padding:3px 5px;`;
     const api = _activePreset();
     const lib = _libLoad();
 
@@ -8809,32 +8771,32 @@ const ProgBuilder = (() => {
         <div class="pb-step-chord">${
           previewChords[step.d % previewChords.length]?.triad?.name || ''
         }</div>
-        <select class="pb-step-deg" data-si="${i}" style="${ss}">
+        <select class="pb-step-deg field-select" data-si="${i}">
           ${DEGREE_NAMES.map((n,j)=>
             `<option value="${j}"${j===step.d?' selected':''}>${n}</option>`
           ).join('')}
         </select>
         <div style="display:flex;gap:2px;">
-          ${[1,2,4].map(v=>`<button class="nes-btn pb-tog pb-step-dur${step.b===v?' on':''}" data-si="${i}" data-dur="${v}" style="font-size:9px;padding:2px 5px;">${v}B</button>`).join('')}
+          ${[1,2,4].map(v=>`<button class="nes-btn btn btn--sm pb-tog pb-step-dur${step.b===v?' on':''}" data-si="${i}" data-dur="${v}">${v}B</button>`).join('')}
         </div>
       </div>`).join('');
     if (_steps.length<16)
       stepsHtml += `<button class="pb-add-step" id="pb-add-step">+</button>`;
 
     const libHtml = lib.length===0
-      ? `<div style="font-size:8px;color:var(--text2);">No saved progressions</div>`
+      ? `<div class="modal-label">No saved progressions</div>`
       : lib.map((e,i)=>`
           <div class="pb-lib-row">
             <span>${e.name}</span>
-            <button class="nes-btn pb-lib-load" data-li="${i}" style="font-size:8px;padding:3px 6px;">LOAD</button>
-            <button class="nes-btn pb-lib-exp" data-li="${i}" style="font-size:8px;padding:3px 6px;">&#8595;</button>
-            <button class="nes-btn pb-lib-del" data-li="${i}" style="font-size:8px;padding:3px 6px;color:var(--accent);border-color:var(--accent);">×</button>
+            <button class="nes-btn btn btn--sm pb-lib-load" data-li="${i}">LOAD</button>
+            <button class="nes-btn btn btn--sm pb-lib-exp" data-li="${i}">&#8595;</button>
+            <button class="nes-btn btn btn--sm btn--danger pb-lib-del" data-li="${i}">×</button>
           </div>`).join('');
 
     el.innerHTML = `
       <div class="pb-title">
         <span>&#9636; PROGRESSION BUILDER</span>
-        <button id="pb-close" style="background:none;border:none;color:var(--accent);font:10px 'Press Start 2P',monospace;cursor:pointer;">×</button>
+        <button id="pb-close" class="btn btn--sm" style="background:none;border:none;">×</button>
       </div>
 
       <div class="pb-section">
@@ -8842,7 +8804,7 @@ const ProgBuilder = (() => {
         <div class="pb-row" style="flex-wrap:wrap;gap:10px;">
           <div style="display:flex;align-items:center;gap:6px;">
             <span class="pb-label" style="margin-bottom:0;">KEY</span>
-            <select id="pb-key" style="${ss}">
+            <select id="pb-key" class="field-select">
               ${NOTE_NAMES_PB.map(k=>
                 `<option${k===ProjectState.key?' selected':''}>${k}</option>`
               ).join('')}
@@ -8850,7 +8812,7 @@ const ProgBuilder = (() => {
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
             <span class="pb-label" style="margin-bottom:0;">SCALE</span>
-            <select id="pb-scale" style="${ss};max-width:110px;">
+            <select id="pb-scale" class="field-select" style="max-width:110px;">
               ${Object.keys(Scales.SCALES).map(s=>
                 `<option${s===ProjectState.scale?' selected':''}>${s}</option>`
               ).join('')}
@@ -8859,7 +8821,7 @@ const ProgBuilder = (() => {
           <div style="display:flex;align-items:center;gap:6px;">
             <span class="pb-label" style="margin-bottom:0;">BPM</span>
             <div style="display:flex;align-items:center;gap:4px;">
-              <span id="pb-bpm-display" style="font-family:'Press Start 2P',monospace;font-size:10px;color:#ffeecc;min-width:40px;text-align:center;cursor:pointer;" title="Click to type BPM">${ProjectState.bpm}</span>
+              <span id="pb-bpm-display" class="modal-label" style="min-width:40px;text-align:center;cursor:pointer;" title="Click to type BPM">${ProjectState.bpm}</span>
               <div style="display:flex;flex-direction:column;gap:1px;">
                 <button class="bpm-arrow" id="pb-bpm-up">&#9650;</button>
                 <button class="bpm-arrow" id="pb-bpm-down">&#9660;</button>
@@ -8871,7 +8833,7 @@ const ProgBuilder = (() => {
 
       <div class="pb-section">
         <div class="pb-label">QUICK START</div>
-        <select id="pb-preset-sel" style="${ss};width:100%;padding:6px 8px;">
+        <select id="pb-preset-sel" class="field-select" style="width:100%;padding:6px 8px;">
           <option value="-1"${api===-1?' selected':''}>— select a preset —</option>
           ${PB_PRESETS.map((p,i) => {
             const label = p.genre ? `${p.genre} \u2014 ${p.title} (${p.roman})` : p.title;
@@ -8894,7 +8856,7 @@ const ProgBuilder = (() => {
         ${_voicing==='arpeggio'?`
         <div class="pb-row" style="margin-top:5px;">
           ${['up','down','updown','random'].map(p=>`
-            <button class="nes-btn pb-tog pb-arp${_arpPat===p?' on':''}" data-a="${p}" style="font-size:9px;padding:4px 8px;">${p.toUpperCase()}</button>`).join('')}
+            <button class="nes-btn btn btn--sm pb-tog pb-arp${_arpPat===p?' on':''}" data-a="${p}">${p.toUpperCase()}</button>`).join('')}
         </div>`:''}
       </div>
 
@@ -9010,17 +8972,16 @@ const ProgBuilder = (() => {
       if (popup) { popup.remove(); return; }
       popup = document.createElement('div');
       popup.id = 'pb-bpm-popup';
+      popup.className = 'modal modal--sm';
       const anchor = pbDisp.getBoundingClientRect();
-      popup.style.cssText = `position:fixed;left:${anchor.left}px;top:${anchor.bottom+4}px;
-        background:#1e1c30;border:2px solid #15788c;padding:8px 10px;z-index:9000;
-        display:flex;flex-direction:column;align-items:center;gap:6px;`;
+      popup.style.cssText = `position:fixed;left:${anchor.left}px;top:${anchor.bottom+4}px;z-index:9000;display:flex;flex-direction:column;align-items:center;gap:6px;`;
       const inp = document.createElement('input');
       inp.type = 'text'; inp.inputMode = 'numeric'; inp.value = ProjectState.bpm;
-      inp.style.cssText = `width:64px;background:#46425e;border:2px solid #00ccaa;color:#ffeecc;
-        font:10px "Press Start 2P",monospace;text-align:center;padding:4px;outline:none;`;
+      inp.className = 'field-input';
+      inp.style.cssText = 'width:64px;text-align:center;outline:none;';
       const lbl = document.createElement('div');
+      lbl.className = 'modal-label';
       lbl.textContent = 'BPM';
-      lbl.style.cssText = `font:8px "Press Start 2P",monospace;color:#ffb0a3;letter-spacing:0.05rem;`;
       const confirm = (v) => { const n = parseInt(v,10); if (!isNaN(n)) _pbSetBpm(n); popup.remove(); };
       inp.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') confirm(inp.value);
