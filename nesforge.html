@@ -111,7 +111,7 @@ select.lcd-select { background: transparent !important; border: none !important;
 }
 .nes-btn:hover { background: var(--hi-dim); color: var(--bg); border-color: var(--hi-dim); }
 .nes-btn:active { background: var(--accent); color: var(--text); border-color: var(--accent); }
-.nes-btn.engaged { background: var(--hi); color: var(--bg-deep); border-color: #00ffcc; }
+.nes-btn.engaged { background: var(--hi); color: var(--bg-deep); border-color: #00ffcc; } /* migration note: do not combine .engaged with .btn--engaged on same element */
 /* ── Design System: Button ───────────────────────────────────
    .btn is the unified button base. .nes-btn is kept as a legacy
    alias during migration and removed in Phase 5 (Task 6).
@@ -472,6 +472,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
 }
 .mob-btn:active { background: var(--hi); color: var(--bg-deep); }
 .mob-btn.danger:active { background: var(--accent); }
+/* Migration: when .mob-btn and .btn--mob coexist, ensure .btn--mob values win (higher specificity overrides .mob-btn source-order advantage) */
+.mob-btn.btn--mob { border-width: 1px; border-style: solid; border-color: transparent; border-radius: 2px; padding: 0 var(--space-3); }
 #mob-play-btn { font-size: 14px; }
 #mob-bpm-display {
   background: var(--bg-deep);
