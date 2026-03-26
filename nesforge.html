@@ -120,7 +120,9 @@ select.lcd-select { background: transparent !important; border: none !important;
 .btn--primary { background: var(--hi); color: var(--bg-deep); border-color: var(--hi); }
 .btn--primary:hover { background: var(--hi-dim); color: var(--bg); border-color: var(--hi-dim); }
 .btn--danger  { background: var(--bg); color: var(--accent); border-color: var(--accent); }
+.btn--danger:hover  { background: var(--accent); color: var(--bg-deep); border-color: var(--accent); }
 .btn--engaged { background: var(--hi); color: var(--bg-deep); border-color: var(--hi); }
+.btn--engaged:hover { background: var(--hi-dim); color: var(--bg-deep); border-color: var(--hi-dim); }
 .btn--sm      { font-size: var(--t-xs); padding: 3px var(--space-1); } /* 3px vertical intentional — space-1 too tall for inline track buttons */
 .btn--icon    { width: 32px; height: 32px; padding: var(--space-1); }
 .btn--full    { width: 100%; }
@@ -2561,7 +2563,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       const selStyle = `width:100%;box-sizing:border-box;`;
       const lblStyle = `flex-shrink:0;`;
       const rowStyle = `display:flex;align-items:center;gap:5px;padding:2px 0;`;
-      const valStyle = `font-size:9px;color:var(--text1);font-family:'Press Start 2P',monospace;background:var(--bg3);border:1px solid var(--hi-dim);padding:2px 4px;flex:1;`;
+      const valStyle = `font-size:9px;color:var(--text);font-family:'Press Start 2P',monospace;background:var(--bg3);border:1px solid var(--hi-dim);padding:2px 4px;flex:1;`;
 
       el.innerHTML = `
         ${multi ? `<div class="modal-label" style="margin-bottom:3px;">${selected.length} NOTES</div>` : ''}
@@ -4982,7 +4984,7 @@ function showTrackSettings(track, x, y) {
     lbl.style.cssText = 'margin-bottom:2px;';
     lbl.textContent = label;
     const ph = document.createElement('div');
-    ph.style.cssText = 'font:9px "Press Start 2P"; color:var(--bg-disabled); padding:5px 8px; border:2px solid var(--bg-deep); width:100%; box-sizing:border-box;';
+    ph.style.cssText = 'font:9px "Press Start 2P"; color:var(--text-dim); padding:5px 8px; border:2px solid var(--bg-deep); width:100%; box-sizing:border-box;';
     ph.textContent = '—';
     d.appendChild(lbl); d.appendChild(ph);
     return d;
@@ -5369,7 +5371,7 @@ function buildTopBar() {
 
   document.getElementById('topbar').innerHTML = `
     <div class="tb-group">
-      <button class="btn btn--icon" id="btn-prog" title="Progression Builder" style="color:var(--hi);border-color:var(--hi);">${PROG}</button>
+      <button class="btn btn--icon btn--engaged" id="btn-prog" title="Progression Builder">${PROG}</button>
     </div>
     <div class="tb-vdivider"></div>
     <div class="tb-group">
@@ -8486,8 +8488,7 @@ const ExportEngine = {
         <option value="0.0625">1/16</option>
         <option value="0.03125">1/32</option>
       </select>
-      <button id="pr-close-btn" class="btn btn--sm pr-topbar-btn"
-        style="color:var(--accent);border-color:var(--accent);">&#10005;</button>
+      <button id="pr-close-btn" class="btn btn--sm btn--danger pr-topbar-btn">&#10005;</button>
     `;
     _wirePRTopbar();
   }
@@ -8717,7 +8718,7 @@ const ProgBuilder = (() => {
   function _render() {
     const el = document.getElementById('prog-builder-content');
     if (!el) return;
-    const ss = `font-size:9px;font-family:'Press Start 2P',monospace;background:var(--bg3);color:var(--text1);border:1px solid var(--hi-dim);padding:3px 5px;`;
+    const ss = `font-size:9px;font-family:'Press Start 2P',monospace;background:var(--bg3);color:var(--text);border:1px solid var(--hi-dim);padding:3px 5px;`;
     const api = _activePreset();
     const lib = _libLoad();
 
