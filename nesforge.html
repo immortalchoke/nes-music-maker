@@ -4221,11 +4221,13 @@ AV.initEvents = function() {
     if (hit.zone === 'clear-all') {
       let clearMode = 'tracks'; // 'tracks' | 'notes'
       const conf = document.createElement('div');
+      conf.className = 'modal';
       conf.style.cssText = `position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
-        background:#46425e;border:2px solid #ff4444;z-index:501;padding:14px 16px 12px;min-width:300px;`;
+        background:var(--bg);border:2px solid var(--accent);z-index:501;padding:14px 16px 12px;min-width:300px;`;
 
       const confTitle = document.createElement('div');
-      confTitle.style.cssText = 'font:9px "Press Start 2P";color:#ff4444;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #ff4444;letter-spacing:1px;';
+      confTitle.className = 'modal-title';
+      confTitle.style.cssText = 'font:9px "Press Start 2P";color:var(--accent);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--accent);letter-spacing:1px;';
       confTitle.textContent = 'CLEAR ALL?';
 
       // Toggle row
@@ -4241,9 +4243,9 @@ AV.initEvents = function() {
           clearMode = mode;
           toggleRow.querySelectorAll('button').forEach(btn => {
             const active = btn.dataset.mode === clearMode;
-            btn.style.background    = active ? '#ff4444' : '';
-            btn.style.color         = active ? '#1e1c30' : '';
-            btn.style.borderColor   = active ? '#ff4444' : '';
+            btn.style.background    = active ? 'var(--accent)' : '';
+            btn.style.color         = active ? 'var(--bg-deep)' : '';
+            btn.style.borderColor   = active ? 'var(--accent)' : '';
           });
           confMsg.textContent = clearMode === 'tracks'
             ? 'Delete all note containers across all tracks. Tracks remain.'
@@ -4255,14 +4257,14 @@ AV.initEvents = function() {
       const btnTracks = mkTogBtn('DELETE TRACKS', 'tracks');
       const btnNotes  = mkTogBtn('CLEAR NOTES',   'notes');
       // Set initial active state
-      btnTracks.style.background = '#ff4444';
-      btnTracks.style.color      = '#1e1c30';
-      btnTracks.style.borderColor = '#ff4444';
+      btnTracks.style.background = 'var(--accent)';
+      btnTracks.style.color      = 'var(--bg-deep)';
+      btnTracks.style.borderColor = 'var(--accent)';
       toggleRow.appendChild(btnTracks);
       toggleRow.appendChild(btnNotes);
 
       const confMsg = document.createElement('div');
-      confMsg.style.cssText = 'font:8px "Press Start 2P";color:#ffeecc;margin-bottom:14px;line-height:1.8;';
+      confMsg.style.cssText = 'font:8px "Press Start 2P";color:var(--text);margin-bottom:14px;line-height:1.8;';
       confMsg.textContent = 'Delete all note containers across all tracks. Tracks remain.';
 
       const btnRow = document.createElement('div');
@@ -4271,8 +4273,8 @@ AV.initEvents = function() {
       cancelBtn.className = 'nes-btn'; cancelBtn.textContent = 'CANCEL'; cancelBtn.style.cssText = 'flex:1;';
       cancelBtn.onclick = () => conf.remove();
       const confirmBtn = document.createElement('button');
-      confirmBtn.className = 'nes-btn'; confirmBtn.textContent = 'DELETE TRACKS';
-      confirmBtn.style.cssText = 'flex:1;color:#ff4444;border-color:#ff4444;';
+      confirmBtn.className = 'nes-btn btn btn--danger'; confirmBtn.textContent = 'DELETE TRACKS';
+      confirmBtn.style.cssText = 'flex:1;color:var(--accent);border-color:var(--accent);';
       confirmBtn.onclick = () => {
         History.push();
         if (clearMode === 'tracks') {
@@ -4485,12 +4487,13 @@ AV.initEvents = function() {
         const inputEl = document.createElement('input');
         inputEl.type = 'text';
         inputEl.value = hit.track.name;
+        inputEl.className = 'field-input';
         inputEl.style.cssText = `
           position:fixed;
           left:${rect.left + 5}px; top:${rect.top + ty + 7}px;
           width:148px; height:16px;
-          background:#2a2845; color:#ffeecc;
-          border:1px solid #00ccaa; outline:none;
+          background:var(--bg-deep); color:var(--text);
+          border:1px solid var(--hi); outline:none;
           font:9px "Press Start 2P"; padding:2px 4px;
           z-index:600; box-sizing:border-box;
         `;
@@ -4849,11 +4852,11 @@ function showAddTrackModal({ defaultType = 'pulse50', onConfirm } = {}) {
           ${TRACK_TYPES.map(t => `
             <div class="atm-type" data-value="${t.value}"
               style="display:flex;align-items:center;gap:8px;padding:5px 7px;cursor:pointer;
-                     border:2px solid ${t.value === selected ? '#00ccaa' : '#333355'};
+                     border:2px solid ${t.value === selected ? 'var(--hi)' : 'var(--bg-deep)'};
                      background:${t.value === selected ? '#003322' : 'transparent'};">
-              <div style="width:8px;height:8px;border:2px solid ${t.value === selected ? '#00ccaa' : '#555577'};
-                          background:${t.value === selected ? '#00ccaa' : 'transparent'};flex-shrink:0;"></div>
-              <span style="color:${t.value === selected ? '#00ccaa' : '#ffeecc'};font-size:9px;">${t.label}</span>
+              <div style="width:8px;height:8px;border:2px solid ${t.value === selected ? 'var(--hi)' : 'var(--bg-disabled)'};
+                          background:${t.value === selected ? 'var(--hi)' : 'transparent'};flex-shrink:0;"></div>
+              <span style="color:${t.value === selected ? 'var(--hi)' : 'var(--text)'};font-size:9px;">${t.label}</span>
               <span class="modal-label" style="margin-left:auto;">${t.sub}</span>
             </div>`).join('')}
         </div>
@@ -4895,13 +4898,15 @@ function showContextMenu(x, y, items) {
   if (el) el.remove();
   el = document.createElement('div');
   el.id = 'ctx-menu';
-  el.style.cssText = `position:fixed;left:${x}px;top:${y}px;background:#46425e;
-    border:2px solid #15788c;z-index:1000;padding:2px;`;
+  el.className = 'modal modal--sm';
+  el.style.cssText = `position:fixed;left:${x}px;top:${y}px;background:var(--bg);
+    border:2px solid var(--bg3);z-index:1000;padding:2px;`;
   items.forEach(item => {
     const btn = document.createElement('div');
     btn.textContent = item.label;
-    btn.style.cssText = 'padding:6px 10px;cursor:pointer;font:8px "Press Start 2P";color:#ffeecc;letter-spacing:0.05rem;';
-    btn.onmouseenter = () => { btn.style.background = '#15788c'; btn.style.color = '#ffeecc'; };
+    btn.className = 'btn';
+    btn.style.cssText = 'padding:6px 10px;cursor:pointer;font:8px "Press Start 2P";color:var(--text);letter-spacing:0.05rem;';
+    btn.onmouseenter = () => { btn.style.background = 'var(--bg3)'; btn.style.color = 'var(--text)'; };
     btn.onmouseleave = () => btn.style.background = '';
     btn.onclick = () => { item.action(); el.remove(); };
     el.appendChild(btn);
@@ -5022,7 +5027,7 @@ function showTrackSettings(track, x, y) {
     lbl.style.cssText = 'margin-bottom:2px;';
     lbl.textContent = label;
     const ph = document.createElement('div');
-    ph.style.cssText = 'font:9px "Press Start 2P"; color:#444466; padding:5px 8px; border:2px solid #2a2840; width:100%; box-sizing:border-box;';
+    ph.style.cssText = 'font:9px "Press Start 2P"; color:var(--bg-disabled); padding:5px 8px; border:2px solid var(--bg-deep); width:100%; box-sizing:border-box;';
     ph.textContent = '—';
     d.appendChild(lbl); d.appendChild(ph);
     return d;
@@ -5044,7 +5049,7 @@ function showTrackSettings(track, x, y) {
     const pcChk = document.createElement('input');
     pcChk.type = 'checkbox';
     pcChk.checked = !!track.powerchord;
-    pcChk.style.cssText = 'width:14px;height:14px;accent-color:#00b9be;cursor:pointer;';
+    pcChk.style.cssText = 'width:14px;height:14px;accent-color:var(--hi);cursor:pointer;';
     pcChk.onchange = e => { track.powerchord = e.target.checked; };
     pcRow.appendChild(pcLbl);
     pcRow.appendChild(pcChk);
@@ -6350,7 +6355,7 @@ const MagicGen = (() => {
       const active = _state.drumPreset === name;
       const style = active
         ? 'border:1px solid var(--hi,#00b9be);background:rgba(0,185,190,0.15);color:var(--hi,#00b9be);'
-        : 'border:1px solid #444466;background:none;color:#8888aa;';
+        : 'border:1px solid var(--bg-disabled);background:none;color:var(--text-dim);';
       const shortName = name.replace('FOUR-ON-FLOOR','4-ON-FLOOR');
       html += `<button class="mg-drum-preset btn btn--sm" data-preset="${name}" style="${style}">${shortName}</button>`;
     });
@@ -6364,7 +6369,7 @@ const MagicGen = (() => {
       const on = _state.drumLayers[layer];
       const style = on
         ? 'background:var(--accent,#ff6600);color:#1e1c30;border-color:var(--accent,#ff6600);'
-        : 'background:none;color:#8888aa;border:1px solid #444466;';
+        : 'background:none;color:var(--text-dim);border:1px solid var(--bg-disabled);';
       html += `<button class="mg-drum-layer btn btn--sm" data-layer="${layer}" style="${style}">${layer.toUpperCase()}</button>`;
     });
     html += `</div></div><div class="mg-divider"></div>`;
@@ -6377,7 +6382,7 @@ const MagicGen = (() => {
       const active = _state.drumIntensity === i;
       const style = active
         ? 'width:12px;height:12px;border-radius:50%;background:var(--hi,#00b9be);border:none;cursor:pointer;'
-        : 'width:12px;height:12px;border-radius:50%;background:none;border:1px solid #444466;cursor:pointer;';
+        : 'width:12px;height:12px;border-radius:50%;background:none;border:1px solid var(--bg-disabled);cursor:pointer;';
       html += `<button class="mg-drum-intensity" data-intensity="${i}" style="${style}"></button>`;
     }
     html += `</div></div><div class="mg-divider"></div>`;
@@ -6386,7 +6391,7 @@ const MagicGen = (() => {
     const humOn = _state.drumHumanize;
     const humStyle = humOn
       ? 'background:var(--accent,#ff6600);color:#1e1c30;border-color:var(--accent,#ff6600);'
-      : 'background:none;color:#8888aa;border:1px solid #444466;';
+      : 'background:none;color:var(--text-dim);border:1px solid var(--bg-disabled);';
     html += `<div class="mg-row" style="margin-bottom:6px;">
       <span class="mg-label">HUMANIZE</span>
       <button id="mg-drum-humanize" class="btn btn--sm" style="${humStyle}">${humOn ? 'ON' : 'OFF'}</button>
@@ -7392,10 +7397,10 @@ const ExportEngine = {
       if (!progressEl) {
         progressEl = document.createElement('div');
         progressEl.id = 'exp-wav-progress';
-        progressEl.style.cssText = 'margin-top:8px;height:6px;background:#1a1a2e;border:1px solid #15788c;border-radius:0;overflow:hidden;';
+        progressEl.style.cssText = 'margin-top:8px;height:6px;background:var(--bg-deep);border:1px solid var(--bg3);border-radius:0;overflow:hidden;';
         const fill = document.createElement('div');
         fill.id = 'exp-wav-progress-fill';
-        fill.style.cssText = 'height:100%;width:0%;background:#00b9be;transition:width 0.1s linear;';
+        fill.style.cssText = 'height:100%;width:0%;background:var(--hi-dim);transition:width 0.1s linear;';
         progressEl.appendChild(fill);
         if (btn) btn.parentNode.insertBefore(progressEl, btn.nextSibling);
       }
@@ -8135,7 +8140,7 @@ const ExportEngine = {
       // "+" add-track button always at end
       const addBtn = document.createElement('button');
       addBtn.className = 'mob-track-btn';
-      addBtn.style.cssText = 'border-style:dashed;border-color:#444466;color:#8888aa;font-size:18px;';
+      addBtn.style.cssText = 'border-style:dashed;border-color:var(--bg-disabled);color:var(--text-dim);font-size:18px;';
       addBtn.textContent = '+';
       addBtn.addEventListener('click', () => {
         const rect = addBtn.getBoundingClientRect();
@@ -9390,13 +9395,13 @@ const ProgBuilder = (() => {
       var _unlocked = false;
 
       function _setStatus(msg, color) {
-        if (statusEl) { statusEl.textContent = msg; statusEl.style.color = color || '#8888aa'; }
+        if (statusEl) { statusEl.textContent = msg; statusEl.style.color = color || 'var(--text-dim)'; }
       }
 
       function _syncUnlock() {
         if (_unlocked) return;
         _unlocked = true;
-        _setStatus('Unlocking audio...', '#ffeecc');
+        _setStatus('Unlocking audio...', 'var(--text)');
         if (promptEl) promptEl.style.animationName = 'none';
 
         try {
@@ -9437,7 +9442,7 @@ const ProgBuilder = (() => {
           }, 3000);
 
         } catch(e) {
-          _setStatus('Error: ' + e.message, '#ff4444');
+          _setStatus('Error: ' + e.message, 'var(--accent)');
         }
       }
 
