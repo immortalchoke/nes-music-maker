@@ -5845,9 +5845,9 @@ const MagicGen = (() => {
     if (!btn) return;
     if (_arpPreviewLooping) {
       btn.textContent = '■ STOP';
-      btn.style.background = '#8b0000';
-      btn.style.color = '#fff';
-      btn.style.borderColor = '#cc2200';
+      btn.style.background = 'var(--accent)';
+      btn.style.color = 'var(--bg-deep)';
+      btn.style.borderColor = 'var(--accent)';
     } else {
       btn.textContent = '▶ PREVIEW';
       btn.style.background = '';
@@ -6168,9 +6168,9 @@ const MagicGen = (() => {
     if (!btn) return;
     if (_previewLooping) {
       btn.textContent = '■ STOP';
-      btn.style.background = '#8b0000';
-      btn.style.color = '#fff';
-      btn.style.borderColor = '#cc2200';
+      btn.style.background = 'var(--accent)';
+      btn.style.color = 'var(--bg-deep)';
+      btn.style.borderColor = 'var(--accent)';
     } else {
       btn.textContent = '▶ PREVIEW';
       btn.style.background = '';
@@ -8033,7 +8033,7 @@ const ExportEngine = {
             _pdDragging = true;
             btn.style.opacity = '0.4';
             _pdPlaceholder = document.createElement('div');
-            _pdPlaceholder.style.cssText = `min-width:56px;height:52px;border:2px dashed #00ccaa;border-radius:4px;flex-shrink:0;`;
+            _pdPlaceholder.style.cssText = `min-width:56px;height:52px;border:2px dashed var(--hi);border-radius:4px;flex-shrink:0;`;
             container.insertBefore(_pdPlaceholder, btn);
           }
           if (_pdDragging && _pdPlaceholder) {
