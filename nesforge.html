@@ -39,6 +39,7 @@
   --z-dropdown:  100;
   --z-modal:     500;
   --z-modal-top: 1000;
+  --z-picker:    1500;   /* transient pickers above modals */
   --z-overlay:   8000;
   --z-system:    99999;
 
@@ -732,7 +733,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 #mob-vel-picker {
   display: none;
   position: fixed;
-  z-index: 1500;
+  z-index: var(--z-picker);
   background: var(--bg-deep);
   border: 2px solid var(--bg3);
   border-radius: 6px;
