@@ -11,6 +11,7 @@
 :root {
   /* ── Backgrounds ─────────────────────────────────────────── */
   --bg:          #46425e;   /* primary app background */
+  --bg-hover:    #3a384e;   /* subtle hover state for cards/panels */
   --bg-deep:     #1e1c30;   /* modals, panels, deep surfaces */
   --bg3:         #15788c;   /* teal — borders, headers, controls */
   --bg-disabled: #444466;   /* inactive/disabled element backgrounds */
@@ -846,7 +847,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 .prog-start-card{flex:1;background:var(--bg);border:2px solid var(--bg3);
   padding:22px 16px;cursor:pointer;display:flex;flex-direction:column;
   align-items:center;gap:14px;font-family:var(--font);}
-.prog-start-card:hover{border-color:var(--hi);background:#3a384e;}
+.prog-start-card:hover{border-color:var(--hi);background:var(--bg-hover);}
 .prog-card-icon{font-size:28px;color:var(--hi);}
 .prog-card-label{font-size:var(--t-base);color:var(--text);text-align:center;}
 .prog-card-desc{font-size:var(--t-sm);color:var(--text2);text-align:center;
