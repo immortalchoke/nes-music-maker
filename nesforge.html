@@ -2574,7 +2574,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
         </div>` : ''}
         <div style="${rowStyle}">
           <span class="modal-label" style="${lblStyle}">LEN</span>
-          <span style="${valStyle}">${lenStr}</span>
+          <span id="pr-len-display" style="${valStyle}">${lenStr}</span>
           <div style="display:flex;flex-direction:column;gap:1px;">
             <button class="bpm-arrow" id="pr-len-up">&#9650;</button>
             <button class="bpm-arrow" id="pr-len-dn">&#9660;</button>
@@ -2638,12 +2638,11 @@ body.mobile-mode #mobile-app { display: flex !important; }
             <option value="-4">5th &#8595;</option>
           </select>
         </div>
-        <div style="display:flex;gap:2px;margin-top:3px;">
+        <div style="display:flex;margin-top:3px;">
           <button class="btn btn--sm" id="pr-harm-this" style="flex:1;">THIS TRACK</button>
-          <button class="btn btn--sm" id="pr-harm-new"  style="flex:1;">NEW TRACK</button>
+          <button class="btn btn--sm" id="pr-harm-new"  style="flex:1;margin-left:-2px;">NEW TRACK</button>
         </div>
-        <button class="btn btn--sm btn--full btn--engaged" id="pr-harmonize-btn"
-          style="margin-top:3px;color:var(--hi);border-color:var(--hi);">
+        <button class="btn btn--sm btn--full btn--primary" id="pr-harmonize-btn" style="margin-top:3px;">
           HARMONIZE
         </button>
 
@@ -2665,6 +2664,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       };
       document.getElementById('pr-len-up').onclick = () => stepLen(1);
       document.getElementById('pr-len-dn').onclick = () => stepLen(-1);
+      document.getElementById('pr-len-display').addEventListener('wheel', e => { e.preventDefault(); stepLen(e.deltaY > 0 ? 1 : -1); }, { passive: false });
 
       // ── VEL stepper ──────────────────────────────────────────────
       let _velVal = displayVel;
@@ -2677,6 +2677,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       };
       document.getElementById('pr-vel-up').onclick = () => stepVel(1);
       document.getElementById('pr-vel-dn').onclick = () => stepVel(-1);
+      document.getElementById('pr-vel-display').addEventListener('wheel', e => { e.preventDefault(); stepVel(e.deltaY > 0 ? 1 : -1); }, { passive: false });
 
       // ── DELETE ───────────────────────────────────────────────────
       document.getElementById('pr-del-note').onclick = () => {
@@ -2755,8 +2756,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
       // ── HARMONIZE target toggle ───────────────────────────────────
       if (!PR._harmTarget) PR._harmTarget = 'this';
       const syncHarmTarget = () => {
-        document.getElementById('pr-harm-this').classList.toggle('engaged', PR._harmTarget === 'this');
-        document.getElementById('pr-harm-new').classList.toggle('engaged',  PR._harmTarget === 'new');
+        document.getElementById('pr-harm-this').classList.toggle('btn--engaged',PR._harmTarget === 'this');
+        document.getElementById('pr-harm-new').classList.toggle('btn--engaged', PR._harmTarget === 'new');
       };
       syncHarmTarget();
       document.getElementById('pr-harm-this').onclick = () => { PR._harmTarget = 'this'; syncHarmTarget(); };
@@ -3176,7 +3177,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
         if (!dragState.hasMoved) {
           ProjectState.loopEnabled = true;
           const btn = document.getElementById('btn-loop');
-          if (btn) btn.classList.add('engaged');
+          if (btn) btn.classList.add('btn--engaged');
           dragState.hasMoved = true;
         }
         const bar = dragState.patStartBar + (mx - this.KEY_WIDTH + this.scrollX) / this.barWidth();
@@ -3269,7 +3270,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
           // Click without drag inside loop → toggle engage/disengage
           ProjectState.loopEnabled = !ProjectState.loopEnabled;
           const btn = document.getElementById('btn-loop');
-          if (btn) btn.classList.toggle('engaged', ProjectState.loopEnabled);
+          if (btn) btn.classList.toggle('btn--engaged',ProjectState.loopEnabled);
           this.draw(); AV.draw();
         }
         dragState = null; this._dragState = null;
@@ -4524,7 +4525,7 @@ AV.initEvents = function() {
           // First real drag — engage loop and start drawing
           ProjectState.loopEnabled = true;
           const btn = document.getElementById('btn-loop');
-          if (btn) btn.classList.add('engaged');
+          if (btn) btn.classList.add('btn--engaged');
           loopDragState.hasMoved = true;
         }
         const anchor = loopDragState.anchorBar;
@@ -4650,7 +4651,7 @@ AV.initEvents = function() {
         if (loopDragState.wasInLoop) {
           ProjectState.loopEnabled = !ProjectState.loopEnabled;
           const btn = document.getElementById('btn-loop');
-          if (btn) btn.classList.toggle('engaged', ProjectState.loopEnabled);
+          if (btn) btn.classList.toggle('btn--engaged',ProjectState.loopEnabled);
         }
         AV.draw(); if (PR.activePattern) PR.draw();
       }
@@ -5436,7 +5437,7 @@ function buildTopBar() {
   document.getElementById('bpm-input').oninput = e => _setBpm(+e.target.value);
   document.getElementById('bpm-input').addEventListener('wheel', e => {
     e.preventDefault();
-    _setBpm(ProjectState.bpm + (e.deltaY < 0 ? 1 : -1));
+    _setBpm(ProjectState.bpm + (e.deltaY > 0 ? 1 : -1));
   }, { passive: false });
   document.getElementById('bpm-up').onclick   = () => _setBpm(ProjectState.bpm + 1);
   document.getElementById('bpm-down').onclick = () => _setBpm(ProjectState.bpm - 1);
@@ -5444,7 +5445,7 @@ function buildTopBar() {
   // Scroll on BPM display to nudge value
   document.getElementById('bpm-display').addEventListener('wheel', (e) => {
     e.preventDefault();
-    _setBpm(ProjectState.bpm + (e.deltaY < 0 ? 1 : -1));
+    _setBpm(ProjectState.bpm + (e.deltaY > 0 ? 1 : -1));
   }, { passive: false });
 
   // Click on BPM display to open NES-style inline input
@@ -5496,7 +5497,7 @@ function buildTopBar() {
 
   document.getElementById('btn-loop').onclick = () => {
     ProjectState.loopEnabled = !ProjectState.loopEnabled;
-    document.getElementById('btn-loop').classList.toggle('engaged', ProjectState.loopEnabled);
+    document.getElementById('btn-loop').classList.toggle('btn--engaged',ProjectState.loopEnabled);
     AV.draw();
   };
 
@@ -5527,7 +5528,7 @@ function buildTopBar() {
   };
 
   // Set initial loop button state
-  document.getElementById('btn-loop').classList.toggle('engaged', ProjectState.loopEnabled);
+  document.getElementById('btn-loop').classList.toggle('btn--engaged',ProjectState.loopEnabled);
 }
 
 // ============================================================
@@ -6408,6 +6409,7 @@ const MagicGen = (() => {
     document.getElementById('mg-drum-rep-up').onclick = () => {
       if (_state.drumRepeats < 8) { _state.drumRepeats++; document.getElementById('mg-drum-rep-val').textContent = _state.drumRepeats; }
     };
+    document.getElementById('mg-drum-rep-val').addEventListener('wheel', e => { e.preventDefault(); const d = e.deltaY > 0 ? 1 : -1; _state.drumRepeats = Math.max(1, Math.min(8, _state.drumRepeats + d)); document.getElementById('mg-drum-rep-val').textContent = _state.drumRepeats; }, { passive: false });
 
     document.getElementById('mg-drum-randomize').onclick = () => {
       _state.drumPreset = _DRUM_PRESET_NAMES[Math.floor(Math.random() * _DRUM_PRESET_NAMES.length)];
@@ -6699,6 +6701,7 @@ const MagicGen = (() => {
       document.getElementById('mg-oct-up').onclick = () => {
         if (_state.octave < 2) { _state.octave++; document.getElementById('mg-oct-val').textContent = _state.octave >= 0 ? '+'+_state.octave : _state.octave; }
       };
+      document.getElementById('mg-oct-val').addEventListener('wheel', e => { e.preventDefault(); const d = e.deltaY > 0 ? 1 : -1; _state.octave = Math.max(-2, Math.min(2, _state.octave + d)); document.getElementById('mg-oct-val').textContent = _state.octave >= 0 ? '+'+_state.octave : _state.octave; }, { passive: false });
       document.getElementById('mg-inv').onchange = e => { _state.inversion = +e.target.value; };
     }
 
@@ -6712,6 +6715,7 @@ const MagicGen = (() => {
       document.getElementById('mg-oct-up').onclick = () => {
         if (_state.octave < 2) { _state.octave++; document.getElementById('mg-oct-val').textContent = _state.octave >= 0 ? '+'+_state.octave : _state.octave; }
       };
+      document.getElementById('mg-oct-val').addEventListener('wheel', e => { e.preventDefault(); const d = e.deltaY > 0 ? 1 : -1; _state.octave = Math.max(-2, Math.min(2, _state.octave + d)); document.getElementById('mg-oct-val').textContent = _state.octave >= 0 ? '+'+_state.octave : _state.octave; }, { passive: false });
 
       // AUTO / CUSTOM toggle
       document.getElementById('mg-arp-auto').onclick = () => {
@@ -6738,6 +6742,7 @@ const MagicGen = (() => {
         document.getElementById('mg-rep-up').onclick = () => {
           if (_state.arpRepeats < 4) { _state.arpRepeats++; document.getElementById('mg-rep-val').textContent = _state.arpRepeats; }
         };
+        document.getElementById('mg-rep-val').addEventListener('wheel', e => { e.preventDefault(); const d = e.deltaY > 0 ? 1 : -1; _state.arpRepeats = Math.max(1, Math.min(4, _state.arpRepeats + d)); document.getElementById('mg-rep-val').textContent = _state.arpRepeats; }, { passive: false });
         document.querySelectorAll('.mg-notelen-btn').forEach(btn => {
           btn.onclick = () => { _state.arpNoteLen = btn.dataset.len; _renderModal(); };
         });
@@ -6749,6 +6754,7 @@ const MagicGen = (() => {
         document.getElementById('mg-rep-up').onclick = () => {
           if (_state.arpRepeats < 4) { _state.arpRepeats++; document.getElementById('mg-rep-val').textContent = _state.arpRepeats; }
         };
+        document.getElementById('mg-rep-val').addEventListener('wheel', e => { e.preventDefault(); const d = e.deltaY > 0 ? 1 : -1; _state.arpRepeats = Math.max(1, Math.min(4, _state.arpRepeats + d)); document.getElementById('mg-rep-val').textContent = _state.arpRepeats; }, { passive: false });
         document.getElementById('mg-steps-dn').onclick = () => {
           if (_state.arpSteps.length > 1) { _state.arpSteps.pop(); _renderModal(); }
         };
@@ -6759,6 +6765,7 @@ const MagicGen = (() => {
             _renderModal();
           }
         };
+        document.getElementById('mg-steps-val').addEventListener('wheel', e => { e.preventDefault(); if (e.deltaY > 0 && _state.arpSteps.length < 16) { const lastLen = _state.arpSteps.length > 0 ? _state.arpSteps[_state.arpSteps.length - 1].len : _state.arpNoteLen; _state.arpSteps.push({ toneIdx: 0, len: lastLen, octave: 0 }); _renderModal(); } else if (e.deltaY <= 0 && _state.arpSteps.length > 1) { _state.arpSteps.pop(); _renderModal(); } }, { passive: false });
         const avail = _getNoteLengths();
         document.querySelectorAll('.mg-step-tone').forEach(cell => {
           cell.onclick = () => {
@@ -8433,7 +8440,7 @@ const ExportEngine = {
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
         <span class="pr-topbar-label">ADD NOTES</span>
         <div style="display:flex;">
-          <button id="pr-tool-default" class="btn btn--sm pr-topbar-btn engaged">SINGLE</button>
+          <button id="pr-tool-default" class="btn btn--sm pr-topbar-btn btn--engaged">SINGLE</button>
           <button id="pr-tool-stamp"   class="btn btn--sm pr-topbar-btn" style="margin-left:-2px;">MULTI</button>
           <button id="pr-tool-magic"   class="btn btn--sm pr-topbar-btn" style="margin-left:-2px;">&#10022; MAGIC</button>
         </div>
@@ -8503,9 +8510,9 @@ const ExportEngine = {
 
     const setTool = (t) => {
       PR._tool = t;
-      document.getElementById('pr-tool-default').classList.toggle('engaged', t === 'default');
-      document.getElementById('pr-tool-stamp').classList.toggle('engaged', t === 'stamp');
-      document.getElementById('pr-tool-magic').classList.toggle('engaged', t === 'magic');
+      document.getElementById('pr-tool-default').classList.toggle('btn--engaged',t === 'default');
+      document.getElementById('pr-tool-stamp').classList.toggle('btn--engaged',t === 'stamp');
+      document.getElementById('pr-tool-magic').classList.toggle('btn--engaged',t === 'magic');
       const sc = document.getElementById('pr-stamp-controls');
       if (sc) sc.style.display = t === 'stamp' ? 'flex' : 'none';
       MagicGen.engaged = (t === 'magic');
@@ -8527,6 +8534,7 @@ const ExportEngine = {
     countEl.textContent = PR._stampCount;
     document.getElementById('pr-stamp-count-up').onclick = () => { PR._stampCount = Math.min(16, PR._stampCount + 1); countEl.textContent = PR._stampCount; };
     document.getElementById('pr-stamp-count-dn').onclick = () => { PR._stampCount = Math.max(2,  PR._stampCount - 1); countEl.textContent = PR._stampCount; };
+    countEl.addEventListener('wheel', e => { e.preventDefault(); const d = e.deltaY > 0 ? 1 : -1; PR._stampCount = Math.max(2, Math.min(16, PR._stampCount + d)); countEl.textContent = PR._stampCount; }, { passive: false });
 
     // LEN select — sets _stampDuration so single-note placement also benefits
     const lenSel = document.getElementById('pr-stamp-len');
@@ -8545,11 +8553,12 @@ const ExportEngine = {
     pitchEl.textContent = PR._stampPitchDelta;
     document.getElementById('pr-stamp-pitch-up').onclick = () => { PR._stampPitchDelta = Math.min(24,  PR._stampPitchDelta + 1); pitchEl.textContent = PR._stampPitchDelta; };
     document.getElementById('pr-stamp-pitch-dn').onclick = () => { PR._stampPitchDelta = Math.max(-24, PR._stampPitchDelta - 1); pitchEl.textContent = PR._stampPitchDelta; };
+    pitchEl.addEventListener('wheel', e => { e.preventDefault(); const d = e.deltaY > 0 ? 1 : -1; PR._stampPitchDelta = Math.max(-24, Math.min(24, PR._stampPitchDelta + d)); pitchEl.textContent = PR._stampPitchDelta; }, { passive: false });
 
     // PITCH mode toggle
     const syncModeToggle = () => {
-      document.getElementById('pr-stamp-mode-semi') .classList.toggle('engaged', PR._stampPitchMode !== 'scale');
-      document.getElementById('pr-stamp-mode-scale').classList.toggle('engaged', PR._stampPitchMode === 'scale');
+      document.getElementById('pr-stamp-mode-semi') .classList.toggle('btn--engaged',PR._stampPitchMode !== 'scale');
+      document.getElementById('pr-stamp-mode-scale').classList.toggle('btn--engaged',PR._stampPitchMode === 'scale');
     };
     syncModeToggle();
     document.getElementById('pr-stamp-mode-semi') .onclick = () => { PR._stampPitchMode = 'semi';  syncModeToggle(); };
@@ -8926,7 +8935,7 @@ const ProgBuilder = (() => {
     const pbDisp = document.getElementById('pb-bpm-display');
     pbDisp.addEventListener('wheel', (e) => {
       e.preventDefault();
-      _pbSetBpm(ProjectState.bpm + (e.deltaY < 0 ? 1 : -1));
+      _pbSetBpm(ProjectState.bpm + (e.deltaY > 0 ? 1 : -1));
     }, { passive: false });
     pbDisp.addEventListener('click', () => {
       let popup = document.getElementById('pb-bpm-popup');
