@@ -15,6 +15,17 @@
   --gray: #15788c; --gray2: #46425e;
   --text: #ffeecc; --text2: #ffb0a3;
   --border: 2px solid #15788c;
+  /* ── NESForge Type Scale ──────────────────────────────────────
+     Press Start 2P renders cleanly only at integer px values.
+     All text in the app maps to one of these 6 tokens only.
+     ------------------------------------------------------------ */
+  --t-xs:   8px;   /* minimum readable — hints, sub-labels, kbd */
+  --t-sm:   9px;   /* UI labels, dropdown options, field labels  */
+  --t-base: 10px;  /* body text, button labels, general UI       */
+  --t-md:   12px;  /* section headings, degree labels, emphasis  */
+  --t-lg:   14px;  /* title text, startup screen headings        */
+  --t-xl:   18px;  /* display text, large headers                */
+  --t-input: 10px; /* Minimum for form controls — prevents iOS auto-zoom */
 }
 html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text);
   font-family: 'Press Start 2P', monospace; font-size: 14px; overflow: hidden;
@@ -37,13 +48,13 @@ html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text
 #lcd-box { display: flex; align-items: stretch; background: #1e1c30; border: 2px solid #15788c; height: 46px; }
 .lcd-field { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 10px; gap: 3px; }
 .lcd-field + .lcd-field { border-left: 1px solid #15788c; }
-.lcd-value { font-family: 'Press Start 2P', monospace; font-size: 11px; color: #ffeecc; display: flex; align-items: center; gap: 3px; }
-.lcd-label { font-family: 'Press Start 2P', monospace; font-size: 5px; color: #ffb0a3; letter-spacing: 0.05rem; }
-#bpm-display { font-family: 'Press Start 2P', monospace; font-size: 11px; color: #ffeecc; min-width: 40px; text-align: center; cursor: default; }
+.lcd-value { font-family: 'Press Start 2P', monospace; font-size: var(--t-base); color: #ffeecc; display: flex; align-items: center; gap: 3px; }
+.lcd-label { font-family: 'Press Start 2P', monospace; font-size: var(--t-xs); color: #ffb0a3; letter-spacing: 0.05rem; }
+#bpm-display { font-family: 'Press Start 2P', monospace; font-size: var(--t-base); color: #ffeecc; min-width: 40px; text-align: center; cursor: default; }
 input.lcd-input { display: none; }
-.bpm-arrow { background: none; border: none; color: #15788c; font-family: 'Press Start 2P', monospace; font-size: 8px; cursor: pointer; padding: 0 1px; line-height: 1; display: block; }
+.bpm-arrow { background: none; border: none; color: #15788c; font-family: 'Press Start 2P', monospace; font-size: var(--t-sm); cursor: pointer; padding: 0 1px; line-height: 1; display: block; }
 .bpm-arrow:hover { color: #00ccaa; }
-select.lcd-select { background: transparent !important; border: none !important; color: #ffeecc; font-family: 'Press Start 2P', monospace; font-size: 11px; padding: 0; cursor: pointer; outline: none; -webkit-appearance: none; appearance: none; }
+select.lcd-select { background: transparent !important; border: none !important; color: #ffeecc; font-family: 'Press Start 2P', monospace; font-size: var(--t-base); padding: 0; cursor: pointer; outline: none; -webkit-appearance: none; appearance: none; }
 #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 #arrangement-panel { flex: 1 1 0; overflow: hidden; min-height: 60px; }
 #panel-divider {
@@ -56,21 +67,20 @@ select.lcd-select { background: transparent !important; border: none !important;
 #pianoroll-panel { height: 480px; min-height: 150px; border-top: var(--border); display: flex;
   flex-direction: column; flex-shrink: 0; }
 #pianoroll-canvas { flex: 1; display: block; touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
-#velocity-canvas { height: 90px; display: block; border-top: var(--border); touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
 #panel-divider { touch-action: none; }
 .nes-btn {
   background: #15788c; color: #ffeecc; border: 2px solid #00b9be;
-  font-family: 'Press Start 2P', monospace; font-size: 7px;
+  font-family: 'Press Start 2P', monospace; font-size: var(--t-sm);
   padding: 4px 6px; cursor: pointer; image-rendering: pixelated;
   letter-spacing: 0.05rem; border-radius: 0;
 }
 .nes-btn:hover { background: #00b9be; color: #46425e; border-color: #00b9be; }
 .nes-btn:active { background: #ff6973; color: #ffeecc; border-color: #ff6973; }
 .nes-btn.engaged { background: #00ccaa; color: #1a1a2e; border-color: #00ffcc; }
-label { display: flex; align-items: center; gap: 4px; font-size: 8px; color: #ffb0a3; letter-spacing: 0.05rem; }
+label { display: flex; align-items: center; gap: 4px; font-size: var(--t-sm); color: #ffb0a3; letter-spacing: 0.05rem; }
 input[type=number], select {
   background: #46425e; color: #ffeecc; border: 2px solid #15788c;
-  font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 2px 4px;
+  font-family: 'Press Start 2P', monospace; font-size: var(--t-sm); padding: 2px 4px;
   letter-spacing: 0.05rem; border-radius: 0;
 }
 /* Scanlines */
@@ -89,7 +99,7 @@ body::after {
 }
 
 /* Pixel borders on all panels */
-#topbar, #arrangement-panel, #pianoroll-panel, #velocity-canvas {
+#topbar, #arrangement-panel, #pianoroll-panel {
   border-color: var(--gray);
   image-rendering: pixelated;
 }
@@ -98,8 +108,11 @@ body::after {
 input, select {
   background: #46425e; color: #ffeecc;
   border: 2px solid #15788c; outline: none;
-  font-family: 'Press Start 2P', monospace; font-size: 7px;
+  font-family: 'Press Start 2P', monospace; font-size: var(--t-sm);
   letter-spacing: 0.05rem; border-radius: 0;
+}
+select, input[type=number], input[type=text], input[type=range] {
+  font-size: var(--t-input) !important;
 }
 input:focus, select:focus { border-color: #00b9be; }
 
@@ -145,7 +158,7 @@ input:focus, select:focus { border-color: #00b9be; }
   color: #ffb0a3;
   border: 2px solid #15788c;
   font-family: 'Press Start 2P', monospace;
-  font-size: 7px;
+  font-size: var(--t-sm);
   padding: 5px 4px;
   cursor: pointer;
   letter-spacing: 0.05rem;
@@ -163,7 +176,7 @@ input:focus, select:focus { border-color: #00b9be; }
   gap: 6px;
 }
 .mg-label {
-  font-size: 6px;
+  font-size: var(--t-xs);
   color: #ffb0a3;
   letter-spacing: 0.05rem;
   flex-shrink: 0;
@@ -178,7 +191,7 @@ input:focus, select:focus { border-color: #00b9be; }
   color: #ffeecc;
   border: 2px solid #15788c;
   font-family: 'Press Start 2P', monospace;
-  font-size: 8px;
+  font-size: var(--t-sm);
   width: 20px;
   height: 20px;
   cursor: pointer;
@@ -188,7 +201,7 @@ input:focus, select:focus { border-color: #00b9be; }
   padding: 0;
 }
 .mg-stepper span {
-  font-size: 8px;
+  font-size: var(--t-sm);
   color: #ffeecc;
   min-width: 20px;
   text-align: center;
@@ -217,7 +230,7 @@ input:focus, select:focus { border-color: #00b9be; }
   align-items: center;
   justify-content: center;
   font-family: 'Press Start 2P', monospace;
-  font-size: 7px;
+  font-size: var(--t-sm);
   cursor: pointer;
   border: 1px solid #15788c;
   border-right: none;
@@ -236,7 +249,7 @@ input:focus, select:focus { border-color: #00b9be; }
   align-items: center;
   justify-content: center;
   font-family: 'Press Start 2P', monospace;
-  font-size: 5px;
+  font-size: var(--t-xs);
   color: #ffb0a3;
   cursor: pointer;
   border: 1px solid #15788c;
@@ -255,7 +268,7 @@ input:focus, select:focus { border-color: #00b9be; }
   align-items: center;
   justify-content: center;
   font-family: 'Press Start 2P', monospace;
-  font-size: 5px;
+  font-size: var(--t-xs);
   color: #8888aa;
   cursor: pointer;
   border: 1px solid #15788c;
@@ -305,7 +318,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   overflow-x: hidden;
   background: var(--bg);
   font-family: 'Press Start 2P', monospace;
-  font-size: 10px;
+  font-size: var(--t-base);
   color: var(--text);
   user-select: none;
   -webkit-user-select: none;
@@ -330,7 +343,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   border: none;
   border-radius: 3px;
   font-family: 'Press Start 2P', monospace;
-  font-size: 9px;
+  font-size: var(--t-sm);
   cursor: pointer;
   padding: 0 8px;
   height: 44px;
@@ -350,7 +363,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   border: 2px solid var(--bg3);
   color: var(--hi);
   font-family: 'Press Start 2P', monospace;
-  font-size: 11px;
+  font-size: var(--t-base);
   padding: 0 8px;
   height: 44px;
   min-width: 60px;
@@ -360,8 +373,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
   border-radius: 3px;
   flex-shrink: 0;
 }
-#mob-tap-btn { font-size: 8px; }
-#mob-loop-btn { font-size: 8px; }
+#mob-tap-btn { font-size: var(--t-sm); }
+#mob-loop-btn { font-size: var(--t-sm); }
 .mob-transport-spacer { flex: 1; min-width: 4px; }
 
 /* Track list */
@@ -389,7 +402,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   background: var(--bg);
   color: var(--text);
   font-family: 'Press Start 2P', monospace;
-  font-size: 7px;
+  font-size: var(--t-sm);
   cursor: pointer;
   flex-shrink: 0;
   padding: 4px;
@@ -424,7 +437,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
 #mob-pitch-label {
   text-align: center;
-  font-size: 9px;
+  font-size: var(--t-sm);
   color: var(--hi);
   padding: 4px 0 2px;
   flex-shrink: 0;
@@ -461,7 +474,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   font-family: 'Press Start 2P', monospace;
-  font-size: 5px;
+  font-size: var(--t-xs);
 }
 .mob-piano-key.white-key {
   width: 36px;
@@ -516,7 +529,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 }
 .mob-bar-dot.active { background: var(--hi); }
 #mob-add-bar, #mob-rem-bar {
-  font-size: 14px;
+  font-size: var(--t-lg);
   min-width: 36px;
   height: 36px;
 }
@@ -591,7 +604,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 }
 .mob-step-vel {
   font-family: 'Press Start 2P', monospace;
-  font-size: 7px;
+  font-size: var(--t-sm);
   color: rgba(0,0,0,0.6);
   line-height: 1;
   pointer-events: none;
@@ -600,7 +613,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   position: absolute;
   top: 3px;
   left: 4px;
-  font-size: 6px;
+  font-size: var(--t-xs);
   color: rgba(255,255,255,0.25);
   font-family: 'Press Start 2P', monospace;
   pointer-events: none;
@@ -610,7 +623,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 #mob-export-btn {
   height: 44px;
   border-radius: 0;
-  font-size: 8px;
+  font-size: var(--t-sm);
   flex-shrink: 0;
   background: #1e1c30;
   border-top: 2px solid var(--bg3);
@@ -641,17 +654,17 @@ body.mobile-mode #mobile-app { display: flex !important; }
 }
 #mob-export-sheet .mob-btn {
   width: 100%;
-  font-size: 9px;
+  font-size: var(--t-sm);
   height: 48px;
 }
 .mob-export-title {
-  font-size: 9px;
+  font-size: var(--t-sm);
   color: var(--hi);
   text-align: center;
   margin-bottom: 4px;
 }
 .mob-export-close {
-  font-size: 9px;
+  font-size: var(--t-sm);
   color: var(--text2);
   text-align: center;
   cursor: pointer;
@@ -671,7 +684,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   border: 2px solid var(--hi);
   color: var(--text);
   font-family: 'Press Start 2P', monospace;
-  font-size: 8px;
+  font-size: var(--t-sm);
   padding: 10px 16px;
   border-radius: 6px;
   z-index: 2000;
@@ -697,7 +710,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 }
 #mob-vel-picker.open { display: flex; }
 #mob-vel-picker-label {
-  font-size: 8px;
+  font-size: var(--t-sm);
   color: var(--hi);
   text-align: center;
 }
@@ -707,7 +720,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   height: 32px;
 }
 #mob-vel-done {
-  font-size: 8px;
+  font-size: var(--t-sm);
   height: 36px;
 }
 
@@ -717,7 +730,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   border: 2px solid var(--bg3);
   color: var(--text);
   font-family: 'Press Start 2P', monospace;
-  font-size: 7px;
+  font-size: var(--t-sm);
   height: 44px;
   border-radius: 3px;
   padding: 0 4px;
@@ -729,8 +742,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
 
 #pr-topbar {
-  height: 34px; background: #1e1c30; border-bottom: 2px solid #15788c;
-  display: flex; align-items: center; gap: 6px; padding: 0 8px;
+  min-height: 48px; background: #1e1c30; border-bottom: 2px solid #15788c;
+  display: flex; align-items: center; gap: 6px; padding: 10px 12px;
   flex-shrink: 0; flex-wrap: nowrap; overflow-x: auto;
 }
 #pr-body {
@@ -740,7 +753,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
   width: 190px; flex-shrink: 0; background: #1e1c30;
   border-right: 2px solid #15788c; display: flex;
   flex-direction: column; padding: 6px; gap: 5px;
-  overflow-y: auto; font-size: 6px; color: var(--text);
+  overflow-y: auto; font-size: var(--t-xs); color: var(--text);
   font-family: 'Press Start 2P', monospace;
 }
 #pr-note-info {
@@ -750,36 +763,37 @@ body.mobile-mode #mobile-app { display: flex !important; }
   flex: 1; display: flex; flex-direction: column; min-width: 0;
 }
 .pr-side-title {
-  font-size: 6px; color: var(--hi); letter-spacing: 0.05rem;
+  font-size: var(--t-xs); color: var(--hi); letter-spacing: 0.05rem;
   padding-bottom: 4px; border-bottom: 1px solid #15788c; margin-bottom: 2px;
 }
 .pr-info-row {
   display: flex; flex-direction: column; gap: 2px;
 }
 .pr-info-label {
-  font-size: 5px; color: var(--text2); letter-spacing: 0.05rem;
+  font-size: var(--t-xs); color: var(--text2); letter-spacing: 0.05rem;
 }
 .pr-info-value {
-  font-size: 6px; color: var(--text); background: #46425e;
+  font-size: var(--t-xs); color: var(--text); background: #46425e;
   border: 1px solid #15788c; padding: 2px 3px;
 }
 .pr-info-input {
-  font-size: 6px; background: #46425e; color: var(--text);
+  font-size: var(--t-xs); background: #46425e; color: var(--text);
   border: 1px solid #15788c; font-family: 'Press Start 2P', monospace;
   padding: 2px 3px; width: 100%; box-sizing: border-box; border-radius: 0;
 }
 .pr-topbar-label {
-  font-size: 8px; color: var(--text2); letter-spacing: 0.05rem;
+  font-size: var(--t-sm); color: var(--text2); letter-spacing: 0.05rem;
   white-space: nowrap; flex-shrink: 0;
 }
 .pr-topbar-btn {
-  height: 24px; font-size: 5px; padding: 0 5px; flex-shrink: 0;
+  height: 26px; font-size: var(--t-xs); padding: 0 8px; flex-shrink: 0;
+  white-space: nowrap;
 }
 .pr-section-divider {
   border-top: 1px solid #15788c; margin: 4px 0;
 }
 #pr-note-info select option, #pr-topbar select option {
-  font-size: 11px;
+  font-size: var(--t-base);
 }
 
 /* ProgBuilder */
@@ -790,9 +804,9 @@ body.mobile-mode #mobile-app { display: flex !important; }
 #prog-startup-content{background:#1e1c30;border:2px solid #15788c;
   padding:36px;display:flex;flex-direction:column;align-items:center;
   gap:24px;max-width:680px;width:92%;}
-#prog-startup-title{font-size:16px;color:var(--hi);letter-spacing:.15rem;
+#prog-startup-title{font-size:var(--t-xl);color:var(--hi);letter-spacing:.15rem;
   font-family:'Press Start 2P',monospace;}
-#prog-startup-sub{font-size:10px;color:var(--text2);letter-spacing:.08rem;
+#prog-startup-sub{font-size:var(--t-base);color:var(--text2);letter-spacing:.08rem;
   font-family:'Press Start 2P',monospace;}
 #prog-startup-cards{display:flex;gap:18px;width:100%;}
 .prog-start-card{flex:1;background:#46425e;border:2px solid #15788c;
@@ -800,50 +814,50 @@ body.mobile-mode #mobile-app { display: flex !important; }
   align-items:center;gap:14px;font-family:'Press Start 2P',monospace;}
 .prog-start-card:hover{border-color:var(--hi);background:#3a384e;}
 .prog-card-icon{font-size:28px;color:var(--hi);}
-.prog-card-label{font-size:10px;color:var(--text);text-align:center;}
-.prog-card-desc{font-size:8px;color:var(--text2);text-align:center;
+.prog-card-label{font-size:var(--t-base);color:var(--text);text-align:center;}
+.prog-card-desc{font-size:var(--t-sm);color:var(--text2);text-align:center;
   line-height:2;}
 #prog-builder-content{background:#1e1c30;border:2px solid #15788c;
   padding:24px;width:min(820px,96vw);max-height:92vh;overflow-y:auto;
   font-family:'Press Start 2P',monospace;}
-.pb-title{font-size:13px;color:var(--hi);margin-bottom:20px;
+.pb-title{font-size:var(--t-md);color:var(--hi);margin-bottom:20px;
   letter-spacing:.1rem;display:flex;align-items:center;
   justify-content:space-between;}
 .pb-section{margin-bottom:18px;}
-.pb-label{font-size:9px;color:var(--text2);margin-bottom:8px;
+.pb-label{font-size:var(--t-sm);color:var(--text2);margin-bottom:8px;
   letter-spacing:.05rem;}
 .pb-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-.pb-preset-btn{font-size:9px;padding:5px 8px;}
+.pb-preset-btn{font-size:var(--t-sm);padding:5px 8px;}
 .pb-step{display:flex;flex-direction:column;align-items:center;gap:8px;
   background:#46425e;border:2px solid #15788c;padding:12px 8px;
   min-width:80px;position:relative;flex-shrink:0;}
 .pb-step:hover{border-color:var(--hi);}
-.pb-step-label{font-size:12px;color:var(--hi);}
-.pb-step-chord{font-size:6px;color:var(--text2);letter-spacing:.03rem;
+.pb-step-label{font-size:var(--t-md);color:var(--hi);}
+.pb-step-chord{font-size:var(--t-xs);color:var(--text2);letter-spacing:.03rem;
   text-align:center;min-height:8px;margin-top:-2px;}
 .pb-step-del{position:absolute;top:2px;right:4px;background:none;
-  border:none;color:var(--accent);font-size:13px;cursor:pointer;
+  border:none;color:var(--accent);font-size:var(--t-md);cursor:pointer;
   font-family:'Press Start 2P',monospace;padding:0;line-height:1;}
 #pb-steps-wrap{display:flex;gap:8px;flex-wrap:wrap;padding:12px;
   background:#46425e;border:2px solid #15788c;min-height:110px;
   align-items:flex-start;align-content:flex-start;}
 .pb-add-step{width:56px;height:96px;background:none;
-  border:2px dashed #15788c;color:#15788c;font-size:24px;
+  border:2px dashed #15788c;color:#15788c;font-size:var(--t-xl);
   cursor:pointer;display:flex;align-items:center;justify-content:center;
   flex-shrink:0;}
 .pb-add-step:hover{border-color:var(--hi);color:var(--hi);}
-.pb-tog{font-size:9px;padding:5px 8px;}
+.pb-tog{font-size:var(--t-sm);padding:5px 8px;}
 .pb-tog.on{background:var(--hi);color:#1e1c30;border-color:var(--hi);}
 .pb-lib-row{display:flex;align-items:center;gap:8px;padding:6px 10px;
-  background:#46425e;border:1px solid #15788c;font-size:9px;
+  background:#46425e;border:1px solid #15788c;font-size:var(--t-sm);
   color:var(--text);margin-bottom:6px;}
 .pb-lib-row span{flex:1;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;}
-.pb-lib-row button{font-size:8px;padding:3px 6px;}
-.pb-generate{width:100%;font-size:11px;padding:12px;color:var(--hi);
+.pb-lib-row button{font-size:var(--t-sm);padding:3px 6px;}
+.pb-generate{width:100%;font-size:var(--t-base);padding:12px;color:var(--hi);
   border-color:var(--hi);margin-top:6px;}
 .pb-generate:hover{background:var(--hi);color:#1e1c30;}
-.pb-total{font-size:9px;color:var(--text2);text-align:right;
+.pb-total{font-size:var(--t-sm);color:var(--text2);text-align:right;
   margin-bottom:6px;}
 #pb-track-toggles{display:flex;flex-direction:column;gap:4px;}
 .pb-track-tog-row{display:flex;align-items:center;gap:8px;padding:6px 8px;
@@ -852,11 +866,11 @@ body.mobile-mode #mobile-app { display: flex !important; }
 .pb-track-tog-row:hover{border-color:var(--hi);}
 .pb-track-tog-row input[type="checkbox"]{width:14px;height:14px;
   accent-color:var(--hi);flex-shrink:0;cursor:pointer;}
-.pb-track-tog-icon{font-size:10px;color:var(--hi);width:14px;
+.pb-track-tog-icon{font-size:var(--t-base);color:var(--hi);width:14px;
   text-align:center;flex-shrink:0;}
-.pb-track-tog-label{font-size:8px;color:var(--text);flex-shrink:0;
+.pb-track-tog-label{font-size:var(--t-sm);color:var(--text);flex-shrink:0;
   letter-spacing:.05rem;}
-.pb-track-tog-sub{font-size:6px;color:var(--text2);letter-spacing:.03rem;}
+.pb-track-tog-sub{font-size:var(--t-xs);color:var(--text2);letter-spacing:.03rem;margin-top:1px;}
 .pb-track-tog-row:has(input:not(:checked)) .pb-track-tog-label,
 .pb-track-tog-row:has(input:not(:checked)) .pb-track-tog-icon{opacity:.4;}
 
@@ -879,7 +893,6 @@ body.mobile-mode #mobile-app { display: flex !important; }
         </div>
         <div id="pr-canvas-area">
           <canvas id="pianoroll-canvas"></canvas>
-          <canvas id="velocity-canvas"></canvas>
         </div>
       </div>
     </div>
@@ -896,9 +909,9 @@ body.mobile-mode #mobile-app { display: flex !important; }
   background:#1a1a2e;flex-direction:column;align-items:center;
   justify-content:center;gap:16px;touch-action:manipulation;">
   <div style="font:10px 'Press Start 2P',monospace;color:#00ccaa;letter-spacing:2px;">NESFORGE</div>
-  <div id="auo-prompt" style="font:7px 'Press Start 2P',monospace;color:#ffeecc;animation:blink 1s step-start infinite;">TAP TO START</div>
-  <div id="auo-status" style="font:5px 'Press Start 2P',monospace;color:#8888aa;max-width:260px;text-align:center;line-height:1.8;"></div>
-  <div style="font:5px 'Press Start 2P',monospace;color:#555577;max-width:260px;text-align:center;line-height:1.8;">
+  <div id="auo-prompt" style="font:9px 'Press Start 2P',monospace;color:#ffeecc;animation:blink 1s step-start infinite;">TAP TO START</div>
+  <div id="auo-status" style="font:8px 'Press Start 2P',monospace;color:#8888aa;max-width:260px;text-align:center;line-height:1.8;"></div>
+  <div style="font:8px 'Press Start 2P',monospace;color:#555577;max-width:260px;text-align:center;line-height:1.8;">
     Make sure volume is up &amp; mute switch is off
   </div>
 </div>
@@ -928,8 +941,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
       <button id="mob-prev-bar" class="mob-btn" style="min-width:36px;height:36px;font-size:12px;">◀</button>
       <div id="mob-bar-dots"></div>
       <button id="mob-next-bar" class="mob-btn" style="min-width:36px;height:36px;font-size:12px;">▶</button>
-      <button id="mob-rem-bar" class="mob-btn danger" style="min-width:32px;height:36px;font-size:10px;">−</button>
-      <button id="mob-add-bar" class="mob-btn" style="min-width:32px;height:36px;font-size:10px;">+</button>
+      <button id="mob-rem-bar" class="mob-btn danger" style="min-width:32px;height:36px;">−</button>
+      <button id="mob-add-bar" class="mob-btn" style="min-width:32px;height:36px;">+</button>
       <button id="mob-clear-track" class="mob-btn danger" style="min-width:32px;height:36px;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 512 512" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m210.82 60.24h90.35v30.12h-90.35z"/><path d="m60.24 90.35h391.53v30.12h-391.53z"/><path d="m90.35 120.47h30.12v301.18h-30.12z"/><path d="m391.53 120.47h30.12v301.18h-30.12z"/><path d="m90.35 421.65h331.29v30.12h-331.29z"/><path d="m180.71 150.59h30.12v271.06h-30.12z"/><path d="m301.18 150.59h30.12v271.06h-30.12z"/></svg></button>
       <button id="mob-magic-btn" class="mob-btn" style="min-width:48px;height:36px;">MAGIC</button>
     </div>
@@ -2038,7 +2051,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
   const PR = {
     KEY_WIDTH: 56,
     ROW_HEIGHT: 16,
-    RULER_HEIGHT: 20,
+    RULER_HEIGHT: 36,
+    LOOP_BAR_H: 18,       // top strip of PR ruler for loop region (= timeline bar height)
     BEAT_WIDTH: 80,       // pixels per beat
     VELOCITY_HEIGHT: 90,
     NOTE_COLORS: {
@@ -2108,13 +2122,12 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
     resizeCanvases() {
       const prCanvas = this.getCanvas();
-      const velCanvas = this.getVelCanvas();
       const panel = document.getElementById('pianoroll-panel');
       const w = panel.clientWidth - 190;
       prCanvas.width = w;
-      prCanvas.height = panel.clientHeight - this.VELOCITY_HEIGHT - 34; // subtract pr-topbar
-      velCanvas.width = w;
-      velCanvas.height = this.VELOCITY_HEIGHT;
+      prCanvas.height = panel.clientHeight - 34; // subtract pr-topbar
+      const velCanvas = this.getVelCanvas();
+      if (velCanvas) { velCanvas.width = w; velCanvas.height = this.VELOCITY_HEIGHT; }
     },
 
     draw() {
@@ -2310,54 +2323,88 @@ body.mobile-mode #mobile-app { display: flex !important; }
         }
       }
 
-      // PR Ruler (drawn as overlay so it covers scrolled content)
+      // PR Ruler — two-bar overlay (loop strip on top, timeline below)
       {
         const RH = this.RULER_HEIGHT;
+        const LBH = this.LOOP_BAR_H;
+        const tlY = LBH;
+        const tlH = RH - LBH;
         const patStartBar = ap ? (ap.track.arrangement.find(e => e.patternId === ap.pattern.id)?.startBar || 0) : 0;
+
+        // Backgrounds
+        ctx.fillStyle = '#2a2845';
+        ctx.fillRect(0, 0, W, LBH);
         ctx.fillStyle = '#46425e';
-        ctx.fillRect(0, 0, W, RH);
-        ctx.strokeStyle = '#15788c';
-        ctx.lineWidth = 1;
+        ctx.fillRect(0, tlY, W, tlH);
+        // Divider + bottom border
+        ctx.strokeStyle = '#15788c'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, tlY); ctx.lineTo(W, tlY); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(0, RH - 0.5); ctx.lineTo(W, RH - 0.5); ctx.stroke();
+
+        // Piano key cover — solid so timeline never bleeds into key gutter
+        ctx.fillStyle = '#2a2845'; ctx.fillRect(0, 0, KEY_WIDTH, LBH);
+        ctx.fillStyle = '#46425e'; ctx.fillRect(0, tlY, KEY_WIDTH, tlH);
+
         if (ap) {
           const barW = this.barWidth();
           const sixteenth = this.sixteenthWidth();
           const totalSixteenths = ap.pattern.lengthBars * ProjectState.timeSignature[0] * 4;
+
+          // Save + clip to right of piano keys
+          ctx.save();
+          ctx.beginPath(); ctx.rect(KEY_WIDTH, 0, W - KEY_WIDTH, RH); ctx.clip();
+
+          // Tick marks and bar numbers in timeline bar
           for (let s = 0; s <= totalSixteenths; s++) {
             const x = KEY_WIDTH + s * sixteenth - scrollX;
             if (x < KEY_WIDTH || x > W) continue;
             const isBar = s % (ProjectState.timeSignature[0] * 4) === 0;
             const isBeat = s % 4 === 0;
             if (isBar || isBeat) {
-              ctx.strokeStyle = isBar ? '#ffb0a3' : '#15788c';
-              ctx.beginPath(); ctx.moveTo(x, isBar ? 2 : RH - 5); ctx.lineTo(x, RH - 1); ctx.stroke();
+              ctx.strokeStyle = isBar ? '#ffb0a3' : '#15788c'; ctx.lineWidth = 1;
+              ctx.beginPath(); ctx.moveTo(x, tlY + (isBar ? 0 : tlH - 5)); ctx.lineTo(x, RH - 1); ctx.stroke();
             }
             if (isBar) {
-              ctx.fillStyle = '#ffb0a3';
-              ctx.font = '5px "Press Start 2P"';
-              ctx.fillText(s / (ProjectState.timeSignature[0] * 4) + 1, x + 2, 9);
+              ctx.fillStyle = '#ffb0a3'; ctx.font = '5px "Press Start 2P"';
+              ctx.fillText(s / (ProjectState.timeSignature[0] * 4) + 1, x + 2, tlY + 9);
             }
           }
-          // Loop region
-          if (ProjectState.loopEnabled) {
-            const lx1 = KEY_WIDTH + (ProjectState.loopStart - patStartBar) * barW - scrollX;
-            const lx2 = KEY_WIDTH + (ProjectState.loopEnd   - patStartBar) * barW - scrollX;
-            if (lx2 > KEY_WIDTH && lx1 < W) {
-              const rx = Math.max(KEY_WIDTH, lx1), rw = Math.min(W, lx2) - rx;
-              ctx.fillStyle = 'rgba(0,185,190,0.2)'; ctx.fillRect(rx, 0, rw, RH - 1);
-              ctx.strokeStyle = '#00b9be'; ctx.lineWidth = 1;
-              if (lx1 >= KEY_WIDTH) { ctx.beginPath(); ctx.moveTo(lx1, 0); ctx.lineTo(lx1, RH - 1); ctx.stroke(); }
-              if (lx2 <= W)         { ctx.beginPath(); ctx.moveTo(lx2, 0); ctx.lineTo(lx2, RH - 1); ctx.stroke(); }
+
+          // Loop region in loop bar — always drawn, grayed when disengaged
+          const lx1 = KEY_WIDTH + (ProjectState.loopStart - patStartBar) * barW - scrollX;
+          const lx2 = KEY_WIDTH + (ProjectState.loopEnd   - patStartBar) * barW - scrollX;
+          if (lx2 > KEY_WIDTH && lx1 < W) {
+            if (ProjectState.loopEnabled) {
+              ctx.fillStyle = 'rgba(0,185,190,0.45)';
+              ctx.fillRect(lx1, 0, lx2 - lx1, LBH);
+              ctx.strokeStyle = '#00ccaa'; ctx.lineWidth = 1;
+              if (lx1 >= KEY_WIDTH) { ctx.beginPath(); ctx.moveTo(lx1, 0); ctx.lineTo(lx1, LBH); ctx.stroke(); }
+              if (lx2 <= W)         { ctx.beginPath(); ctx.moveTo(lx2, 0); ctx.lineTo(lx2, LBH); ctx.stroke(); }
+              // Subtle tint in timeline bar
+              ctx.fillStyle = 'rgba(0,185,190,0.08)';
+              ctx.fillRect(lx1, tlY, lx2 - lx1, tlH);
+            } else {
+              ctx.fillStyle = 'rgba(100,100,140,0.35)';
+              ctx.fillRect(lx1, 0, lx2 - lx1, LBH);
+              ctx.strokeStyle = '#555577'; ctx.lineWidth = 1;
+              if (lx1 >= KEY_WIDTH) { ctx.beginPath(); ctx.moveTo(lx1, 0); ctx.lineTo(lx1, LBH); ctx.stroke(); }
+              if (lx2 <= W)         { ctx.beginPath(); ctx.moveTo(lx2, 0); ctx.lineTo(lx2, LBH); ctx.stroke(); }
             }
           }
-          // Playhead cap
+
+          // Playhead in timeline bar
           const rel = ProjectState.playheadBar - patStartBar;
           const px = KEY_WIDTH + rel * barW - scrollX;
           if (px >= KEY_WIDTH && px <= W) {
-            ctx.strokeStyle = '#ffeecc'; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, RH - 1); ctx.stroke();
-            ctx.lineWidth = 1;
+            ctx.strokeStyle = '#ffeecc'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(px, tlY); ctx.lineTo(px, RH - 1); ctx.stroke();
+            ctx.fillStyle = '#ffeecc';
+            ctx.beginPath();
+            ctx.moveTo(px - 4, tlY); ctx.lineTo(px + 4, tlY); ctx.lineTo(px, tlY + 5);
+            ctx.closePath(); ctx.fill();
           }
+
+          ctx.restore();
         }
       }
 
@@ -2418,8 +2465,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
           : '—';
         const pitchColor = hp !== null ? '#ffeecc' : '#555577';
         el.innerHTML = `<div style="display:flex;align-items:center;gap:5px;padding:2px 0;">
-          <span style="font-size:8px;color:#ffb0a3;font-family:'Press Start 2P',monospace;letter-spacing:0.05rem;">PITCH</span>
-          <span style="font-size:8px;color:${pitchColor};font-family:'Press Start 2P',monospace;">${pitchLabel}</span>
+          <span style="font-size:9px;color:#ffb0a3;font-family:'Press Start 2P',monospace;letter-spacing:0.05rem;">PITCH</span>
+          <span style="font-size:9px;color:${pitchColor};font-family:'Press Start 2P',monospace;">${pitchLabel}</span>
         </div>`;
         return;
       }
@@ -2441,17 +2488,17 @@ body.mobile-mode #mobile-app { display: flex !important; }
         : note.velocity;
       const pitchName = multi ? null : NOTE_NAMES[note.pitch % 12] + Math.floor(note.pitch / 12);
       const isChromatic = ProjectState.scale === 'Chromatic';
-      const selStyle = `font-size:8px;width:100%;font-family:'Press Start 2P',monospace;background:#46425e;color:#ffeecc;border:1px solid #15788c;box-sizing:border-box;`;
-      const lblStyle = `font-size:8px;color:#ffb0a3;font-family:'Press Start 2P',monospace;letter-spacing:0.05rem;flex-shrink:0;`;
+      const selStyle = `font-size:9px;width:100%;font-family:'Press Start 2P',monospace;background:#46425e;color:#ffeecc;border:1px solid #15788c;box-sizing:border-box;`;
+      const lblStyle = `font-size:9px;color:#ffb0a3;font-family:'Press Start 2P',monospace;letter-spacing:0.05rem;flex-shrink:0;`;
       const rowStyle = `display:flex;align-items:center;gap:5px;padding:2px 0;`;
-      const valStyle = `font-size:8px;color:#ffeecc;font-family:'Press Start 2P',monospace;background:#46425e;border:1px solid #15788c;padding:2px 4px;flex:1;`;
+      const valStyle = `font-size:9px;color:#ffeecc;font-family:'Press Start 2P',monospace;background:#46425e;border:1px solid #15788c;padding:2px 4px;flex:1;`;
 
       el.innerHTML = `
-        ${multi ? `<div style="font-size:5px;color:var(--text2);margin-bottom:3px;">${selected.length} NOTES</div>` : ''}
+        ${multi ? `<div style="font-size:8px;color:var(--text2);margin-bottom:3px;">${selected.length} NOTES</div>` : ''}
         ${!multi ? `
         <div style="display:flex;align-items:center;gap:5px;padding:2px 0;">
-          <span style="font-size:8px;color:#ffb0a3;font-family:'Press Start 2P',monospace;letter-spacing:0.05rem;">PITCH</span>
-          <span style="font-size:8px;color:#ffeecc;font-family:'Press Start 2P',monospace;">${pitchName}</span>
+          <span style="font-size:9px;color:#ffb0a3;font-family:'Press Start 2P',monospace;letter-spacing:0.05rem;">PITCH</span>
+          <span style="font-size:9px;color:#ffeecc;font-family:'Press Start 2P',monospace;">${pitchName}</span>
         </div>` : ''}
         <div style="${rowStyle}">
           <span style="${lblStyle}">LEN</span>
@@ -2485,23 +2532,23 @@ body.mobile-mode #mobile-app { display: flex !important; }
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:3px;margin-top:3px;">
-          <button class="nes-btn" id="pr-quantize-btn" style="width:100%;font-size:7px;">QUANTIZE</button>
-          <button class="nes-btn" id="pr-redist-btn"   style="width:100%;font-size:7px;">REDISTRIBUTE</button>
+          <button class="nes-btn" id="pr-quantize-btn" style="width:100%;font-size:9px;">QUANTIZE</button>
+          <button class="nes-btn" id="pr-redist-btn"   style="width:100%;font-size:9px;">REDISTRIBUTE</button>
         </div>
 
         <div class="pr-section-divider"></div>
         <div class="pr-side-title" style="margin-top:2px;">SHIFT PITCH</div>
         <div style="display:flex;gap:2px;justify-content:space-between;">
-          <button class="nes-btn" id="pr-pitch-oct-dn"  style="flex:1;font-size:7px;padding:0;">-8VA</button>
-          <button class="nes-btn" id="pr-pitch-semi-dn" style="flex:1;font-size:7px;padding:0;">-ST</button>
-          <button class="nes-btn" id="pr-pitch-semi-up" style="flex:1;font-size:7px;padding:0;">+ST</button>
-          <button class="nes-btn" id="pr-pitch-oct-up"  style="flex:1;font-size:7px;padding:0;">+8VA</button>
+          <button class="nes-btn" id="pr-pitch-oct-dn"  style="flex:1;font-size:9px;padding:0;">-8VA</button>
+          <button class="nes-btn" id="pr-pitch-semi-dn" style="flex:1;font-size:9px;padding:0;">-ST</button>
+          <button class="nes-btn" id="pr-pitch-semi-up" style="flex:1;font-size:9px;padding:0;">+ST</button>
+          <button class="nes-btn" id="pr-pitch-oct-up"  style="flex:1;font-size:9px;padding:0;">+8VA</button>
         </div>
         ${!isChromatic ? `
         <div style="${rowStyle}margin-top:3px;">
           <span style="${lblStyle}">SCALE STEP</span>
-          <button class="nes-btn" id="pr-pitch-step-dn" style="font-size:8px;padding:0 6px;">-</button>
-          <button class="nes-btn" id="pr-pitch-step-up" style="font-size:8px;padding:0 6px;">+</button>
+          <button class="nes-btn" id="pr-pitch-step-dn" style="font-size:9px;padding:0 6px;">-</button>
+          <button class="nes-btn" id="pr-pitch-step-up" style="font-size:9px;padding:0 6px;">+</button>
         </div>
         ` : ''}
 
@@ -2520,15 +2567,15 @@ body.mobile-mode #mobile-app { display: flex !important; }
           </select>
         </div>
         <div style="display:flex;gap:2px;margin-top:3px;">
-          <button class="nes-btn" id="pr-harm-this" style="flex:1;font-size:7px;padding:0 2px;">THIS TRACK</button>
-          <button class="nes-btn" id="pr-harm-new"  style="flex:1;font-size:7px;padding:0 2px;">NEW TRACK</button>
+          <button class="nes-btn" id="pr-harm-this" style="flex:1;font-size:9px;padding:0 2px;">THIS TRACK</button>
+          <button class="nes-btn" id="pr-harm-new"  style="flex:1;font-size:9px;padding:0 2px;">NEW TRACK</button>
         </div>
         <button class="nes-btn" id="pr-harmonize-btn"
-          style="margin-top:3px;width:100%;font-size:7px;color:var(--hi);border-color:var(--hi);">
+          style="margin-top:3px;width:100%;font-size:9px;color:var(--hi);border-color:var(--hi);">
           HARMONIZE
         </button>
 
-        <button class="nes-btn" id="pr-del-note" style="margin-top:auto;width:100%;font-size:7px;color:var(--accent);border-color:var(--accent);">
+        <button class="nes-btn" id="pr-del-note" style="margin-top:auto;width:100%;font-size:9px;color:var(--accent);border-color:var(--accent);">
           DELETE${multi ? ' ALL' : ''}
         </button>
       `;
@@ -2785,6 +2832,21 @@ body.mobile-mode #mobile-app { display: flex !important; }
     const _onDblClick = (mx, my, clientX, clientY) => {
       const ap = this.activePattern;
       if (!ap || mx < this.KEY_WIDTH) return;
+      // Ruler area interception
+      if (my < this.RULER_HEIGHT) {
+        if (my >= this.LOOP_BAR_H) {
+          // Timeline bar double-click → place playhead + play
+          const patStartBar = ap.track.arrangement.find(en => en.patternId === ap.pattern.id)?.startBar || 0;
+          const bar = patStartBar + (mx - this.KEY_WIDTH + this.scrollX) / this.barWidth();
+          ProjectState.playheadBar = Math.max(0, bar);
+          if (typeof Sequencer !== 'undefined') {
+            Sequencer._playStartBar = ProjectState.playheadBar;
+            Sequencer.play();
+          }
+          this.draw(); AV.draw();
+        }
+        return;
+      }
       const hit = hitTestNote(mx, my, _touchExpand);
       if (hit) {
         History.push();
@@ -2859,36 +2921,20 @@ body.mobile-mode #mobile-app { display: flex !important; }
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
 
-      // Ruler interaction
+      // Ruler interaction — two-bar model
       if (my < this.RULER_HEIGHT) {
         const patStartBar = ap.track.arrangement.find(en => en.patternId === ap.pattern.id)?.startBar || 0;
         const bar = patStartBar + (mx - this.KEY_WIDTH + this.scrollX) / this.barWidth();
-        if (!e.shiftKey && ProjectState.loopEnabled) {
+        if (my < this.LOOP_BAR_H) {
+          // Loop bar: click toggle, drag draws new loop region
           const barW = this.barWidth();
           const lx1 = this.KEY_WIDTH + (ProjectState.loopStart - patStartBar) * barW - this.scrollX;
           const lx2 = this.KEY_WIDTH + (ProjectState.loopEnd   - patStartBar) * barW - this.scrollX;
-          if (mx >= lx1 - 8 && mx <= lx1 + 8) {
-            dragState = { type: 'pr-loop-left', patStartBar, origStart: ProjectState.loopStart, origEnd: ProjectState.loopEnd, hasMoved: false };
-            return;
-          }
-          if (mx >= lx2 - 8 && mx <= lx2 + 8) {
-            dragState = { type: 'pr-loop-right', patStartBar, origStart: ProjectState.loopStart, origEnd: ProjectState.loopEnd, hasMoved: false };
-            return;
-          }
-          if (mx >= lx1 && mx <= lx2) {
-            dragState = { type: 'pr-loop-move', patStartBar, origStart: ProjectState.loopStart, origEnd: ProjectState.loopEnd, startBar: bar, hasMoved: false };
-            return;
-          }
-        }
-        if (e.shiftKey) {
+          const inLoop = mx >= lx1 && mx <= lx2;
           const snapped = Math.max(0, Math.floor(bar));
-          ProjectState.loopStart = snapped;
-          ProjectState.loopEnd = snapped + 1;
-          ProjectState.loopEnabled = true;
-          const btn = document.getElementById('btn-loop');
-          if (btn) btn.classList.add('engaged');
-          dragState = { type: 'pr-loop-right', patStartBar, origStart: snapped, origEnd: snapped + 1, hasMoved: false };
+          dragState = { type: 'pr-loop-bar-drag', patStartBar, anchorBar: snapped, anchorX: mx, hasMoved: false, wasInLoop: inLoop };
         } else {
+          // Timeline bar: click/drag scrubs playhead
           ProjectState.playheadBar = Math.max(0, bar);
           if (typeof Sequencer !== 'undefined') Sequencer._playStartBar = ProjectState.playheadBar;
           dragState = { type: 'pr-playhead', patStartBar };
@@ -3039,45 +3085,40 @@ body.mobile-mode #mobile-app { display: flex !important; }
       const my = e.clientY - rect.top;
 
       if (dragState.type === 'pr-playhead') {
+        const barW = this.barWidth();
+        const canvasW = canvas.offsetWidth;
+        const edgeZone = 60;
+        if (mx < this.KEY_WIDTH + edgeZone) {
+          this.scrollX = Math.max(0, this.scrollX - barW * 0.4);
+        } else if (mx > canvasW - edgeZone) {
+          this.scrollX += barW * 0.4;
+        }
         const bar = dragState.patStartBar + (mx - this.KEY_WIDTH + this.scrollX) / this.barWidth();
         ProjectState.playheadBar = Math.max(0, bar);
         if (typeof Sequencer !== 'undefined') Sequencer._playStartBar = ProjectState.playheadBar;
         this.draw(); AV.draw();
         return;
       }
-      if (dragState.type === 'pr-loop') {
-        const bar = dragState.patStartBar + (mx - this.KEY_WIDTH + this.scrollX) / this.barWidth();
-        ProjectState.loopEnd = Math.max(ProjectState.loopStart + 1, Math.ceil(bar));
-        this.draw(); AV.draw();
-        return;
-      }
-      if (dragState.type === 'pr-loop-left') {
-        const bar = dragState.patStartBar + (mx - this.KEY_WIDTH + this.scrollX) / this.barWidth();
-        const cell = 1 / ProjectState.timeSignature[0];
-        const snapped = Math.round(bar / cell) * cell;
-        ProjectState.loopStart = Math.max(0, Math.min(dragState.origEnd - cell, snapped));
-        dragState.hasMoved = true;
-        this.draw(); AV.draw();
-        return;
-      }
-      if (dragState.type === 'pr-loop-right') {
+      if (dragState.type === 'pr-loop-bar-drag') {
+        if (Math.abs(mx - dragState.anchorX) < 6) return;
+        if (!dragState.hasMoved) {
+          ProjectState.loopEnabled = true;
+          const btn = document.getElementById('btn-loop');
+          if (btn) btn.classList.add('engaged');
+          dragState.hasMoved = true;
+        }
         const bar = dragState.patStartBar + (mx - this.KEY_WIDTH + this.scrollX) / this.barWidth();
         const cell = 1 / ProjectState.timeSignature[0];
-        const snapped = Math.round(bar / cell) * cell;
-        ProjectState.loopEnd = Math.max(dragState.origStart + cell, snapped);
-        dragState.hasMoved = true;
-        this.draw(); AV.draw();
-        return;
-      }
-      if (dragState.type === 'pr-loop-move') {
-        const bar = dragState.patStartBar + (mx - this.KEY_WIDTH + this.scrollX) / this.barWidth();
-        const cell = 1 / ProjectState.timeSignature[0];
-        const delta = Math.round((bar - dragState.startBar) / cell) * cell;
-        const dur = dragState.origEnd - dragState.origStart;
-        const newStart = Math.max(0, dragState.origStart + delta);
-        ProjectState.loopStart = newStart;
-        ProjectState.loopEnd = newStart + dur;
-        if (Math.abs(delta) >= cell) dragState.hasMoved = true;
+        const snap = (v) => Math.round(v / cell) * cell;
+        const anchor = dragState.anchorBar;
+        const snapped = snap(bar);
+        if (snapped <= anchor) {
+          ProjectState.loopStart = Math.max(0, snapped);
+          ProjectState.loopEnd = anchor + 1;
+        } else {
+          ProjectState.loopStart = anchor;
+          ProjectState.loopEnd = Math.max(anchor + 1, snapped);
+        }
         this.draw(); AV.draw();
         return;
       }
@@ -3151,17 +3192,18 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
     const onCanvasMouseUp = (e) => {
       if (!dragState) return;
-      if (dragState.type === 'pr-loop-move' && !dragState.hasMoved) {
-        // Click without drag on loop body → disable loop
-        ProjectState.loopEnabled = false;
-        const btn = document.getElementById('btn-loop');
-        if (btn) btn.classList.remove('engaged');
+      if (dragState.type === 'pr-loop-bar-drag') {
+        if (!dragState.hasMoved && dragState.wasInLoop) {
+          // Click without drag inside loop → toggle engage/disengage
+          ProjectState.loopEnabled = !ProjectState.loopEnabled;
+          const btn = document.getElementById('btn-loop');
+          if (btn) btn.classList.toggle('engaged', ProjectState.loopEnabled);
+          this.draw(); AV.draw();
+        }
         dragState = null; this._dragState = null;
-        this.draw(); AV.draw();
         return;
       }
-      if (dragState.type === 'pr-playhead' || dragState.type === 'pr-loop' ||
-          dragState.type === 'pr-loop-left' || dragState.type === 'pr-loop-right' || dragState.type === 'pr-loop-move') {
+      if (dragState.type === 'pr-playhead') {
         dragState = null; this._dragState = null;
         return;
       }
@@ -3231,6 +3273,16 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
+      if (e.ctrlKey) {
+        // Pinch-to-zoom: scale BEAT_WIDTH, keep bar under cursor fixed
+        const factor = Math.exp(-e.deltaY / 120);
+        const mx = e.offsetX;
+        const barUnderCursor = (mx - this.KEY_WIDTH + this.scrollX) / this.barWidth();
+        this.BEAT_WIDTH = Math.max(20, Math.min(320, this.BEAT_WIDTH * factor));
+        this.scrollX = Math.max(0, barUnderCursor * this.barWidth() - (mx - this.KEY_WIDTH));
+        PR.draw();
+        return;
+      }
       if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
         const ap = this.activePattern;
         const maxScrollX = ap
@@ -3432,6 +3484,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
     // Velocity canvas interaction
     const velCanvas = this.getVelCanvas();
+    if (!velCanvas) return;
     velCanvas.addEventListener('mousedown', (e) => {
       const ap = this.activePattern;
       if (!ap) return;
@@ -3580,6 +3633,7 @@ const AV = {
   TRACK_HEIGHT: 96,
   BEAT_WIDTH: 40,
   RULER_HEIGHT: 36,
+  LOOP_BAR_H: 18,   // top strip of ruler reserved for loop region (= timeline bar height)
   scrollX: 0,
   scrollY: 0,
   NOTE_COLORS: PR.NOTE_COLORS,
@@ -3607,8 +3661,8 @@ const AV = {
     ctx.fillStyle = '#46425e';
     ctx.fillRect(0, 0, W, H);
 
-    this._drawRuler(ctx, W);
     this._drawTracks(ctx, W, H);
+    this._drawRuler(ctx, W);
     if (this._avMarquee) {
       const { startX, startY, currentX, currentY } = this._avMarquee;
       const rx = Math.min(startX, currentX), ry = Math.min(startY, currentY);
@@ -3636,13 +3690,24 @@ const AV = {
   },
 
   _drawRuler(ctx, W) {
-    const { HEADER_WIDTH, RULER_HEIGHT, scrollX } = this;
+    const { HEADER_WIDTH, RULER_HEIGHT, LOOP_BAR_H, scrollX } = this;
+    const timelineY = LOOP_BAR_H;
+    const timelineH = RULER_HEIGHT - LOOP_BAR_H;
+
+    // Top bar background (loop region strip)
+    ctx.fillStyle = '#2a2845';
+    ctx.fillRect(0, 0, W, LOOP_BAR_H);
+    // Bottom bar background (timeline)
     ctx.fillStyle = '#46425e';
-    ctx.fillRect(0, 0, W, RULER_HEIGHT);
+    ctx.fillRect(0, timelineY, W, timelineH);
+    // Divider between the two bars
     ctx.strokeStyle = '#15788c';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, timelineY); ctx.lineTo(W, timelineY); ctx.stroke();
+    // Bottom border of ruler
     ctx.beginPath(); ctx.moveTo(0, RULER_HEIGHT); ctx.lineTo(W, RULER_HEIGHT); ctx.stroke();
 
-    // Clip all timeline content to the right of the header so it never bleeds over the buttons
+    // Clip timeline content to right of header
     ctx.save();
     ctx.beginPath();
     ctx.rect(HEADER_WIDTH, 0, W - HEADER_WIDTH, RULER_HEIGHT);
@@ -3650,35 +3715,65 @@ const AV = {
 
     const barW = this.barWidth();
     const songLen = getSongLengthBars() + 4;
+
+    // Bar tick marks and numbers in the timeline bar only
     for (let b = 0; b <= songLen; b++) {
       const x = HEADER_WIDTH + b * barW - scrollX;
       if (x < HEADER_WIDTH || x > W) continue;
       ctx.strokeStyle = '#15788c';
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, RULER_HEIGHT); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, timelineY); ctx.lineTo(x, RULER_HEIGHT); ctx.stroke();
       ctx.fillStyle = '#ffb0a3';
       ctx.font = '6px "Press Start 2P"';
-      ctx.fillText(b + 1, x + 2, 13);
+      ctx.fillText(b + 1, x + 2, timelineY + 13);
     }
 
-    // Loop region (only when loop is enabled)
+    // Loop region — always drawn, grayed when disengaged
+    const lx1 = HEADER_WIDTH + ProjectState.loopStart * barW - scrollX;
+    const lx2 = HEADER_WIDTH + ProjectState.loopEnd * barW - scrollX;
     if (ProjectState.loopEnabled) {
-      const lx1 = HEADER_WIDTH + ProjectState.loopStart * barW - scrollX;
-      const lx2 = HEADER_WIDTH + ProjectState.loopEnd * barW - scrollX;
-      ctx.fillStyle = 'rgba(0,185,190,0.2)';
-      ctx.fillRect(lx1, 0, lx2 - lx1, RULER_HEIGHT);
-      ctx.strokeStyle = '#00b9be';
-      ctx.beginPath(); ctx.moveTo(lx1,0); ctx.lineTo(lx1,RULER_HEIGHT); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(lx2,0); ctx.lineTo(lx2,RULER_HEIGHT); ctx.stroke();
+      ctx.fillStyle = 'rgba(0,185,190,0.45)';
+      ctx.fillRect(lx1, 0, lx2 - lx1, LOOP_BAR_H);
+      ctx.strokeStyle = '#00ccaa';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(lx1, 0); ctx.lineTo(lx1, LOOP_BAR_H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lx2, 0); ctx.lineTo(lx2, LOOP_BAR_H); ctx.stroke();
+      // Subtle tint in timeline bar too
+      ctx.fillStyle = 'rgba(0,185,190,0.08)';
+      ctx.fillRect(lx1, timelineY, lx2 - lx1, timelineH);
+    } else {
+      // Disengaged: muted gray indicator so region is still visible
+      ctx.fillStyle = 'rgba(100,100,140,0.35)';
+      ctx.fillRect(lx1, 0, lx2 - lx1, LOOP_BAR_H);
+      ctx.strokeStyle = '#555577';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(lx1, 0); ctx.lineTo(lx1, LOOP_BAR_H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lx2, 0); ctx.lineTo(lx2, LOOP_BAR_H); ctx.stroke();
     }
 
-    // Playhead
+    // Playhead — in timeline bar only
     const px = HEADER_WIDTH + ProjectState.playheadBar * barW - scrollX;
     ctx.strokeStyle = '#ffeecc';
-    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, RULER_HEIGHT); ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px, timelineY); ctx.lineTo(px, RULER_HEIGHT); ctx.stroke();
+    // Small triangle head at the top of the timeline bar
+    ctx.fillStyle = '#ffeecc';
+    ctx.beginPath();
+    ctx.moveTo(px - 4, timelineY);
+    ctx.lineTo(px + 4, timelineY);
+    ctx.lineTo(px, timelineY + 5);
+    ctx.closePath();
+    ctx.fill();
 
     ctx.restore();
 
-    // Draw buttons last so they always appear on top of any timeline overflow
+    // Header cover — solid fill matching track headers, with right border
+    ctx.fillStyle = '#46425e';
+    ctx.fillRect(0, 0, HEADER_WIDTH, RULER_HEIGHT);
+    ctx.strokeStyle = '#15788c';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(HEADER_WIDTH, 0); ctx.lineTo(HEADER_WIDTH, RULER_HEIGHT); ctx.stroke();
+
+    // Buttons always on top
     const hz = this._hoverHit?.zone;
     // Add track (+)
     ctx.fillStyle = hz === 'add-track' ? '#00b9be' : '#15788c';
@@ -3829,14 +3924,22 @@ const AV = {
           ctx.restore();
         }
 
+        // Loop-shorten strip: top half of the LOOPED EXTENSION area only.
+        // Click here to instantly clip the loop end to that bar position.
+        if (entry.loopBars && entry.loopBars > pat.lengthBars) {
+          const extW = bw - contentW;
+          ctx.fillStyle = color + '55';
+          ctx.fillRect(bx + contentW, blockY, extW, blockH / 2);
+        }
+
         ctx.fillStyle = color;
         ctx.font = '5px "Press Start 2P"';
         ctx.fillText(pat.name, bx + 3, blockY + 11);
 
-        // Resize handle: top-right corner of content (6×8 px)
+        // Loop handle: TOP-right corner of content (6×8 px) — drag up here to extend loop
         ctx.fillStyle = color;
         ctx.fillRect(bx + contentW - 6, blockY, 6, 8);
-        // Loop handle: bottom-right corner of content (6×8 px, dimmer)
+        // Resize handle: bottom-right corner of content (6×8 px, dimmer)
         ctx.fillStyle = color + 'aa';
         ctx.fillRect(bx + contentW - 6, blockY + blockH - 8, 6, 8);
 
@@ -3910,12 +4013,13 @@ AV.initEvents = function() {
   let _lastMdZone = null;
 
   const getHit = (mx, my) => {
-    const { HEADER_WIDTH, TRACK_HEIGHT, RULER_HEIGHT, scrollX, scrollY } = this;
+    const { HEADER_WIDTH, TRACK_HEIGHT, RULER_HEIGHT, LOOP_BAR_H, scrollX, scrollY } = this;
     const barW = this.barWidth();
     if (my < RULER_HEIGHT) {
       if (mx >= 4 && mx <= 30) return { zone: 'add-track' };
       if (mx >= 34 && mx <= 60) return { zone: 'clear-all' };
-      return { zone: 'ruler' };
+      if (my < LOOP_BAR_H) return { zone: 'loop-bar' };
+      return { zone: 'timeline-bar' };
     }
     const trackIdx = Math.floor((my - RULER_HEIGHT + scrollY) / TRACK_HEIGHT);
     if (trackIdx < 0 || trackIdx >= ProjectState.tracks.length) return null;
@@ -3936,12 +4040,23 @@ AV.initEvents = function() {
       const contentRight = bx + pat.lengthBars * barW - 2;
       const bw = totalBars * barW - 2;
       if (mx >= bx && mx <= bx + bw) {
-        const blockMid = ty + TRACK_HEIGHT * 0.5;
-        // Resize zone: right 8px of content edge, top half
+        const blockTopY = ty + 2;
+        const blockH = TRACK_HEIGHT - 4;
+        // Loop-shorten: top HALF of the looped EXTENSION area (past content end)
+        if (entry.loopBars && entry.loopBars > pat.lengthBars) {
+          const extStartX = bx + (pat.lengthBars * barW - 2);
+          const extEndX = bx + bw - 8; // exclude tail loop-extend handle
+          if (mx >= extStartX && mx <= extEndX &&
+              my >= blockTopY && my <= blockTopY + blockH / 2) {
+            return { zone: 'loop-shorten', track, entry, pat };
+          }
+        }
+        // Resize/loop handle: right 8px of content edge
+        // Top third → loop-pattern (create/extend); bottom two-thirds → resize
         if (mx >= contentRight - 8 && mx <= contentRight + 4) {
-          return my <= blockMid
-            ? { zone: 'resize-pattern', track, entry, pat, bar }
-            : { zone: 'loop-pattern', track, entry, pat, bar };
+          return my <= blockTopY + blockH / 3
+            ? { zone: 'loop-pattern', track, entry, pat, bar }
+            : { zone: 'resize-pattern', track, entry, pat, bar };
         }
         // Extend loop zone: right 8px of the looped block tail
         if (entry.loopBars && entry.loopBars > pat.lengthBars && mx >= bx + bw - 8) {
@@ -3961,41 +4076,26 @@ AV.initEvents = function() {
     if (!hit) { _lastMdZone = null; return; }
     _lastMdZone = hit.zone;
 
-    if (hit.zone === 'ruler') {
+    if (hit.zone === 'loop-bar') {
       const { HEADER_WIDTH, scrollX } = this;
       const barW = this.barWidth();
       const bar = (mx - HEADER_WIDTH + scrollX) / barW;
-      if (!e.shiftKey && ProjectState.loopEnabled) {
-        const lx1 = HEADER_WIDTH + ProjectState.loopStart * barW - scrollX;
-        const lx2 = HEADER_WIDTH + ProjectState.loopEnd * barW - scrollX;
-        if (mx >= lx1 - 8 && mx <= lx1 + 8) {
-          loopDragState = { type: 'resize-left', origStart: ProjectState.loopStart, origEnd: ProjectState.loopEnd, startX: mx, hasMoved: false };
-          return;
-        }
-        if (mx >= lx2 - 8 && mx <= lx2 + 8) {
-          loopDragState = { type: 'resize-right', origStart: ProjectState.loopStart, origEnd: ProjectState.loopEnd, startX: mx, hasMoved: false };
-          return;
-        }
-        if (mx >= lx1 && mx <= lx2) {
-          loopDragState = { type: 'move', origStart: ProjectState.loopStart, origEnd: ProjectState.loopEnd, startBar: bar, hasMoved: false };
-          return;
-        }
-      }
-      if (e.shiftKey) {
-        // Shift+click starts a new loop region
-        const snapped = Math.max(0, Math.floor(bar));
-        ProjectState.loopStart = snapped;
-        ProjectState.loopEnd = snapped + 1;
-        ProjectState.loopEnabled = true;
-        const btn = document.getElementById('btn-loop');
-        if (btn) btn.classList.add('engaged');
-        loopDragState = { type: 'resize-right', origStart: snapped, origEnd: snapped + 1, startX: mx, hasMoved: false };
-      } else {
-        // Plain click/drag moves playhead
-        ProjectState.playheadBar = Math.max(0, bar);
-        if (typeof Sequencer !== 'undefined') Sequencer._playStartBar = ProjectState.playheadBar;
-        playheadDrag = true;
-      }
+      const lx1 = HEADER_WIDTH + ProjectState.loopStart * barW - scrollX;
+      const lx2 = HEADER_WIDTH + ProjectState.loopEnd * barW - scrollX;
+      const inLoop = mx >= lx1 && mx <= lx2;
+      // Any drag will draw a new loop region; click without drag on existing = toggle
+      const snapped = Math.max(0, Math.floor(bar));
+      loopDragState = { type: 'loop-bar-drag', anchorBar: snapped, anchorX: mx, hasMoved: false, wasInLoop: inLoop };
+      AV.draw();
+      return;
+    }
+    if (hit.zone === 'timeline-bar') {
+      const { HEADER_WIDTH, scrollX } = this;
+      const barW = this.barWidth();
+      const bar = (mx - HEADER_WIDTH + scrollX) / barW;
+      ProjectState.playheadBar = Math.max(0, bar);
+      if (typeof Sequencer !== 'undefined') Sequencer._playStartBar = ProjectState.playheadBar;
+      playheadDrag = true;
       AV.draw();
       return;
     }
@@ -4010,7 +4110,7 @@ AV.initEvents = function() {
         background:#46425e;border:2px solid #ff4444;z-index:501;padding:14px 16px 12px;min-width:300px;`;
 
       const confTitle = document.createElement('div');
-      confTitle.style.cssText = 'font:7px "Press Start 2P";color:#ff4444;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #ff4444;letter-spacing:1px;';
+      confTitle.style.cssText = 'font:9px "Press Start 2P";color:#ff4444;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #ff4444;letter-spacing:1px;';
       confTitle.textContent = 'CLEAR ALL?';
 
       // Toggle row
@@ -4020,7 +4120,7 @@ AV.initEvents = function() {
         const b = document.createElement('button');
         b.className = 'nes-btn';
         b.textContent = label;
-        b.style.cssText = `flex:1;font-size:6px;padding:5px 4px;`;
+        b.style.cssText = `flex:1;font-size:8px;padding:5px 4px;`;
         b.dataset.mode = mode;
         b.onclick = () => {
           clearMode = mode;
@@ -4047,7 +4147,7 @@ AV.initEvents = function() {
       toggleRow.appendChild(btnNotes);
 
       const confMsg = document.createElement('div');
-      confMsg.style.cssText = 'font:6px "Press Start 2P";color:#ffeecc;margin-bottom:14px;line-height:1.8;';
+      confMsg.style.cssText = 'font:8px "Press Start 2P";color:#ffeecc;margin-bottom:14px;line-height:1.8;';
       confMsg.textContent = 'Delete all note containers across all tracks. Tracks remain.';
 
       const btnRow = document.createElement('div');
@@ -4061,7 +4161,9 @@ AV.initEvents = function() {
       confirmBtn.onclick = () => {
         History.push();
         if (clearMode === 'tracks') {
-          for (const track of ProjectState.tracks) { track.patterns = []; track.arrangement = []; }
+          ProjectState.tracks = [];
+          ProjectState.selectedTrackId = null;
+          ProjectState.armedTrackId = null;
           if (PR.activePattern) {
             PR.activePattern = null;
             document.getElementById('pianoroll-panel').style.display = 'none';
@@ -4191,6 +4293,24 @@ AV.initEvents = function() {
       };
       return;
     }
+    if (hit.zone === 'loop-shorten') {
+      const { HEADER_WIDTH, scrollX } = this;
+      const snapshot = JSON.stringify(ProjectState); // before any change
+      const barW = this.barWidth();
+      const cell = 1 / ProjectState.timeSignature[0];
+      const rawBar = (mx - HEADER_WIDTH + scrollX) / barW;
+      const snapped = Math.round(rawBar / cell) * cell;
+      const origLoopBars = hit.entry.loopBars;
+      // Instantly clip to clicked position, then allow drag to continue adjusting
+      hit.entry.loopBars = Math.max(hit.pat.lengthBars + cell, snapped - hit.entry.startBar);
+      dragState = {
+        type: 'loop-shorten-drag',
+        entry: hit.entry, track: hit.track, pat: hit.pat,
+        origLoopBars, snapshot
+      };
+      AV.draw();
+      return;
+    }
     if (hit.zone === 'loop-pattern') {
       AV._selEntries.clear();
       AV._selEntries.add(hit.entry);
@@ -4231,6 +4351,17 @@ AV.initEvents = function() {
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     const hit = getHit(mx, my);
     if (!hit) return;
+    if (hit.zone === 'timeline-bar') {
+      // Double-click on timeline bar → place playhead + start playback
+      const bar = (mx - AV.HEADER_WIDTH + AV.scrollX) / AV.barWidth();
+      ProjectState.playheadBar = Math.max(0, bar);
+      if (typeof Sequencer !== 'undefined') {
+        Sequencer._playStartBar = ProjectState.playheadBar;
+        Sequencer.play();
+      }
+      AV.draw();
+      return;
+    }
     if (hit.zone === 'header') {
       // Double-click in track name area → inline rename
       const trackIdx = ProjectState.tracks.indexOf(hit.track);
@@ -4245,7 +4376,7 @@ AV.initEvents = function() {
           width:148px; height:16px;
           background:#2a2845; color:#ffeecc;
           border:1px solid #00ccaa; outline:none;
-          font:7px "Press Start 2P"; padding:2px 4px;
+          font:9px "Press Start 2P"; padding:2px 4px;
           z-index:600; box-sizing:border-box;
         `;
         document.body.appendChild(inputEl);
@@ -4292,6 +4423,14 @@ AV.initEvents = function() {
     const my = e.clientY - rect.top;
     if (playheadDrag) {
       const barW = this.barWidth();
+      // Edge auto-scroll: nudge scrollX when dragging near canvas edges
+      const canvasW = canvas.offsetWidth;
+      const edgeZone = 60;
+      if (mx < this.HEADER_WIDTH + edgeZone) {
+        this.scrollX = Math.max(0, this.scrollX - barW * 0.4);
+      } else if (mx > canvasW - edgeZone) {
+        this.scrollX += barW * 0.4;
+      }
       const bar = (mx - this.HEADER_WIDTH + this.scrollX) / barW;
       ProjectState.playheadBar = Math.max(0, bar);
       if (typeof Sequencer !== 'undefined') Sequencer._playStartBar = ProjectState.playheadBar;
@@ -4302,24 +4441,26 @@ AV.initEvents = function() {
     if (loopDragState) {
       const barW = this.barWidth();
       const bar = (mx - this.HEADER_WIDTH + this.scrollX) / barW;
-      const { type, origStart, origEnd } = loopDragState;
-      const cell = 1 / ProjectState.timeSignature[0]; // 1 beat in bar units
+      const cell = 1 / ProjectState.timeSignature[0];
       const snap = (v) => Math.round(v / cell) * cell;
-      if (type === 'resize-left') {
+      if (loopDragState.type === 'loop-bar-drag') {
+        if (Math.abs(mx - loopDragState.anchorX) < 6) return;
+        if (!loopDragState.hasMoved) {
+          // First real drag — engage loop and start drawing
+          ProjectState.loopEnabled = true;
+          const btn = document.getElementById('btn-loop');
+          if (btn) btn.classList.add('engaged');
+          loopDragState.hasMoved = true;
+        }
+        const anchor = loopDragState.anchorBar;
         const snapped = snap(bar);
-        ProjectState.loopStart = Math.max(0, Math.min(origEnd - cell, snapped));
-        loopDragState.hasMoved = true;
-      } else if (type === 'resize-right') {
-        const snapped = snap(bar);
-        ProjectState.loopEnd = Math.max(origStart + cell, snapped);
-        loopDragState.hasMoved = true;
-      } else if (type === 'move') {
-        const delta = snap(bar - loopDragState.startBar);
-        const dur = origEnd - origStart;
-        const newStart = Math.max(0, origStart + delta);
-        ProjectState.loopStart = newStart;
-        ProjectState.loopEnd = newStart + dur;
-        if (Math.abs(delta) >= cell) loopDragState.hasMoved = true;
+        if (snapped <= anchor) {
+          ProjectState.loopStart = Math.max(0, snapped);
+          ProjectState.loopEnd = anchor + 1;
+        } else {
+          ProjectState.loopStart = anchor;
+          ProjectState.loopEnd = Math.max(anchor + 1, snapped);
+        }
       }
       AV.draw();
       if (PR.activePattern) PR.draw();
@@ -4333,17 +4474,22 @@ AV.initEvents = function() {
     }
     // Cursor feedback + hover highlights when not dragging
     if (!dragState) {
-      if (my < this.RULER_HEIGHT && ProjectState.loopEnabled) {
+      if (my < this.LOOP_BAR_H) {
+        // Loop bar cursor
         const barW = this.barWidth();
         const lx1 = this.HEADER_WIDTH + ProjectState.loopStart * barW - this.scrollX;
         const lx2 = this.HEADER_WIDTH + ProjectState.loopEnd * barW - this.scrollX;
-        if (mx >= lx1 - 8 && mx <= lx1 + 8) { canvas.style.cursor = 'ew-resize'; return; }
-        if (mx >= lx2 - 8 && mx <= lx2 + 8) { canvas.style.cursor = 'ew-resize'; return; }
-        if (mx >= lx1 && mx <= lx2) { canvas.style.cursor = 'grab'; return; }
+        canvas.style.cursor = (mx >= lx1 && mx <= lx2) ? 'pointer' : 'crosshair';
+        return;
+      }
+      if (my < this.RULER_HEIGHT) {
+        canvas.style.cursor = 'col-resize';
+        return;
       }
       const hit = getHit(mx, my);
       if (hit?.zone === 'resize-pattern') canvas.style.cursor = 'ew-resize';
       else if (hit?.zone === 'loop-pattern') canvas.style.cursor = 'col-resize';
+      else if (hit?.zone === 'loop-shorten') canvas.style.cursor = 'col-resize';
       else if (hit?.zone === 'pattern') canvas.style.cursor = e.altKey ? 'copy' : 'grab';
       else canvas.style.cursor = '';
       // Update hover hit — only redraw if something changed
@@ -4367,6 +4513,15 @@ AV.initEvents = function() {
       const deltaBars = (mx - dragState.startX) / barW;
       const newLoop = Math.max(dragState.pat.lengthBars, Math.round((dragState.origLoopBars + deltaBars) * 2) / 2);
       dragState.entry.loopBars = newLoop <= dragState.pat.lengthBars ? undefined : newLoop;
+      AV.draw();
+      return;
+    }
+    if (dragState.type === 'loop-shorten-drag') {
+      const { HEADER_WIDTH, scrollX } = this;
+      const rawBar = (mx - HEADER_WIDTH + scrollX) / barW;
+      const cell = 1 / ProjectState.timeSignature[0];
+      const snapped = Math.round(rawBar / cell) * cell;
+      dragState.entry.loopBars = Math.max(dragState.pat.lengthBars + cell, snapped - dragState.entry.startBar);
       AV.draw();
       return;
     }
@@ -4405,6 +4560,7 @@ AV.initEvents = function() {
     if (dragState?.snapshot) {
       const changed = dragState.type === 'resize-pattern' ? dragState.pat.lengthBars !== dragState.origLengthBars
         : dragState.type === 'loop-pattern' ? (dragState.entry.loopBars || dragState.pat.lengthBars) !== dragState.origLoopBars
+        : dragState.type === 'loop-shorten-drag' ? dragState.entry.loopBars !== dragState.origLoopBars
         : dragState.cloned || dragState.entry?.startBar !== dragState.origBar || dragState.track !== dragState.origTrack;
       if (changed) History._pushSnapshot(dragState.snapshot);
       // If pattern moved to a different track, update the piano roll reference
@@ -4414,11 +4570,13 @@ AV.initEvents = function() {
       }
     }
     if (loopDragState) {
-      if (loopDragState.type === 'move' && !loopDragState.hasMoved) {
-        // Click without drag on loop body → disable loop
-        ProjectState.loopEnabled = false;
-        const btn = document.getElementById('btn-loop');
-        if (btn) btn.classList.remove('engaged');
+      if (loopDragState.type === 'loop-bar-drag' && !loopDragState.hasMoved) {
+        // Click without drag: toggle engage if clicked inside loop, otherwise do nothing
+        if (loopDragState.wasInLoop) {
+          ProjectState.loopEnabled = !ProjectState.loopEnabled;
+          const btn = document.getElementById('btn-loop');
+          if (btn) btn.classList.toggle('engaged', ProjectState.loopEnabled);
+        }
         AV.draw(); if (PR.activePattern) PR.draw();
       }
       loopDragState = null;
@@ -4458,6 +4616,16 @@ AV.initEvents = function() {
 
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
+    if (e.ctrlKey) {
+      // Pinch-to-zoom: scale BEAT_WIDTH, keep bar under cursor fixed
+      const factor = Math.exp(-e.deltaY / 120);
+      const mx = e.offsetX;
+      const barUnderCursor = (mx - this.HEADER_WIDTH + this.scrollX) / this.barWidth();
+      this.BEAT_WIDTH = Math.max(10, Math.min(200, this.BEAT_WIDTH * factor));
+      this.scrollX = Math.max(0, barUnderCursor * this.barWidth() - (mx - this.HEADER_WIDTH));
+      this.draw();
+      return;
+    }
     const maxScrollY = Math.max(0, ProjectState.tracks.length * this.TRACK_HEIGHT - canvas.height + this.RULER_HEIGHT);
     if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
       let maxBar = 0;
@@ -4549,19 +4717,19 @@ function showAddTrackModal({ defaultType = 'pulse50', onConfirm } = {}) {
   el.id = 'add-track-modal';
   el.style.cssText = `position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
     background:#1a1a2e;border:2px solid #00ccaa;z-index:1001;padding:16px;min-width:220px;
-    font:7px "Press Start 2P";color:#e0e0ff;display:flex;flex-direction:column;gap:10px;`;
+    font:9px "Press Start 2P";color:#e0e0ff;display:flex;flex-direction:column;gap:10px;`;
 
   let selected = defaultType;
   let currentName = DEFAULT_NAMES[defaultType] || 'TRACK';
 
   const render = () => {
     el.innerHTML = `
-      <div style="color:#00ccaa;font-size:8px;letter-spacing:1px;">NEW TRACK</div>
+      <div style="color:#00ccaa;font-size:9px;letter-spacing:1px;">NEW TRACK</div>
       <div>
         <div style="color:#8888aa;margin-bottom:5px;">NAME</div>
         <input id="atm-name" type="text" value="${currentName}"
           style="background:#0d0d1a;border:2px solid #444466;color:#e0e0ff;
-                 font:7px 'Press Start 2P';padding:4px 6px;width:100%;box-sizing:border-box;">
+                 font:9px 'Press Start 2P';padding:4px 6px;width:100%;box-sizing:border-box;">
       </div>
       <div>
         <div style="color:#8888aa;margin-bottom:6px;">TYPE</div>
@@ -4573,18 +4741,18 @@ function showAddTrackModal({ defaultType = 'pulse50', onConfirm } = {}) {
                      background:${t.value === selected ? '#003322' : 'transparent'};">
               <div style="width:8px;height:8px;border:2px solid ${t.value === selected ? '#00ccaa' : '#555577'};
                           background:${t.value === selected ? '#00ccaa' : 'transparent'};flex-shrink:0;"></div>
-              <span style="color:${t.value === selected ? '#00ccaa' : '#ffeecc'};font-size:7px;">${t.label}</span>
-              <span style="color:#555577;font-size:5px;margin-left:auto;">${t.sub}</span>
+              <span style="color:${t.value === selected ? '#00ccaa' : '#ffeecc'};font-size:9px;">${t.label}</span>
+              <span style="color:#555577;font-size:8px;margin-left:auto;">${t.sub}</span>
             </div>`).join('')}
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:2px;">
         <button id="atm-cancel"
           style="flex:1;background:#1a1a2e;border:2px solid #444466;color:#8888aa;
-                 font:7px 'Press Start 2P';padding:6px;cursor:pointer;">CANCEL</button>
+                 font:9px 'Press Start 2P';padding:6px;cursor:pointer;">CANCEL</button>
         <button id="atm-create"
           style="flex:1;background:#003322;border:2px solid #00ccaa;color:#00ccaa;
-                 font:7px 'Press Start 2P';padding:6px;cursor:pointer;">CREATE</button>
+                 font:9px 'Press Start 2P';padding:6px;cursor:pointer;">CREATE</button>
       </div>
     `;
 
@@ -4624,7 +4792,7 @@ function showContextMenu(x, y, items) {
   items.forEach(item => {
     const btn = document.createElement('div');
     btn.textContent = item.label;
-    btn.style.cssText = 'padding:6px 10px;cursor:pointer;font:6px "Press Start 2P";color:#ffeecc;letter-spacing:0.05rem;';
+    btn.style.cssText = 'padding:6px 10px;cursor:pointer;font:8px "Press Start 2P";color:#ffeecc;letter-spacing:0.05rem;';
     btn.onmouseenter = () => { btn.style.background = '#15788c'; btn.style.color = '#ffeecc'; };
     btn.onmouseleave = () => btn.style.background = '';
     btn.onclick = () => { item.action(); el.remove(); };
@@ -4659,7 +4827,7 @@ function showTrackSettings(track, x, y) {
   xBtn.style.cssText = `
     position:absolute; top:6px; right:8px;
     background:none; border:none; color:#00b9be;
-    font:8px "Press Start 2P"; cursor:pointer; padding:2px 4px; line-height:1;
+    font:9px "Press Start 2P"; cursor:pointer; padding:2px 4px; line-height:1;
   `;
   xBtn.textContent = '✕';
   xBtn.onclick = () => el.remove();
@@ -4668,7 +4836,7 @@ function showTrackSettings(track, x, y) {
   // Title
   const title = document.createElement('div');
   title.style.cssText = `
-    font:7px "Press Start 2P"; color:#00b9be;
+    font:9px "Press Start 2P"; color:#00b9be;
     margin-bottom:12px; padding-bottom:8px; padding-right:20px;
     border-bottom:1px solid #15788c; letter-spacing:1px;
   `;
@@ -4681,7 +4849,7 @@ function showTrackSettings(track, x, y) {
     display:block; box-sizing:border-box;
     margin-top:6px; width:100%; background:#2a0a0a;
     border:2px solid #ff4444; color:#ff4444;
-    font:7px "Press Start 2P"; padding:5px 6px;
+    font:9px "Press Start 2P"; padding:5px 6px;
     cursor:pointer; letter-spacing:1px;
   `;
   trashBtn.textContent = '[ DELETE TRACK ]';
@@ -4698,10 +4866,10 @@ function showTrackSettings(track, x, y) {
       box-shadow:none; border-radius:0;
     `;
     const confTitle = document.createElement('div');
-    confTitle.style.cssText = 'font:7px "Press Start 2P"; color:#ff4444; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #ff4444; letter-spacing:1px;';
+    confTitle.style.cssText = 'font:9px "Press Start 2P"; color:#ff4444; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #ff4444; letter-spacing:1px;';
     confTitle.textContent = 'DELETE TRACK?';
     const confMsg = document.createElement('div');
-    confMsg.style.cssText = 'font:6px "Press Start 2P"; color:#ffeecc; margin-bottom:14px; line-height:1.8;';
+    confMsg.style.cssText = 'font:8px "Press Start 2P"; color:#ffeecc; margin-bottom:14px; line-height:1.8;';
     confMsg.textContent = `"${track.name}" and all its patterns will be removed.`;
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex; gap:8px;';
@@ -4740,7 +4908,7 @@ function showTrackSettings(track, x, y) {
   const selStyle = `
     background:#46425e; color:#ffeecc;
     border:2px solid #15788c; outline:none;
-    font:7px "Press Start 2P"; padding:5px 8px;
+    font:9px "Press Start 2P"; padding:5px 8px;
     width:100%; margin-top:4px; cursor:pointer;
     appearance:none; -webkit-appearance:none;
   `;
@@ -4749,7 +4917,7 @@ function showTrackSettings(track, x, y) {
     const d = document.createElement('div');
     d.style.cssText = 'margin-bottom:10px;';
     const lbl = document.createElement('div');
-    lbl.style.cssText = 'font:6px "Press Start 2P"; color:#ffb0a3; margin-bottom:2px;';
+    lbl.style.cssText = 'font:8px "Press Start 2P"; color:#ffb0a3; margin-bottom:2px;';
     lbl.textContent = label;
     const sel = document.createElement('select');
     sel.style.cssText = selStyle;
@@ -4768,10 +4936,10 @@ function showTrackSettings(track, x, y) {
     const d = document.createElement('div');
     d.style.cssText = 'margin-bottom:10px;';
     const lbl = document.createElement('div');
-    lbl.style.cssText = 'font:6px "Press Start 2P"; color:#ffb0a3; margin-bottom:2px;';
+    lbl.style.cssText = 'font:8px "Press Start 2P"; color:#ffb0a3; margin-bottom:2px;';
     lbl.textContent = label;
     const ph = document.createElement('div');
-    ph.style.cssText = 'font:7px "Press Start 2P"; color:#444466; padding:5px 8px; border:2px solid #2a2840; width:100%; box-sizing:border-box;';
+    ph.style.cssText = 'font:9px "Press Start 2P"; color:#444466; padding:5px 8px; border:2px solid #2a2840; width:100%; box-sizing:border-box;';
     ph.textContent = '—';
     d.appendChild(lbl); d.appendChild(ph);
     return d;
@@ -4788,7 +4956,7 @@ function showTrackSettings(track, x, y) {
     const pcRow = document.createElement('div');
     pcRow.style.cssText = 'margin-bottom:4px;display:flex;align-items:center;gap:8px;';
     const pcLbl = document.createElement('div');
-    pcLbl.style.cssText = 'font:6px "Press Start 2P";color:#ffb0a3;';
+    pcLbl.style.cssText = 'font:8px "Press Start 2P";color:#ffb0a3;';
     pcLbl.textContent = 'POWER CHORD';
     const pcChk = document.createElement('input');
     pcChk.type = 'checkbox';
@@ -4799,7 +4967,7 @@ function showTrackSettings(track, x, y) {
     pcRow.appendChild(pcChk);
     el.appendChild(pcRow);
     const pcHint = document.createElement('div');
-    pcHint.style.cssText = 'font:5px "Press Start 2P";color:#ffb0a3;margin-top:-2px;margin-bottom:10px;opacity:0.6;';
+    pcHint.style.cssText = 'font:8px "Press Start 2P";color:#ffb0a3;margin-top:-2px;margin-bottom:10px;opacity:0.6;';
     pcHint.textContent = '+5TH · HEAVY ONLY';
     el.appendChild(pcHint);
   } else {
@@ -4967,23 +5135,23 @@ function showMidiImportDialog(midiData, filename) {
   const el = document.createElement('div');
   el.style.cssText = `
     position:fixed; z-index:9999; background:#1a1a2e; border:2px solid #00ccaa;
-    padding:16px; font:7px "Press Start 2P"; color:#e0e0ff;
+    padding:16px; font:9px "Press Start 2P"; color:#e0e0ff;
     display:flex; flex-direction:column; gap:10px; min-width:240px;
   `;
   el.innerHTML = `
-    <div style="color:#00ccaa;font-size:8px;letter-spacing:1px">IMPORT MIDI</div>
+    <div style="color:#00ccaa;font-size:9px;letter-spacing:1px">IMPORT MIDI</div>
     <div style="color:#8888aa;word-break:break-all">${filename.replace(/</g,'&lt;')}</div>
     <div style="color:#8888aa">${rawNotes.length} notes detected</div>
     <div>
       <div style="margin-bottom:5px;color:#8888aa">TRACK NAME</div>
       <input id="midi-tname" type="text" value="${filename.replace(/\.midi?$/i,'').replace(/</g,'&lt;')}"
-        style="background:#0d0d1a;border:2px solid #444466;color:#e0e0ff;font:7px 'Press Start 2P';
+        style="background:#0d0d1a;border:2px solid #444466;color:#e0e0ff;font:9px 'Press Start 2P';
                padding:4px 6px;width:100%;box-sizing:border-box">
     </div>
     <div>
       <div style="margin-bottom:5px;color:#8888aa">TRACK TYPE</div>
       <select id="midi-ttype"
-        style="background:#0d0d1a;border:2px solid #444466;color:#e0e0ff;font:7px 'Press Start 2P';
+        style="background:#0d0d1a;border:2px solid #444466;color:#e0e0ff;font:9px 'Press Start 2P';
                padding:4px 6px;width:100%;box-sizing:border-box">
         ${trackTypes.map(t=>`<option value="${t.value}">${t.label}</option>`).join('')}
       </select>
@@ -4991,10 +5159,10 @@ function showMidiImportDialog(midiData, filename) {
     <div style="display:flex;gap:8px;margin-top:4px">
       <button id="midi-cancel"
         style="flex:1;background:#1a1a2e;border:2px solid #444466;color:#8888aa;
-               font:7px 'Press Start 2P';padding:6px;cursor:pointer">CANCEL</button>
+               font:9px 'Press Start 2P';padding:6px;cursor:pointer">CANCEL</button>
       <button id="midi-import"
         style="flex:1;background:#003322;border:2px solid #00ccaa;color:#00ccaa;
-               font:7px 'Press Start 2P';padding:6px;cursor:pointer">IMPORT</button>
+               font:9px 'Press Start 2P';padding:6px;cursor:pointer">IMPORT</button>
     </div>
   `;
 
@@ -5196,7 +5364,7 @@ function buildTopBar() {
       <div class="lcd-field">
         <div class="lcd-value">
           <select id="ts-num" class="lcd-select">${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option${n===4?' selected':''}>${n}</option>`).join('')}</select>
-          <span style="color:#15788c;font-size:11px;font-family:'Press Start 2P',monospace;">/</span>
+          <span style="color:#15788c;font-size:10px;font-family:'Press Start 2P',monospace;">/</span>
           <select id="ts-den" class="lcd-select">${[2,4,8,16].map(n=>`<option${n===4?' selected':''}>${n}</option>`).join('')}</select>
         </div>
         <div class="lcd-label">TIME</div>
@@ -5206,7 +5374,7 @@ function buildTopBar() {
         <div class="lcd-label">KEY</div>
       </div>
       <div class="lcd-field">
-        <div class="lcd-value"><select id="scale-sel" class="lcd-select" style="font-size:8px;max-width:80px;">${Object.keys(Scales.SCALES).map(s=>`<option>${s}</option>`).join('')}</select></div>
+        <div class="lcd-value"><select id="scale-sel" class="lcd-select" style="font-size:9px;max-width:80px;">${Object.keys(Scales.SCALES).map(s=>`<option>${s}</option>`).join('')}</select></div>
         <div class="lcd-label">SCALE</div>
       </div>
     </div>
@@ -5257,9 +5425,9 @@ function buildTopBar() {
     const inp = document.createElement('input');
     inp.type = 'text'; inp.inputMode = 'numeric'; inp.value = ProjectState.bpm;
     inp.style.cssText = `width:64px;background:#46425e;border:2px solid #00ccaa;color:#ffeecc;
-      font:11px "Press Start 2P",monospace;text-align:center;padding:4px;outline:none;`;
+      font:10px "Press Start 2P",monospace;text-align:center;padding:4px;outline:none;`;
     const lbl = document.createElement('div');
-    lbl.textContent = 'BPM'; lbl.style.cssText = `font:5px "Press Start 2P",monospace;color:#ffb0a3;letter-spacing:0.05rem;`;
+    lbl.textContent = 'BPM'; lbl.style.cssText = `font:8px "Press Start 2P",monospace;color:#ffb0a3;letter-spacing:0.05rem;`;
     const confirm = (v) => {
       const n = parseInt(v, 10);
       if (!isNaN(n)) _setBpm(n);
@@ -6094,9 +6262,9 @@ const MagicGen = (() => {
     // Header — title left, randomize middle, close right
     let html = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div style="font:8px 'Press Start 2P',monospace;color:var(--hi,#00b9be);letter-spacing:0.05rem;">✦ DRUM MAGIC</div>
+        <div style="font:9px 'Press Start 2P',monospace;color:var(--hi,#00b9be);letter-spacing:0.05rem;">✦ DRUM MAGIC</div>
         <div style="display:flex;align-items:center;gap:6px;">
-          <button id="mg-drum-randomize" style="font:5px 'Press Start 2P',monospace;padding:3px 6px;cursor:pointer;background:none;border:1px solid #444466;color:#8888aa;">⚄ RANDOM</button>
+          <button id="mg-drum-randomize" style="font:8px 'Press Start 2P',monospace;padding:3px 6px;cursor:pointer;background:none;border:1px solid #444466;color:#8888aa;">⚄ RANDOM</button>
           <button id="mg-close" style="background:none;border:none;color:#ffb0a3;font:10px 'Press Start 2P',monospace;cursor:pointer;">×</button>
         </div>
       </div>
@@ -6110,7 +6278,7 @@ const MagicGen = (() => {
         ? 'border:1px solid var(--hi,#00b9be);background:rgba(0,185,190,0.15);color:var(--hi,#00b9be);'
         : 'border:1px solid #444466;background:none;color:#8888aa;';
       const shortName = name.replace('FOUR-ON-FLOOR','4-ON-FLOOR');
-      html += `<button class="mg-drum-preset" data-preset="${name}" style="font:5px 'Press Start 2P',monospace;padding:4px 2px;cursor:pointer;${style}">${shortName}</button>`;
+      html += `<button class="mg-drum-preset" data-preset="${name}" style="font:8px 'Press Start 2P',monospace;padding:4px 2px;cursor:pointer;${style}">${shortName}</button>`;
     });
     html += `</div><div class="mg-divider"></div>`;
 
@@ -6123,7 +6291,7 @@ const MagicGen = (() => {
       const style = on
         ? 'background:var(--accent,#ff6600);color:#1e1c30;border-color:var(--accent,#ff6600);'
         : 'background:none;color:#8888aa;border:1px solid #444466;';
-      html += `<button class="mg-drum-layer" data-layer="${layer}" style="font:5px 'Press Start 2P',monospace;padding:4px 6px;cursor:pointer;${style}">${layer.toUpperCase()}</button>`;
+      html += `<button class="mg-drum-layer" data-layer="${layer}" style="font:8px 'Press Start 2P',monospace;padding:4px 6px;cursor:pointer;${style}">${layer.toUpperCase()}</button>`;
     });
     html += `</div></div><div class="mg-divider"></div>`;
 
@@ -6147,7 +6315,7 @@ const MagicGen = (() => {
       : 'background:none;color:#8888aa;border:1px solid #444466;';
     html += `<div class="mg-row" style="margin-bottom:6px;">
       <span class="mg-label">HUMANIZE</span>
-      <button id="mg-drum-humanize" style="font:5px 'Press Start 2P',monospace;padding:4px 8px;cursor:pointer;${humStyle}">${humOn ? 'ON' : 'OFF'}</button>
+      <button id="mg-drum-humanize" style="font:8px 'Press Start 2P',monospace;padding:4px 8px;cursor:pointer;${humStyle}">${humOn ? 'ON' : 'OFF'}</button>
     </div>`;
 
     // Repeats
@@ -6233,7 +6401,7 @@ const MagicGen = (() => {
     // Header row
     let html = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div style="font:8px 'Press Start 2P',monospace;color:#00b9be;letter-spacing:0.05rem;">USE MAGIC</div>
+        <div style="font:9px 'Press Start 2P',monospace;color:#00b9be;letter-spacing:0.05rem;">USE MAGIC</div>
         <button id="mg-close" style="background:none;border:none;color:#ffb0a3;font:10px 'Press Start 2P',monospace;cursor:pointer;">×</button>
       </div>
     `;
@@ -6251,7 +6419,7 @@ const MagicGen = (() => {
     html += `
       <div class="mg-row">
         <span class="mg-label">DEGREE</span>
-        <select id="mg-degree" style="font-size:7px;flex:1;max-width:120px;">
+        <select id="mg-degree" style="font-size:9px;flex:1;max-width:120px;">
           ${DEGREE_OPTIONS.map(o=>`<option value="${o.value}"${o.value===_state.degreeIdx?' selected':''}>${o.label}</option>`).join('')}
         </select>
       </div>`;
@@ -6261,7 +6429,7 @@ const MagicGen = (() => {
       html += `
         <div class="mg-row">
           <span class="mg-label">ROOT</span>
-          <select id="mg-root" style="font-size:7px;flex:1;max-width:120px;">
+          <select id="mg-root" style="font-size:9px;flex:1;max-width:120px;">
             ${NOTE_NAMES.map(n=>`<option${n===_state.root?' selected':''}>${n}</option>`).join('')}
           </select>
         </div>`;
@@ -6271,7 +6439,7 @@ const MagicGen = (() => {
     html += `
       <div class="mg-row">
         <span class="mg-label">TYPE</span>
-        <select id="mg-type" style="font-size:7px;flex:1;max-width:120px;">
+        <select id="mg-type" style="font-size:9px;flex:1;max-width:120px;">
           ${TYPE_NAMES.map(t=>`<option${t===_state.typeName?' selected':''}>${t}</option>`).join('')}
         </select>
       </div>`;
@@ -6304,7 +6472,7 @@ const MagicGen = (() => {
       html += `
         <div class="mg-row">
           <span class="mg-label">INVERSION</span>
-          <select id="mg-inv" style="font-size:7px;flex:1;max-width:120px;">
+          <select id="mg-inv" style="font-size:9px;flex:1;max-width:120px;">
             ${invOptions.map((v,i)=>`<option value="${i}"${i===_state.inversion?' selected':''}>${v}</option>`).join('')}
           </select>
         </div>`;
@@ -6347,7 +6515,7 @@ const MagicGen = (() => {
         html += `
           <div class="mg-row">
             <span class="mg-label">PATTERN</span>
-            <select id="mg-arp-pattern" style="font-size:7px;flex:1;max-width:140px;">
+            <select id="mg-arp-pattern" style="font-size:9px;flex:1;max-width:140px;">
               ${['Up','Down','Up-Down','Down-Up','Random'].map(p=>`<option${p===_state.arpPattern?' selected':''}>${p}</option>`).join('')}
             </select>
           </div>`;
@@ -6374,7 +6542,7 @@ const MagicGen = (() => {
             <span class="mg-label" style="padding-top:4px;">NOTE LEN</span>
             <div class="mg-seg" style="flex-wrap:wrap;gap:2px;justify-content:flex-end;">`;
         _getNoteLengths().forEach(len => {
-          html += `<button class="mg-notelen-btn${_state.arpNoteLen===len?' active':''}" data-len="${len}" style="padding:4px 6px;font-size:6px;">${len}</button>`;
+          html += `<button class="mg-notelen-btn${_state.arpNoteLen===len?' active':''}" data-len="${len}" style="padding:4px 6px;font-size:8px;">${len}</button>`;
         });
         html += `</div></div>`;
       } else {
@@ -6819,6 +6987,8 @@ const Sequencer = {
           ? entry.loopBars : pat.lengthBars;
 
         for (const note of pat.notes) {
+          // Skip notes that fall outside the pattern's visible length (trimmed off)
+          if (note.start >= pat.lengthBars) continue;
           // Tile the note across all repetitions within the entry's total span
           for (let rep = 0; ; rep++) {
             const noteAbsBar = entry.startBar + note.start + rep * pat.lengthBars;
@@ -7061,6 +7231,7 @@ const ExportEngine = {
         const totalBars = (entry.loopBars && entry.loopBars > pat.lengthBars)
           ? entry.loopBars : pat.lengthBars;
         for (const note of pat.notes) {
+          if (note.start >= pat.lengthBars) continue; // skip notes trimmed off by pattern shortening
           for (let rep = 0; ; rep++) {
             const noteBar = entry.startBar + note.start + rep * pat.lengthBars;
             if (noteBar >= entry.startBar + totalBars) break;
@@ -7280,13 +7451,13 @@ const ExportEngine = {
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML = `
-      <div style="background:#1a1a2e;border:2px solid #00ccaa;padding:16px;font:7px 'Press Start 2P';color:#e0e0ff;display:flex;flex-direction:column;gap:10px;min-width:260px;">
-        <div style="color:#00ccaa;font-size:8px;letter-spacing:1px;">FILE NAME</div>
+      <div style="background:#1a1a2e;border:2px solid #00ccaa;padding:16px;font:9px 'Press Start 2P';color:#e0e0ff;display:flex;flex-direction:column;gap:10px;min-width:260px;">
+        <div style="color:#00ccaa;font-size:9px;letter-spacing:1px;">FILE NAME</div>
         <input id="_pfn-inp" type="text" value="${defaultName}"
-          style="background:#0d0d1a;border:2px solid #444466;color:#e0e0ff;font:7px 'Press Start 2P';padding:4px 6px;width:100%;box-sizing:border-box;">
+          style="background:#0d0d1a;border:2px solid #444466;color:#e0e0ff;font:9px 'Press Start 2P';padding:4px 6px;width:100%;box-sizing:border-box;">
         <div style="display:flex;gap:8px;margin-top:4px;">
-          <button id="_pfn-cancel" style="flex:1;background:#1a1a2e;border:2px solid #444466;color:#8888aa;font:7px 'Press Start 2P';padding:6px;cursor:pointer;">CANCEL</button>
-          <button id="_pfn-ok" style="flex:1;background:#003322;border:2px solid #00ccaa;color:#00ccaa;font:7px 'Press Start 2P';padding:6px;cursor:pointer;">${actionLabel}</button>
+          <button id="_pfn-cancel" style="flex:1;background:#1a1a2e;border:2px solid #444466;color:#8888aa;font:9px 'Press Start 2P';padding:6px;cursor:pointer;">CANCEL</button>
+          <button id="_pfn-ok" style="flex:1;background:#003322;border:2px solid #00ccaa;color:#00ccaa;font:9px 'Press Start 2P';padding:6px;cursor:pointer;">${actionLabel}</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
@@ -7361,7 +7532,7 @@ const ExportEngine = {
     modal.style.display = 'flex';
     modal.innerHTML = `
       <div style="background:#46425e;border:2px solid #15788c;padding:16px;min-width:240px;border-radius:0;">
-        <div style="font:8px 'Press Start 2P';color:#00b9be;margin-bottom:12px;">EXPORT</div>
+        <div style="font:9px 'Press Start 2P';color:#00b9be;margin-bottom:12px;">EXPORT</div>
         <button class="nes-btn" id="exp-wav" style="display:block;width:100%;margin-bottom:6px;">EXPORT WAV</button>
         <button class="nes-btn" id="exp-midi" style="display:block;width:100%;margin-bottom:6px;">EXPORT MIDI</button>
         <button class="nes-btn" id="exp-stems" style="display:block;width:100%;margin-bottom:12px;">EXPORT STEMS</button>
@@ -7383,6 +7554,7 @@ const ExportEngine = {
     const _bd = document.getElementById('bpm-display'); if (_bd) _bd.textContent = state.bpm;
     const _ks = document.getElementById('key-sel');     if (_ks) _ks.value = state.key;
     const _ss = document.getElementById('scale-sel');   if (_ss) _ss.value = state.scale;
+    AV.resize(); AV.draw();
   }
 
   // ============================================================
@@ -8216,15 +8388,15 @@ const ExportEngine = {
   function buildPRTopbar() {
     const bar = document.getElementById('pr-topbar');
     if (!bar) return;
-    const selStyle = `font-size:7px;height:24px;font-family:'Press Start 2P',monospace;background:#46425e;color:#ffeecc;border:1px solid #15788c;`;
+    const selStyle = `font-size:9px;height:26px;font-family:'Press Start 2P',monospace;background:#46425e;color:#ffeecc;border:1px solid #15788c;`;
     bar.innerHTML = `
       <!-- ADD NOTES label + 3-way tool toggle -->
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
         <span class="pr-topbar-label">ADD NOTES</span>
         <div style="display:flex;">
-          <button id="pr-tool-default" class="nes-btn pr-topbar-btn engaged" style="width:58px;">SINGLE</button>
-          <button id="pr-tool-stamp"   class="nes-btn pr-topbar-btn" style="width:58px;margin-left:-2px;">MULTI</button>
-          <button id="pr-tool-magic"   class="nes-btn pr-topbar-btn" style="width:58px;margin-left:-2px;">&#10022; MAGIC</button>
+          <button id="pr-tool-default" class="nes-btn pr-topbar-btn engaged">SINGLE</button>
+          <button id="pr-tool-stamp"   class="nes-btn pr-topbar-btn" style="margin-left:-2px;">MULTI</button>
+          <button id="pr-tool-magic"   class="nes-btn pr-topbar-btn" style="margin-left:-2px;">&#10022; MAGIC</button>
         </div>
       </div>
 
@@ -8232,7 +8404,7 @@ const ExportEngine = {
       <div id="pr-stamp-controls" style="display:none;align-items:center;gap:5px;margin-left:8px;">
         <span class="pr-topbar-label">COUNT</span>
         <div style="display:flex;align-items:center;gap:2px;">
-          <span id="pr-stamp-count-val" style="font-size:8px;font-family:'Press Start 2P',monospace;color:#ffeecc;min-width:14px;text-align:center;">4</span>
+          <span id="pr-stamp-count-val" style="font-size:9px;font-family:'Press Start 2P',monospace;color:#ffeecc;min-width:14px;text-align:center;">4</span>
           <div style="display:flex;flex-direction:column;gap:1px;">
             <button class="bpm-arrow" id="pr-stamp-count-up">&#9650;</button>
             <button class="bpm-arrow" id="pr-stamp-count-dn">&#9660;</button>
@@ -8248,15 +8420,15 @@ const ExportEngine = {
         </select>
         <span class="pr-topbar-label">PITCH &#916;</span>
         <div style="display:flex;align-items:center;gap:2px;">
-          <span id="pr-stamp-pitch-val" style="font-size:8px;font-family:'Press Start 2P',monospace;color:#ffeecc;min-width:20px;text-align:center;">0</span>
+          <span id="pr-stamp-pitch-val" style="font-size:9px;font-family:'Press Start 2P',monospace;color:#ffeecc;min-width:20px;text-align:center;">0</span>
           <div style="display:flex;flex-direction:column;gap:1px;">
             <button class="bpm-arrow" id="pr-stamp-pitch-up">&#9650;</button>
             <button class="bpm-arrow" id="pr-stamp-pitch-dn">&#9660;</button>
           </div>
         </div>
         <div style="display:flex;">
-          <button id="pr-stamp-mode-semi"  class="nes-btn pr-topbar-btn" style="width:46px;">SEMI</button>
-          <button id="pr-stamp-mode-scale" class="nes-btn pr-topbar-btn" style="width:46px;margin-left:-2px;">SCALE</button>
+          <button id="pr-stamp-mode-semi"  class="nes-btn pr-topbar-btn">SEMI</button>
+          <button id="pr-stamp-mode-scale" class="nes-btn pr-topbar-btn" style="margin-left:-2px;">SCALE</button>
         </div>
         <span class="pr-topbar-label">INTERVAL</span>
         <select id="pr-stamp-interval" style="${selStyle}">
@@ -8528,20 +8700,20 @@ const ProgBuilder = (() => {
           ).join('')}
         </select>
         <div style="display:flex;gap:2px;">
-          ${[1,2,4].map(v=>`<button class="nes-btn pb-tog pb-step-dur${step.b===v?' on':''}" data-si="${i}" data-dur="${v}" style="font-size:8px;padding:2px 5px;">${v}B</button>`).join('')}
+          ${[1,2,4].map(v=>`<button class="nes-btn pb-tog pb-step-dur${step.b===v?' on':''}" data-si="${i}" data-dur="${v}" style="font-size:9px;padding:2px 5px;">${v}B</button>`).join('')}
         </div>
       </div>`).join('');
     if (_steps.length<16)
       stepsHtml += `<button class="pb-add-step" id="pb-add-step">+</button>`;
 
     const libHtml = lib.length===0
-      ? `<div style="font-size:5px;color:var(--text2);">No saved progressions</div>`
+      ? `<div style="font-size:8px;color:var(--text2);">No saved progressions</div>`
       : lib.map((e,i)=>`
           <div class="pb-lib-row">
             <span>${e.name}</span>
-            <button class="nes-btn pb-lib-load" data-li="${i}" style="font-size:4px;padding:2px 4px;">LOAD</button>
-            <button class="nes-btn pb-lib-exp" data-li="${i}" style="font-size:4px;padding:2px 4px;">&#8595;</button>
-            <button class="nes-btn pb-lib-del" data-li="${i}" style="font-size:4px;padding:2px 4px;color:var(--accent);border-color:var(--accent);">×</button>
+            <button class="nes-btn pb-lib-load" data-li="${i}" style="font-size:8px;padding:3px 6px;">LOAD</button>
+            <button class="nes-btn pb-lib-exp" data-li="${i}" style="font-size:8px;padding:3px 6px;">&#8595;</button>
+            <button class="nes-btn pb-lib-del" data-li="${i}" style="font-size:8px;padding:3px 6px;color:var(--accent);border-color:var(--accent);">×</button>
           </div>`).join('');
 
     el.innerHTML = `
@@ -8572,7 +8744,7 @@ const ProgBuilder = (() => {
           <div style="display:flex;align-items:center;gap:6px;">
             <span class="pb-label" style="margin-bottom:0;">BPM</span>
             <div style="display:flex;align-items:center;gap:4px;">
-              <span id="pb-bpm-display" style="font-family:'Press Start 2P',monospace;font-size:11px;color:#ffeecc;min-width:40px;text-align:center;cursor:pointer;" title="Click to type BPM">${ProjectState.bpm}</span>
+              <span id="pb-bpm-display" style="font-family:'Press Start 2P',monospace;font-size:10px;color:#ffeecc;min-width:40px;text-align:center;cursor:pointer;" title="Click to type BPM">${ProjectState.bpm}</span>
               <div style="display:flex;flex-direction:column;gap:1px;">
                 <button class="bpm-arrow" id="pb-bpm-up">&#9650;</button>
                 <button class="bpm-arrow" id="pb-bpm-down">&#9660;</button>
@@ -8730,10 +8902,10 @@ const ProgBuilder = (() => {
       const inp = document.createElement('input');
       inp.type = 'text'; inp.inputMode = 'numeric'; inp.value = ProjectState.bpm;
       inp.style.cssText = `width:64px;background:#46425e;border:2px solid #00ccaa;color:#ffeecc;
-        font:11px "Press Start 2P",monospace;text-align:center;padding:4px;outline:none;`;
+        font:10px "Press Start 2P",monospace;text-align:center;padding:4px;outline:none;`;
       const lbl = document.createElement('div');
       lbl.textContent = 'BPM';
-      lbl.style.cssText = `font:5px "Press Start 2P",monospace;color:#ffb0a3;letter-spacing:0.05rem;`;
+      lbl.style.cssText = `font:8px "Press Start 2P",monospace;color:#ffb0a3;letter-spacing:0.05rem;`;
       const confirm = (v) => { const n = parseInt(v,10); if (!isNaN(n)) _pbSetBpm(n); popup.remove(); };
       inp.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') confirm(inp.value);
