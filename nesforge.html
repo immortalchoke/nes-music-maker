@@ -4853,7 +4853,7 @@ function showAddTrackModal({ defaultType = 'pulse50', onConfirm } = {}) {
             <div class="atm-type" data-value="${t.value}"
               style="display:flex;align-items:center;gap:8px;padding:5px 7px;cursor:pointer;
                      border:2px solid ${t.value === selected ? 'var(--hi)' : 'var(--bg-deep)'};
-                     background:${t.value === selected ? '#003322' : 'transparent'};">
+                     background:${t.value === selected ? 'rgba(0,204,170,0.1)' : 'transparent'};">
               <div style="width:8px;height:8px;border:2px solid ${t.value === selected ? 'var(--hi)' : 'var(--bg-disabled)'};
                           background:${t.value === selected ? 'var(--hi)' : 'transparent'};flex-shrink:0;"></div>
               <span style="color:${t.value === selected ? 'var(--hi)' : 'var(--text)'};font-size:9px;">${t.label}</span>
