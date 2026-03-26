@@ -112,6 +112,86 @@ select.lcd-select { background: transparent !important; border: none !important;
 .nes-btn:hover { background: var(--hi-dim); color: var(--bg); border-color: var(--hi-dim); }
 .nes-btn:active { background: var(--accent); color: var(--text); border-color: var(--accent); }
 .nes-btn.engaged { background: var(--hi); color: var(--bg-deep); border-color: #00ffcc; }
+/* ── Design System: Button ───────────────────────────────────
+   .btn is the unified button base. .nes-btn is kept as a legacy
+   alias during migration and removed in Phase 5 (Task 6).
+   ------------------------------------------------------------ */
+.btn {
+  background: var(--bg3);
+  color: var(--text);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--hi-dim);
+  font-family: var(--font);
+  font-size: var(--t-sm);
+  letter-spacing: var(--tracking);
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  border-radius: 0;
+  image-rendering: pixelated;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn:hover   { background: var(--hi-dim); color: var(--bg); border-color: var(--hi-dim); }
+.btn:active  { background: var(--accent); color: var(--text); border-color: var(--accent); }
+.btn--primary { background: var(--hi); color: var(--bg-deep); border-color: var(--hi); }
+.btn--primary:hover { background: var(--hi-dim); color: var(--bg); border-color: var(--hi-dim); }
+.btn--danger  { background: var(--bg); color: var(--accent); border-color: var(--accent); }
+.btn--engaged { background: var(--hi); color: var(--bg-deep); border-color: var(--hi); }
+.btn--sm      { font-size: var(--t-xs); padding: 3px var(--space-1); } /* 3px vertical intentional — space-1 too tall for inline track buttons */
+.btn--icon    { width: 32px; height: 32px; padding: var(--space-1); }
+.btn--full    { width: 100%; }
+.btn--mob     {
+  border-radius: 2px;
+  border-color: transparent;
+  border-width: 1px;
+  padding: 0 var(--space-3);
+  height: 44px;
+  min-width: 44px;
+}
+
+/* ── Design System: Modals ───────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: var(--z-modal);
+}
+.modal {
+  background: var(--bg-deep);
+  border: var(--border);
+  padding: var(--space-4);
+  display: flex; flex-direction: column; gap: var(--space-3);
+  font-family: var(--font);
+}
+.modal--sm  { width: 320px; }
+.modal--lg  { width: min(680px, 94vw); max-height: 90vh; overflow-y: auto; }
+.modal-title   { font-size: var(--t-lg); color: var(--text); letter-spacing: var(--tracking); margin-bottom: var(--space-2); }
+.modal-section { display: flex; flex-direction: column; gap: var(--space-2); }
+.modal-label   { font-size: var(--t-xs); color: var(--text-dim); letter-spacing: var(--tracking); font-family: var(--font); }
+.modal-row     { display: flex; align-items: center; gap: var(--space-2); }
+.modal-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+
+/* ── Design System: Form Controls ───────────────────────────── */
+.field         { display: flex; flex-direction: column; gap: var(--space-1); }
+.field-label   { font-size: var(--t-xs); color: var(--text-dim); letter-spacing: var(--tracking); font-family: var(--font); }
+/* .field-input and .field-select share identical base — intentional, may diverge later */
+.field-input   { background: var(--bg); color: var(--text); border-width: 2px; border-style: solid; border-color: var(--bg3); font-family: var(--font); font-size: var(--t-input); padding: var(--space-1) var(--space-2); }
+.field-select  { background: var(--bg); color: var(--text); border-width: 2px; border-style: solid; border-color: var(--bg3); font-family: var(--font); font-size: var(--t-input); padding: var(--space-1) var(--space-2); }
+.field-input:focus, .field-select:focus { border-color: var(--hi-dim); }
+
+/* ── Design System: Layout Utilities ────────────────────────── */
+.row     { display: flex; align-items: center; gap: var(--space-2); }
+.col     { display: flex; flex-direction: column; gap: var(--space-2); }
+.divider { width: 100%; height: 0; border: none; border-top: var(--border-thin); margin: var(--space-2) 0; }
+
+/* ── Design System: Status & Feedback ───────────────────────── */
+.badge         { display: inline-block; padding: 1px var(--space-1); font-size: var(--t-xs); font-family: var(--font); letter-spacing: var(--tracking); border-width: 1px; border-style: solid; border-color: var(--bg3); color: var(--text-dim); }
+.badge--active { background: var(--hi); color: var(--bg-deep); border-color: var(--hi); }
+.status-error  { color: var(--accent); font-size: var(--t-xs); font-family: var(--font); }
+.status-ok     { color: var(--hi); font-size: var(--t-xs); font-family: var(--font); }
+
 label { display: flex; align-items: center; gap: 4px; font-size: var(--t-sm); color: var(--accent2); letter-spacing: var(--tracking); }
 input[type=number], select {
   background: var(--bg); color: var(--text); border: 2px solid var(--bg3);
