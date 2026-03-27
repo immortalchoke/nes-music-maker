@@ -1127,6 +1127,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       distortion: 'off', powerchord: false,
       muted: false, soloed: false,
       sample: null,
+      sampleMode: 'tape',  // 'tape' | 'fixed' (dpcm/sampler tracks only)
       patterns: [], arrangement: []
     };
     ProjectState.tracks.push(track);
@@ -2008,11 +2009,29 @@ body.mobile-mode #mobile-app { display: flex !important; }
   function playDPCM(track, pitch, startTime, durationSecs) {
     if (!track.sample) return;
     const ctx = getAudioCtx();
-    const buf = ctx.createBuffer(1, track.sample.length, 8000);
-    buf.getChannelData(0).set(track.sample);
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.playbackRate.value = Math.pow(2, (pitch - 60) / 12);
+    const pitchRatio = Math.pow(2, (pitch - 60) / 12);
+    let buf, src;
+
+    if (track.sampleMode === 'fixed') {
+      // Fixed-duration mode: encode pitch into the buffer's sample rate
+      // so the browser resamples on decode rather than during playback.
+      // Result: pitch changes, duration stays constant regardless of note.
+      const pitchedRate = Math.round(8000 * pitchRatio);
+      buf = ctx.createBuffer(1, track.sample.length, pitchedRate);
+      buf.getChannelData(0).set(track.sample);
+      src = ctx.createBufferSource();
+      src.buffer = buf;
+      // playbackRate stays 1.0 — duration is always sample.length / 8000 sec
+    } else {
+      // Tape mode (default): playbackRate shifts pitch AND duration together.
+      // Authentic NES DPCM behavior.
+      buf = ctx.createBuffer(1, track.sample.length, 8000);
+      buf.getChannelData(0).set(track.sample);
+      src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = pitchRatio;
+    }
+
     const chanGain = ctx.createGain();
     chanGain.gain.value = track.volume / 100;
     const panner = ctx.createStereoPanner();
@@ -5121,6 +5140,18 @@ function showTrackSettings(track, x, y) {
     v => { track.delay = v; }));
   el.appendChild(row('REVERB', ['off','room','hall'], track.reverb,
     v => { track.reverb = v; }));
+
+  // Sample Mode — dpcm and sampler tracks only
+  if (track.channelType === 'dpcm' || track.channelType === 'sampler') {
+    el.appendChild(row('SAMPLE MODE', ['tape', 'fixed'], track.sampleMode || 'tape',
+      v => { track.sampleMode = v; }));
+    const smHint = document.createElement('div');
+    smHint.className = 'modal-label';
+    smHint.style.cssText = 'margin-top:-6px;margin-bottom:10px;opacity:0.6;';
+    smHint.textContent = (track.sampleMode || 'tape') === 'tape'
+      ? 'PITCH = SPEED' : 'PITCH \u2260 DURATION';
+    el.appendChild(smHint);
+  }
 
   el.appendChild(trashBtn);
 
