@@ -1127,7 +1127,11 @@ body.mobile-mode #mobile-app { display: flex !important; }
       distortion: 'off', powerchord: false,
       muted: false, soloed: false,
       sample: null,
-      sampleMode: 'tape',  // 'tape' | 'fixed' (dpcm/sampler tracks only)
+      sampleMode:  'tape',     // 'tape' | 'fixed' (dpcm/sampler tracks only)
+      samplerMode: 'oneshot',  // 'oneshot' | 'pitched' | 'pads'
+      rootNote:    60,         // used by oneshot and per-zone in pitched
+      zones:       [],         // PITCHED: [{sample,rootNote,minNote,maxNote}]
+      pads:        {},         // PADS: {[midiNote]: {sample,rootNote,name}}
       patterns: [], arrangement: []
     };
     ProjectState.tracks.push(track);
@@ -2007,26 +2011,44 @@ body.mobile-mode #mobile-app { display: flex !important; }
   }
 
   function playDPCM(track, pitch, startTime, durationSecs) {
-    if (!track.sample) return;
     const ctx = getAudioCtx();
-    const pitchRatio = Math.pow(2, (pitch - 60) / 12);
+
+    // ── Resolve which sample + rootNote to use ──────────────
+    let sample   = null;
+    let rootNote = track.rootNote ?? 60;
+
+    if (track.samplerMode === 'pads') {
+      const pad = track.pads && track.pads[pitch];
+      if (!pad || !pad.sample) return;
+      sample   = pad.sample;
+      rootNote = pad.rootNote ?? pitch;
+    } else if (track.samplerMode === 'pitched' && track.zones && track.zones.length > 0) {
+      const zone = track.zones.reduce((best, z) =>
+        Math.abs(z.rootNote - pitch) < Math.abs(best.rootNote - pitch) ? z : best,
+        track.zones[0]);
+      sample   = zone.sample;
+      rootNote = zone.rootNote;
+    } else {
+      if (!track.sample) return;
+      sample   = track.sample;
+      rootNote = track.rootNote ?? 60;
+    }
+
+    if (!sample) return;
+
+    // ── Playback ────────────────────────────────────────────
+    const pitchRatio = Math.pow(2, (pitch - rootNote) / 12);
     let buf, src;
 
     if (track.sampleMode === 'fixed') {
-      // Fixed-duration mode: encode pitch into the buffer's sample rate
-      // so the browser resamples on decode rather than during playback.
-      // Result: pitch changes, duration stays constant regardless of note.
       const pitchedRate = Math.round(8000 * pitchRatio);
-      buf = ctx.createBuffer(1, track.sample.length, pitchedRate);
-      buf.getChannelData(0).set(track.sample);
+      buf = ctx.createBuffer(1, sample.length, pitchedRate);
+      buf.getChannelData(0).set(sample);
       src = ctx.createBufferSource();
       src.buffer = buf;
-      // playbackRate stays 1.0 — duration is always sample.length / 8000 sec
     } else {
-      // Tape mode (default): playbackRate shifts pitch AND duration together.
-      // Authentic NES DPCM behavior.
-      buf = ctx.createBuffer(1, track.sample.length, 8000);
-      buf.getChannelData(0).set(track.sample);
+      buf = ctx.createBuffer(1, sample.length, 8000);
+      buf.getChannelData(0).set(sample);
       src = ctx.createBufferSource();
       src.buffer = buf;
       src.playbackRate.value = pitchRatio;
@@ -2040,7 +2062,11 @@ body.mobile-mode #mobile-app { display: flex !important; }
     chanGain.connect(panner);
     panner.connect(getMasterGain());
     src.start(startTime);
-    src.stop(startTime + durationSecs + 0.05);
+    // PADS mode: always play full sample regardless of note duration
+    const stopTime = track.samplerMode === 'pads'
+      ? startTime + sample.length / 8000 + 0.05
+      : startTime + durationSecs + 0.05;
+    src.stop(stopTime);
   }
 
   // Universal note dispatcher — used by Sequencer
@@ -2261,8 +2287,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
       const { KEY_WIDTH, ROW_HEIGHT, scrollX, scrollY } = this;
       const ap = this.activePattern;
       const isNoise = ap && isDrumChannel(ap.track.channelType);
-      const rows = isNoise ? this.DRUM_ROWS : null;
-      const numRows = isNoise ? 6 : 128;
+      const isPads  = ap && ap.track.channelType === 'sampler' && ap.track.samplerMode === 'pads';
+      const PAD_RANGE = Array.from({length: 24}, (_, i) => i + 24); // C1–B2
+      const rows    = isNoise ? this.DRUM_ROWS : (isPads ? PAD_RANGE : null);
+      const numRows = isNoise ? 6 : (isPads ? 24 : 128);
 
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = '#46425e';
@@ -2274,9 +2302,9 @@ body.mobile-mode #mobile-app { display: flex !important; }
 
       const scalePitches = Scales.getInScalePitches(ProjectState.key, ProjectState.scale);
 
-      const drumOffset = isNoise ? this.RULER_HEIGHT : 0;
+      const drumOffset = (isNoise || isPads) ? this.RULER_HEIGHT : 0;
       for (let i = 0; i < numRows; i++) {
-        const pitch = isNoise ? rows[i] : (127 - i);
+        const pitch = (isNoise || isPads) ? rows[i] : (127 - i);
         const y = drumOffset + i * ROW_HEIGHT - scrollY;
         if (y + ROW_HEIGHT < 0 || y > H) continue;
 
@@ -2285,7 +2313,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
         const inScale = scalePitches.has(pitch % 12);
 
         // Row background
-        if (isNoise) {
+        if (isNoise || isPads) {
           ctx.fillStyle = '#46425e';
         } else if (inScale) {
           ctx.fillStyle = isBlack ? '#1a5c6a' : '#1e6878';
@@ -2303,6 +2331,14 @@ body.mobile-mode #mobile-app { display: flex !important; }
           ctx.font = '5px "Press Start 2P"';
           const drumNames = ap.track.channelType === 'pcm7' ? this.PCM7_DRUM_NAMES : this.DRUM_NAMES;
           ctx.fillText(drumNames[pitch] || '', 2, y + 7);
+        } else if (isPads) {
+          const NS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+          const padData = ap.track.pads?.[pitch];
+          ctx.fillStyle = isPressed ? '#00ccaa' : (padData?.sample ? '#15788c' : '#46425e');
+          ctx.fillRect(0, y, KEY_WIDTH, ROW_HEIGHT);
+          ctx.fillStyle = isPressed ? '#1e1c30' : (padData?.sample ? '#00b9be' : '#8888aa');
+          ctx.font = '5px "Press Start 2P"';
+          ctx.fillText(padData?.name || (NS[pitch % 12] + Math.floor(pitch / 12)), 2, y + 7);
         } else {
           ctx.fillStyle = isPressed ? '#00ccaa' : (isBlack ? '#46425e' : '#ffeecc');
           ctx.fillRect(0, y, KEY_WIDTH - 2, ROW_HEIGHT - 1);
@@ -2359,7 +2395,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
         const cellDur = this._stampDuration !== null ? this._stampDuration : defaultDur;
         const cellW = cellDur * this.barWidth();
         const cellX = KEY_WIDTH + snappedStart * this.barWidth() - scrollX;
-        const rowIdx = isNoise ? (rows ? rows.indexOf(pitch) : -1) : (127 - pitch);
+        const rowIdx = (isNoise || isPads) ? (rows ? rows.indexOf(pitch) : -1) : (127 - pitch);
         const cellY = drumOffset + rowIdx * ROW_HEIGHT - scrollY;
 
         ctx.save();
@@ -2401,7 +2437,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
         const normalColor = this.NOTE_COLORS[ap.track.channelType] || '#ff6973';
         const selectedColor = this.SELECTED_NOTE_COLORS[ap.track.channelType] || '#ff6644';
         for (const note of ap.pattern.notes) {
-          const rowIdx = isNoise ? rows.indexOf(note.pitch) : (127 - note.pitch);
+          const rowIdx = (isNoise || isPads) ? rows.indexOf(note.pitch) : (127 - note.pitch);
           if (rowIdx < 0) continue;
           const y = drumOffset + rowIdx * ROW_HEIGHT - scrollY;
           const x = KEY_WIDTH + note.start * this.barWidth() - scrollX;
@@ -2881,10 +2917,12 @@ body.mobile-mode #mobile-app { display: flex !important; }
       const ap = this.activePattern;
       if (!ap) return null;
       const isNoise = isDrumChannel(ap.track.channelType);
-      const rows = isNoise ? this.DRUM_ROWS : null;
+      const isPads  = ap.track.channelType === 'sampler' && ap.track.samplerMode === 'pads';
+      const PAD_RANGE = Array.from({length: 24}, (_, i) => i + 24);
+      const rows = isNoise ? this.DRUM_ROWS : (isPads ? PAD_RANGE : null);
       const relX = mx - this.KEY_WIDTH + this.scrollX;
-      // Drum rows are drawn below the ruler; subtract RULER_HEIGHT so row 0 maps to top drum row
-      const relY = (my - (isNoise ? this.RULER_HEIGHT : 0)) + this.scrollY;
+      // Drum/pads rows are drawn below the ruler; subtract RULER_HEIGHT so row 0 maps to top row
+      const relY = (my - ((isNoise || isPads) ? this.RULER_HEIGHT : 0)) + this.scrollY;
       const barW = this.barWidth();
       // Snap to the current cell size (stamp duration) so a click anywhere in a cell
       // lands at that cell's start rather than an arbitrary 1/32 subdivision.
@@ -2894,7 +2932,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       const snapPx = Math.max(barW / 64, snapVal * barW);
       const snappedStart = Math.floor(relX / snapPx) * snapPx / barW;
       const rowIdx = Math.floor(relY / this.ROW_HEIGHT);
-      const pitch = isNoise ? rows[rowIdx] : (127 - rowIdx);
+      const pitch = (isNoise || isPads) ? (rows[rowIdx] ?? -1) : (127 - rowIdx);
       return { snappedStart, rowIdx, pitch };
     };
 
@@ -2905,11 +2943,13 @@ body.mobile-mode #mobile-app { display: flex !important; }
       const ap = this.activePattern;
       if (!ap) return null;
       const isNoise = isDrumChannel(ap.track.channelType);
-      const rows = isNoise ? this.DRUM_ROWS : null;
+      const isPads  = ap.track.channelType === 'sampler' && ap.track.samplerMode === 'pads';
+      const PAD_RANGE = Array.from({length: 24}, (_, i) => i + 24);
+      const rows = isNoise ? this.DRUM_ROWS : (isPads ? PAD_RANGE : null);
       const barW = this.barWidth();
-      const drumOffset = isNoise ? this.RULER_HEIGHT : 0;
+      const drumOffset = (isNoise || isPads) ? this.RULER_HEIGHT : 0;
       for (const note of ap.pattern.notes) {
-        const rowIdx = isNoise ? rows.indexOf(note.pitch) : (127 - note.pitch);
+        const rowIdx = (isNoise || isPads) ? rows.indexOf(note.pitch) : (127 - note.pitch);
         const y = drumOffset + rowIdx * this.ROW_HEIGHT - this.scrollY;
         const x = this.KEY_WIDTH + note.start * barW - this.scrollX;
         const w = note.duration * barW;
@@ -3130,21 +3170,27 @@ body.mobile-mode #mobile-app { display: flex !important; }
           this.draw();
         } else {
           const wasSelected = !!note.selected;
-          if (!wasSelected) {
-            ap.pattern.notes.forEach(n => { n.selected = false; });
+          if (e.shiftKey) {
+            // Shift+click: toggle this note in/out of the current selection
+            note.selected = !wasSelected;
+            this.draw();
+          } else {
+            if (!wasSelected) {
+              ap.pattern.notes.forEach(n => { n.selected = false; });
+            }
+            note.selected = true;
+            this._stampDuration = note.duration;
+            dragState = {
+              type: 'move', note,
+              startX: mx, startY: my,
+              origPitch: note.pitch, origStart: note.start,
+              lastPitch: note.pitch, lastStart: note.start,
+              hasMoved: false,
+              movingSelection: wasSelected,
+              snapshot
+            };
+            this.draw();
           }
-          note.selected = true;
-          this._stampDuration = note.duration;
-          dragState = {
-            type: 'move', note,
-            startX: mx, startY: my,
-            origPitch: note.pitch, origStart: note.start,
-            lastPitch: note.pitch, lastStart: note.start,
-            hasMoved: false,
-            movingSelection: wasSelected,
-            snapshot
-          };
-          this.draw();
         }
       } else {
         ap.pattern.notes.forEach(n => { n.selected = false; });
@@ -3267,9 +3313,13 @@ body.mobile-mode #mobile-app { display: flex !important; }
         if (!pos) return;
         const newStart = Math.max(0, pos.snappedStart);
         const isNoise = isDrumChannel(ap.track.channelType);
+        const isPads  = ap.track.channelType === 'sampler' && ap.track.samplerMode === 'pads';
+        const PAD_RANGE = Array.from({length: 24}, (_, i) => i + 24);
         const newPitch = isNoise
           ? (this.DRUM_ROWS.includes(pos.pitch) ? pos.pitch : dragState.lastPitch)
-          : Math.max(0, Math.min(127, pos.pitch));
+          : isPads
+            ? (PAD_RANGE.includes(pos.pitch) ? pos.pitch : dragState.lastPitch)
+            : Math.max(0, Math.min(127, pos.pitch));
 
         if (newPitch !== dragState.lastPitch || newStart !== dragState.lastStart) {
           const pitchChanged = newPitch !== dragState.lastPitch;
@@ -3522,9 +3572,13 @@ body.mobile-mode #mobile-app { display: flex !important; }
           if (!pos) return;
           const newStart = Math.max(0, pos.snappedStart);
           const isNoise = isDrumChannel(ap.track.channelType);
+          const isPads  = ap.track.channelType === 'sampler' && ap.track.samplerMode === 'pads';
+          const PAD_RANGE = Array.from({length: 24}, (_, i) => i + 24);
           const newPitch = isNoise
             ? (this.DRUM_ROWS.includes(pos.pitch) ? pos.pitch : dragState.lastPitch)
-            : Math.max(0, Math.min(127, pos.pitch));
+            : isPads
+              ? (PAD_RANGE.includes(pos.pitch) ? pos.pitch : dragState.lastPitch)
+              : Math.max(0, Math.min(127, pos.pitch));
           if (newPitch !== dragState.lastPitch || newStart !== dragState.lastStart) {
             const pitchChanged = newPitch !== dragState.lastPitch;
             const dStart = newStart - dragState.lastStart, dPitch = newPitch - dragState.lastPitch;
@@ -6420,7 +6474,7 @@ const NoteSeq = (() => {
     // Header — title left, randomize middle, close right
     let html = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div class="modal-title" style="margin:0;">✦ DRUM SEQUENCER</div>
+        <div class="modal-title" style="margin:0;">DRUM SEQUENCER</div>
         <div style="display:flex;align-items:center;gap:6px;">
           <button id="mg-drum-randomize" class="btn btn--sm">⚄ RANDOM</button>
           <button id="mg-close" class="btn btn--sm" style="background:none;border:none;">×</button>
@@ -6990,18 +7044,26 @@ const DPCMSampler = {
   _recStart:       0,
   _stopFn:         null,
   _recordedChunks: null,
+  _samplerMode:    'oneshot',
+  _targetPad:      null,
+  _targetZone:     null,
+  _rootNote:       60,
 
   // ── Public entry point ─────────────────────────────────────
   open(track, name) {
-    this._targetTrack = track || null;
+    this._targetTrack  = track || null;
     this._newTrackName = name || 'SAMPLE';
-    this._rawSamples  = null;
-    this._rawRate     = 0;
-    this._trimStart   = 0;
-    this._trimEnd     = 1;
-    this._bitDepth    = 4;
-    this._filter      = 'lo';
-    this._recording   = false;
+    this._rawSamples   = null;
+    this._rawRate      = 0;
+    this._trimStart    = 0;
+    this._trimEnd      = 1;
+    this._bitDepth     = 4;
+    this._filter       = 'lo';
+    this._recording    = false;
+    this._samplerMode  = track ? (track.samplerMode || 'oneshot') : 'oneshot';
+    this._targetPad    = null;
+    this._targetZone   = null;
+    this._rootNote     = 60;
     if (this._stream) {
       this._stream.getTracks().forEach(t => t.stop());
       this._stream = null;
@@ -7022,32 +7084,59 @@ const DPCMSampler = {
   // ── PHASE A: Source selection ──────────────────────────────
   _renderSource() {
     const el = document.getElementById('nes-sampler-content');
+    const modeDesc = {
+      oneshot: 'ONE SAMPLE \u00b7 PITCHED ACROSS ALL KEYS',
+      pitched: 'MULTIPLE SAMPLES AT SPECIFIC PITCHES \u00b7 BEST QUALITY',
+      pads:    'DIFFERENT SAMPLE PER KEY \u00b7 DRUM KIT STYLE'
+    };
     el.innerHTML = `
       <div class="nss-title">
         <span>&#9636; NES SAMPLER</span>
         <button class="btn btn--sm btn--danger" id="nss-close">&#x2715;</button>
       </div>
+
       <div class="nss-section">
-        <div class="nss-label">CHOOSE SOURCE</div>
-        <div class="nss-row" style="gap:var(--space-2);">
-          <button class="btn btn--primary btn--full" id="nss-mic-btn"
-            style="flex:1;">&#127897; RECORD MIC</button>
-          <button class="btn btn--full" id="nss-file-btn"
-            style="flex:1;">&#128193; UPLOAD FILE</button>
-          <input type="file" id="nss-file-input"
-            accept="audio/*" style="display:none;">
+        <div class="nss-label">SAMPLE TYPE</div>
+        <div style="display:flex;gap:0;">
+          ${[['oneshot','ONE SHOT'],['pitched','PITCHED'],['pads','PADS']]
+            .map(([v,l],i) => `
+            <button class="btn btn--sm nss-mode-tog${this._samplerMode===v?' btn--primary':''}"
+              data-mode="${v}"
+              style="flex:1;border-radius:0;${i>0?'margin-left:-2px;':''}
+                z-index:${this._samplerMode===v?2:1};position:relative;">
+              ${l}
+            </button>`).join('')}
+        </div>
+        <div style="font-size:var(--t-xs);color:var(--text-dim);margin-top:var(--space-1);">
+          ${modeDesc[this._samplerMode]}
         </div>
       </div>
-      ${this._targetTrack ? `
-      <div style="font-size:var(--t-xs);color:var(--text-dim);
-        margin-top:var(--space-2);">
-        REPLACING SAMPLE ON: ${this._targetTrack.name}
-      </div>` : `
-      <div style="font-size:var(--t-xs);color:var(--text-dim);
-        margin-top:var(--space-2);">
-        A NEW DPCM TRACK WILL BE CREATED
-      </div>`}
+
+      <div class="nss-section">
+        <div class="nss-label">TARGET</div>
+        ${this._buildTargetOptions()}
+      </div>
+
+      <div class="nss-section">
+        <div class="nss-label">SOURCE</div>
+        <div class="nss-row">
+          <button class="btn btn--primary" id="nss-mic-btn" style="flex:1;">&#127897; RECORD MIC</button>
+          <button class="btn" id="nss-file-btn" style="flex:1;">&#128193; UPLOAD FILE</button>
+          <input type="file" id="nss-file-input" accept="audio/*" style="display:none;">
+        </div>
+      </div>
     `;
+
+    el.querySelectorAll('.nss-mode-tog').forEach(btn => {
+      btn.onclick = () => {
+        this._samplerMode = btn.dataset.mode;
+        this._targetTrack = null;
+        this._targetPad   = null;
+        this._targetZone  = null;
+        this._renderSource();
+      };
+    });
+    this._wireTargetOptions();
     document.getElementById('nss-close').onclick = () => this.close();
     document.getElementById('nss-mic-btn').onclick = () => this._renderRecord();
     document.getElementById('nss-file-btn').onclick =
@@ -7055,6 +7144,151 @@ const DPCMSampler = {
     document.getElementById('nss-file-input').onchange = (e) => {
       if (e.target.files[0]) this._loadFile(e.target.files[0]);
     };
+  },
+
+  _buildTargetOptions() {
+    const NS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+    const samplerTracks = ProjectState.tracks.filter(
+      t => t.channelType === 'sampler' && t.samplerMode === this._samplerMode);
+
+    if (this._samplerMode === 'oneshot') {
+      let html = `<label style="display:flex;align-items:center;gap:var(--space-2);
+          margin-bottom:var(--space-1);font-size:var(--t-xs);cursor:pointer;">
+          <input type="radio" name="nss-target" value="new"
+            ${!this._targetTrack ? 'checked' : ''}>
+          NEW ONE SHOT TRACK
+        </label>`;
+      samplerTracks.forEach(t => {
+        html += `<label style="display:flex;align-items:center;gap:var(--space-2);
+            margin-bottom:var(--space-1);font-size:var(--t-xs);cursor:pointer;">
+            <input type="radio" name="nss-target" value="track-${t.id}"
+              ${this._targetTrack?.id === t.id ? 'checked' : ''}>
+            REPLACE SAMPLE ON: ${t.name}
+          </label>`;
+      });
+      return html;
+
+    } else if (this._samplerMode === 'pads') {
+      const track = this._targetTrack;
+      let trackSel = `<div style="margin-bottom:var(--space-2);">
+          <span style="font-size:var(--t-xs);color:var(--text-dim);">TRACK: </span>
+          <select id="nss-pad-track" style="font-size:var(--t-xs);
+            background:var(--bg);color:var(--text);border:1px solid var(--bg3);
+            padding:2px 4px;font-family:'Press Start 2P',monospace;">
+            <option value="new">+ NEW PAD TRACK</option>
+            ${samplerTracks.map(t =>
+              `<option value="${t.id}"${this._targetTrack?.id === t.id ? ' selected' : ''}>${t.name}</option>`
+            ).join('')}
+          </select>
+        </div>`;
+      let grid = `<div style="display:grid;grid-template-columns:repeat(12,1fr);gap:2px;">`;
+      for (let midi = 24; midi <= 47; midi++) {
+        const pc = midi % 12;
+        const oct = Math.floor(midi / 12) - 1;
+        const name = NS[pc];
+        const isBlack = [1,3,6,8,10].includes(pc);
+        const hasSample = track?.pads?.[midi]?.sample;
+        const isSelected = this._targetPad === midi;
+        grid += `<button class="btn btn--sm nss-pad-btn" data-midi="${midi}"
+            style="padding:2px;min-width:0;font-size:6px;
+              ${isBlack ? 'background:var(--bg-deep);color:var(--text-dim);' : ''}
+              ${hasSample ? 'border-color:var(--hi);color:var(--hi);' : ''}
+              ${isSelected ? 'background:var(--hi);color:var(--bg-deep);border-color:var(--hi);' : ''}"
+            title="${name}${oct}">${name}${oct}</button>`;
+      }
+      grid += '</div>';
+      return trackSel + grid;
+
+    } else {
+      // PITCHED
+      const track = this._targetTrack;
+      let trackSel = `<div style="margin-bottom:var(--space-2);">
+          <span style="font-size:var(--t-xs);color:var(--text-dim);">TRACK: </span>
+          <select id="nss-zone-track" style="font-size:var(--t-xs);
+            background:var(--bg);color:var(--text);border:1px solid var(--bg3);
+            padding:2px 4px;font-family:'Press Start 2P',monospace;">
+            <option value="new">+ NEW PITCHED TRACK</option>
+            ${samplerTracks.map(t =>
+              `<option value="${t.id}"${this._targetTrack?.id === t.id ? ' selected' : ''}>${t.name}</option>`
+            ).join('')}
+          </select>
+        </div>`;
+      const zones = track?.zones || [];
+      let zoneList = zones.length === 0
+        ? `<div style="font-size:var(--t-xs);color:var(--text-dim);">
+             NO ZONES YET \u2014 ADD FIRST SAMPLE BELOW</div>`
+        : zones.map((z, i) => {
+            const rn = NS[z.rootNote % 12] + Math.floor(z.rootNote / 12);
+            return `<div style="display:flex;align-items:center;gap:6px;font-size:var(--t-xs);
+                padding:3px 0;color:${this._targetZone === i ? 'var(--hi)' : 'var(--text)'};">
+                <span>ZONE ${i+1}: ROOT ${rn}</span>
+                <button class="btn btn--sm btn--danger nss-del-zone" data-zi="${i}"
+                  style="padding:1px 4px;font-size:6px;">\u00d7</button>
+              </div>`;
+          }).join('');
+      return trackSel +
+        `<div style="margin-bottom:var(--space-1);">${zoneList}</div>
+         <div style="font-size:var(--t-xs);color:var(--text-dim);">
+           + RECORD OR UPLOAD BELOW TO ADD A NEW ZONE</div>`;
+    }
+  },
+
+  _wireTargetOptions() {
+    const el = document.getElementById('nes-sampler-content');
+
+    el.querySelectorAll('input[name="nss-target"]').forEach(radio => {
+      radio.onchange = () => {
+        const v = radio.value;
+        this._targetTrack = v === 'new' ? null
+          : ProjectState.tracks.find(t => t.id === v.replace('track-', '')) || null;
+      };
+    });
+
+    const padTrackSel = document.getElementById('nss-pad-track');
+    if (padTrackSel) {
+      padTrackSel.onchange = () => {
+        const v = padTrackSel.value;
+        this._targetTrack = v === 'new' ? null
+          : ProjectState.tracks.find(t => t.id === v) || null;
+        this._targetPad = null;
+        this._renderSource();
+      };
+    }
+
+    el.querySelectorAll('.nss-pad-btn').forEach(btn => {
+      btn.onclick = () => {
+        this._targetPad = parseInt(btn.dataset.midi);
+        el.querySelectorAll('.nss-pad-btn').forEach(b => {
+          const isThis = parseInt(b.dataset.midi) === this._targetPad;
+          const hasSample = this._targetTrack?.pads?.[parseInt(b.dataset.midi)]?.sample;
+          b.style.background = isThis ? 'var(--hi)' : (hasSample ? '' : '');
+          b.style.color = isThis ? 'var(--bg-deep)' : '';
+          b.style.borderColor = isThis ? 'var(--hi)' : (hasSample ? 'var(--hi)' : '');
+        });
+      };
+    });
+
+    const zoneTrackSel = document.getElementById('nss-zone-track');
+    if (zoneTrackSel) {
+      zoneTrackSel.onchange = () => {
+        const v = zoneTrackSel.value;
+        this._targetTrack = v === 'new' ? null
+          : ProjectState.tracks.find(t => t.id === v) || null;
+        this._targetZone = null;
+        this._renderSource();
+      };
+    }
+
+    el.querySelectorAll('.nss-del-zone').forEach(btn => {
+      btn.onclick = () => {
+        const zi = parseInt(btn.dataset.zi);
+        if (this._targetTrack?.zones) {
+          History.push();
+          this._targetTrack.zones.splice(zi, 1);
+          this._renderSource();
+        }
+      };
+    });
   },
 
   // ── PHASE B: Recording ─────────────────────────────────────
@@ -7274,11 +7508,40 @@ const DPCMSampler = {
         </div>
       </div>
 
+      ${this._samplerMode !== 'pads' ? `
+      <div class="nss-section">
+        <div class="nss-label">ROOT NOTE
+          <span style="color:var(--text-dim);margin-left:8px;font-size:var(--t-xs);">
+            WHAT NOTE IS THIS RECORDING?
+          </span>
+        </div>
+        <div class="nss-row">
+          <select id="nss-root-oct" style="font-size:var(--t-xs);background:var(--bg);
+            color:var(--text);border:1px solid var(--bg3);padding:3px 5px;
+            font-family:'Press Start 2P',monospace;">
+            ${[0,1,2,3,4,5,6,7,8].map(o =>
+              `<option value="${o}"${Math.floor(this._rootNote/12)===o?' selected':''}>${o}</option>`
+            ).join('')}
+          </select>
+          <select id="nss-root-pc" style="font-size:var(--t-xs);background:var(--bg);
+            color:var(--text);border:1px solid var(--bg3);padding:3px 5px;
+            font-family:'Press Start 2P',monospace;">
+            ${['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'].map((n,i) =>
+              `<option value="${i}"${this._rootNote%12===i?' selected':''}>${n}</option>`
+            ).join('')}
+          </select>
+          <span style="font-size:var(--t-xs);color:var(--hi);" id="nss-root-display">
+            ${'ABCDEFG'[0]} <!-- placeholder, set in RAF -->
+          </span>
+        </div>
+      </div>` : ''}
+
       <div class="nss-row" style="margin-top:var(--space-3);">
         <button class="btn" id="nss-preview-btn" style="flex:1;">
           &#9654; PREVIEW</button>
         <button class="btn btn--primary" id="nss-create-btn" style="flex:2;">
-          CREATE TRACK</button>
+          ${this._samplerMode === 'pads' ? 'ASSIGN PAD' : this._samplerMode === 'pitched' ? 'ADD ZONE' : 'CREATE TRACK'}
+        </button>
       </div>
     `;
 
@@ -7299,6 +7562,28 @@ const DPCMSampler = {
       document.getElementById('nss-flt-' + f).onclick = () => {
         this._filter = f; this._renderTrim(); };
     });
+
+    // Root note selectors (only present for oneshot/pitched modes)
+    const _updateRootDisplay = () => {
+      const NS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+      const d = document.getElementById('nss-root-display');
+      if (d) d.textContent = NS[this._rootNote % 12] + Math.floor(this._rootNote / 12);
+    };
+    const octSel = document.getElementById('nss-root-oct');
+    const pcSel  = document.getElementById('nss-root-pc');
+    if (octSel) {
+      octSel.onchange = () => {
+        this._rootNote = parseInt(octSel.value) * 12 + (this._rootNote % 12);
+        _updateRootDisplay();
+      };
+    }
+    if (pcSel) {
+      pcSel.onchange = () => {
+        this._rootNote = Math.floor(this._rootNote / 12) * 12 + parseInt(pcSel.value);
+        _updateRootDisplay();
+      };
+    }
+    _updateRootDisplay();
 
     document.getElementById('nss-preview-btn').onclick =
       () => this._previewSample();
@@ -7474,15 +7759,57 @@ const DPCMSampler = {
   _commitSample() {
     const processed = this._getProcessedSample();
     if (!processed) return;
-    let track = this._targetTrack;
-    if (!track) {
-      History.push();
-      track = addTrack('sampler', this._newTrackName || 'SAMPLE');
-      addPattern(track.id, 0, 4);
+    History.push();
+    const NS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+    if (this._samplerMode === 'pads') {
+      let track = this._targetTrack;
+      if (!track) {
+        track = addTrack('sampler', this._newTrackName || 'PADS');
+        track.samplerMode = 'pads';
+        addPattern(track.id, 0, 4);
+      }
+      const padNote = this._targetPad ?? 36;
+      if (!track.pads) track.pads = {};
+      track.pads[padNote] = {
+        sample:   processed,
+        rootNote: padNote,
+        name:     NS[padNote % 12] + Math.floor(padNote / 12)
+      };
+      track.sample = processed;
+      this.drawWaveform(track);
+      EventBus.emit('dpcm:recorded', { track });
+
+    } else if (this._samplerMode === 'pitched') {
+      let track = this._targetTrack;
+      if (!track) {
+        track = addTrack('sampler', this._newTrackName || 'PITCHED');
+        track.samplerMode = 'pitched';
+        track.zones = [];
+        addPattern(track.id, 0, 4);
+      }
+      if (!track.zones) track.zones = [];
+      const root = this._rootNote ?? 60;
+      track.zones.push({ sample: processed, rootNote: root, minNote: root - 6, maxNote: root + 6 });
+      track.zones.sort((a, b) => a.rootNote - b.rootNote);
+      track.sample = processed;
+      this.drawWaveform(track);
+      EventBus.emit('dpcm:recorded', { track });
+
+    } else {
+      // ONE SHOT
+      let track = this._targetTrack;
+      if (!track) {
+        track = addTrack('sampler', this._newTrackName || 'SAMPLE');
+        track.samplerMode = 'oneshot';
+        addPattern(track.id, 0, 4);
+      }
+      track.sample    = processed;
+      track.rootNote  = this._rootNote ?? 60;
+      this.drawWaveform(track);
+      EventBus.emit('dpcm:recorded', { track });
     }
-    track.sample = processed;
-    this.drawWaveform(track);
-    EventBus.emit('dpcm:recorded', { track });
+
     this.close();
     AV.resize();
     AV.draw();
@@ -7589,6 +7916,10 @@ const Sequencer = {
   stop() {
     this._playing = false;
     if (this._timer) { clearInterval(this._timer); this._timer = null; }
+    // Close the AudioContext immediately — kills all scheduled nodes mid-playback.
+    // getMasterGain() and getAudioCtx() recreate lazily on next play.
+    if (audioCtx) { try { audioCtx.close(); } catch(e) {} audioCtx = null; }
+    masterGain.node = null;
     if (ProjectState.loopEnabled) ProjectState.playheadBar = ProjectState.loopStart;
     AV.draw();
     if (PR.activePattern) PR.draw();
@@ -9046,7 +9377,7 @@ const ExportEngine = {
         <div style="display:flex;">
           <button id="pr-tool-default" class="btn btn--sm pr-topbar-btn btn--engaged">SINGLE</button>
           <button id="pr-tool-stamp"   class="btn btn--sm pr-topbar-btn" style="margin-left:-2px;">MULTI</button>
-          <button id="pr-tool-noteseq"   class="btn btn--sm pr-topbar-btn" style="margin-left:-2px;">&#10022; SEQUENCER</button>
+          <button id="pr-tool-noteseq"   class="btn btn--sm pr-topbar-btn" style="margin-left:-2px;">SEQUENCER</button>
         </div>
       </div>
 
