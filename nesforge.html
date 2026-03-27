@@ -1063,6 +1063,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       <div class="mob-export-title">EXPORT</div>
       <button id="mob-exp-share" class="btn btn--mob">SHARE AS WAV</button>
       <button id="mob-exp-wav" class="btn btn--mob">DOWNLOAD WAV</button>
+      <button id="mob-exp-mp3" class="btn btn--mob">SHARE COMPRESSED</button>
       <button id="mob-exp-midi" class="btn btn--mob">DOWNLOAD MIDI</button>
       <div class="mob-export-close" id="mob-export-close-btn">CANCEL</div>
     </div>
@@ -1753,10 +1754,50 @@ body.mobile-mode #mobile-app { display: flex !important; }
     return () => { oscs.forEach(o => { try { o.stop(); } catch(e) {} }); chain.stop(); };
   }
 
-  // DRUM PITCH → PRESET mapping (GM-like)
+  // DRUM PITCH → PRESET mapping (full GM coverage, variants collapsed)
   const DRUM_MIDI = {
-    36: 'kick', 38: 'snare', 42: 'hihatC',
-    46: 'hihatO', 37: 'rim', 39: 'clap'
+    // Kick variants → kick
+    35: 'kick',   // Acoustic Bass Drum
+    36: 'kick',   // Bass Drum 1
+    // Snare variants → snare
+    38: 'snare',  // Acoustic Snare
+    40: 'snare',  // Electric Snare
+    // Hi-hat variants
+    42: 'hihatC', // Closed Hi-Hat
+    44: 'hihatC', // Pedal Hi-Hat
+    46: 'hihatO', // Open Hi-Hat
+    // Rim / stick
+    37: 'rim',    // Side Stick
+    31: 'rim',    // Sticks (non-GM but common)
+    // Clap / snap
+    39: 'clap',   // Hand Clap
+    // Toms → kick (lowest body sound available)
+    41: 'kick',   // Low Floor Tom
+    43: 'kick',   // High Floor Tom
+    45: 'kick',   // Low Tom
+    47: 'kick',   // Low-Mid Tom
+    48: 'kick',   // Hi-Mid Tom
+    50: 'kick',   // High Tom
+    // Cymbals → open/closed hat (nearest bright equivalent)
+    49: 'hihatO', // Crash Cymbal 1
+    51: 'hihatC', // Ride Cymbal 1
+    52: 'hihatO', // Chinese Cymbal
+    53: 'hihatC', // Ride Bell
+    55: 'hihatO', // Splash Cymbal
+    57: 'hihatO', // Crash Cymbal 2
+    59: 'hihatC', // Ride Cymbal 2
+    // Misc percussion → rim (short, tonal)
+    54: 'rim',    // Tambourine
+    56: 'rim',    // Cowbell
+    75: 'rim',    // Claves
+    76: 'rim',    // Hi Wood Block
+    77: 'rim',    // Low Wood Block
+  };
+
+  // Preset name → canonical GM MIDI pitch for export
+  const DRUM_MIDI_EXPORT = {
+    kick: 36, snare: 38, hihatC: 42,
+    hihatO: 46, rim: 37, clap: 39,
   };
 
   // True for any channel type that uses the 6-row drum grid
@@ -5313,110 +5354,212 @@ function parseMidi(buffer) {
 }
 
 function showMidiImportDialog(midiData, filename) {
-  // Flatten all note-on/off events across tracks into a list of { pitch, startTick, durationTicks, velocity }
-  const rawNotes = [];
-  for (const track of midiData.tracks) {
-    const openNotes = {}; // key: `${channel}-${pitch}` → { startTick, velocity }
-    for (const ev of track.events) {
-      const key = `${ev.channel}-${ev.pitch}`;
-      if (ev.type === 'noteOn') {
-        openNotes[key] = { startTick: ev.tick, velocity: ev.velocity };
-      } else if (ev.type === 'noteOff') {
-        if (openNotes[key]) {
-          rawNotes.push({
-            pitch:        ev.pitch,
-            startTick:    openNotes[key].startTick,
-            durationTicks: ev.tick - openNotes[key].startTick,
-            velocity:     openNotes[key].velocity,
-          });
-          delete openNotes[key];
+  const ppq         = midiData.ppq || 480;
+  const beatsPerBar = ProjectState.timeSignature?.[0] || 4;
+  const ticksPerBar = ppq * beatsPerBar;
+
+  // Extract { notes[], isDrum, hasNotes } from an event array
+  function extractTrackNotes(events) {
+    const openNotes = {};
+    const notes = [];
+    const channels = new Set();
+    let hasNotes = false;
+
+    for (const ev of events) {
+      if (ev.type === 'noteOn' || ev.type === 'noteOff') {
+        channels.add(ev.channel);
+        hasNotes = true;
+        const key = `${ev.channel}-${ev.pitch}`;
+        if (ev.type === 'noteOn' && ev.velocity > 0) {
+          openNotes[key] = { startTick: ev.tick, velocity: ev.velocity, channel: ev.channel };
+        } else {
+          // noteOff or noteOn with velocity=0
+          if (openNotes[key]) {
+            notes.push({
+              pitch:         ev.pitch,
+              channel:       openNotes[key].channel,
+              startTick:     openNotes[key].startTick,
+              durationTicks: Math.max(1, ev.tick - openNotes[key].startTick),
+              velocity:      openNotes[key].velocity,
+            });
+            delete openNotes[key];
+          }
         }
       }
     }
-    // Flush any notes that had note-on but no note-off (assume 1-beat duration)
+    // Flush unclosed note-ons (assume 1-beat duration)
     for (const [k, v] of Object.entries(openNotes)) {
       const pitch = parseInt(k.split('-')[1]);
-      rawNotes.push({ pitch, startTick: v.startTick, durationTicks: midiData.ppq || 480, velocity: v.velocity });
+      notes.push({ pitch, channel: v.channel, startTick: v.startTick,
+        durationTicks: ppq, velocity: v.velocity });
+    }
+
+    const isDrum = [...channels].some(ch => ch === 9 || ch === 15);
+    return { notes, isDrum, channels, hasNotes };
+  }
+
+  let detectedTracks = [];
+
+  if (midiData.format === 0) {
+    // Format 0: single MTrk — split by channel (ch 9/15 = drums)
+    const byChannel = {};
+    const track0 = midiData.tracks[0];
+    if (track0) {
+      for (const ev of track0.events) {
+        if (ev.type === 'noteOn' || ev.type === 'noteOff') {
+          if (!byChannel[ev.channel]) byChannel[ev.channel] = [];
+          byChannel[ev.channel].push(ev);
+        }
+      }
+    }
+    for (const [ch, evs] of Object.entries(byChannel)) {
+      const { notes, isDrum } = extractTrackNotes(evs);
+      if (notes.length > 0) {
+        detectedTracks.push({
+          name: isDrum ? 'DRUMS' : `CH ${parseInt(ch) + 1}`,
+          notes, isDrum,
+          suggestedType: isDrum ? 'pcm7' : 'pulse50',
+        });
+      }
+    }
+  } else {
+    // Format 1: each MTrk becomes one NESForge track (skip empty/tempo-only tracks)
+    for (let i = 0; i < midiData.tracks.length; i++) {
+      const { notes, isDrum, hasNotes } = extractTrackNotes(midiData.tracks[i].events);
+      if (!hasNotes || notes.length === 0) continue;
+      detectedTracks.push({
+        name: `TRACK ${i + 1}`,
+        notes, isDrum,
+        suggestedType: isDrum ? 'pcm7' : 'pulse50',
+      });
     }
   }
 
-  if (rawNotes.length === 0) { alert('No notes found in MIDI file.'); return; }
+  if (detectedTracks.length === 0) { alert('No notes found in MIDI file.'); return; }
 
-  const trackTypes = [
-    { value: 'pulse50',   label: 'Lead (Pulse 50%)' },
-    { value: 'pulse25',   label: 'Harmony (Pulse 25%)' },
-    { value: 'triangle',  label: 'Bass (Triangle)' },
-    { value: 'chord',     label: 'Chord' },
-    { value: 'noise',     label: 'Noise / Drums' },
+  const TRACK_TYPES = [
+    { value: 'pulse50',  label: 'LEAD (Pulse 50%)' },
+    { value: 'pulse25',  label: 'HARMONY (Pulse 25%)' },
+    { value: 'triangle', label: 'BASS (Triangle)' },
+    { value: 'chord',    label: 'CHORD' },
+    { value: 'pcm7',     label: 'DRUMS (PCM7)' },
+    { value: 'noise',    label: 'NOISE DRUMS' },
   ];
 
-  const el = document.createElement('div');
-  el.className = 'modal modal--sm';
-  el.style.cssText = 'position:fixed; z-index:9999; min-width:240px;';
-  el.innerHTML = `
-    <div class="modal-title">IMPORT MIDI</div>
-    <div class="modal-label" style="word-break:break-all">${filename.replace(/</g,'&lt;')}</div>
-    <div class="modal-label">${rawNotes.length} notes detected</div>
-    <div class="modal-section">
-      <div class="modal-label" style="margin-bottom:5px;">TRACK NAME</div>
-      <input id="midi-tname" type="text" value="${filename.replace(/\.midi?$/i,'').replace(/</g,'&lt;')}"
-        class="field-input">
-    </div>
-    <div class="modal-section">
-      <div class="modal-label" style="margin-bottom:5px;">TRACK TYPE</div>
-      <select id="midi-ttype" class="field-select">
-        ${trackTypes.map(t=>`<option value="${t.value}">${t.label}</option>`).join('')}
-      </select>
-    </div>
-    <div class="modal-actions">
-      <button id="midi-cancel" class="btn" style="flex:1;">CANCEL</button>
-      <button id="midi-import" class="btn btn--primary" style="flex:1;">IMPORT</button>
-    </div>
-  `;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,10,26,.9);' +
+    'display:flex;align-items:center;justify-content:center;';
 
-  // Center popup
-  el.style.left = '50%'; el.style.top = '50%';
-  el.style.transform = 'translate(-50%,-50%)';
-  document.body.appendChild(el);
+  overlay.innerHTML = `
+    <div style="background:var(--bg-deep);border:2px solid var(--bg3);
+      padding:var(--space-4);width:min(600px,95vw);max-height:90vh;overflow-y:auto;
+      font-family:'Press Start 2P',monospace;">
+      <div style="font-size:var(--t-lg);color:var(--hi);margin-bottom:var(--space-3);">IMPORT MIDI</div>
+      <div style="font-size:var(--t-xs);color:var(--text-dim);margin-bottom:var(--space-3);">
+        ${filename.replace(/</g, '&lt;')} &middot;
+        ${detectedTracks.length} TRACK${detectedTracks.length > 1 ? 'S' : ''} DETECTED
+      </div>
+      <div id="midi-track-rows">
+        ${detectedTracks.map((dt, i) => `
+          <div style="display:flex;align-items:center;gap:var(--space-2);
+            padding:var(--space-2);margin-bottom:var(--space-1);
+            background:var(--bg);border:1px solid var(--bg3);">
+            <input type="checkbox" id="midi-inc-${i}" checked
+              style="width:14px;height:14px;accent-color:var(--hi);flex-shrink:0;cursor:pointer;">
+            <input type="text" id="midi-name-${i}" value="${dt.name}"
+              style="font-size:var(--t-xs);background:var(--bg-deep);color:var(--text);
+              border:1px solid var(--bg3);padding:3px 5px;width:100px;flex-shrink:0;
+              font-family:'Press Start 2P',monospace;">
+            <select id="midi-type-${i}"
+              style="font-size:var(--t-xs);background:var(--bg-deep);color:var(--text);
+              border:1px solid var(--bg3);padding:3px 5px;flex:1;
+              font-family:'Press Start 2P',monospace;">
+              ${TRACK_TYPES.map(t =>
+                `<option value="${t.value}"${t.value === dt.suggestedType ? ' selected' : ''}>
+                  ${t.label}</option>`
+              ).join('')}
+            </select>
+            <span style="font-size:var(--t-xs);color:var(--text-dim);flex-shrink:0;">
+              ${dt.notes.length}n</span>
+          </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:var(--space-2);margin-top:var(--space-3);">
+        <button class="btn" id="midi-cancel" style="flex:1;">CANCEL</button>
+        <button class="btn btn--primary" id="midi-import-btn" style="flex:2;">
+          IMPORT ALL CHECKED</button>
+      </div>
+    </div>`;
 
-  document.getElementById('midi-cancel').onclick = () => el.remove();
+  document.body.appendChild(overlay);
+  document.getElementById('midi-cancel').onclick = () => overlay.remove();
 
-  document.getElementById('midi-import').onclick = () => {
-    const trackName = document.getElementById('midi-tname').value.trim() || 'MIDI Track';
-    const channelType = document.getElementById('midi-ttype').value;
+  document.getElementById('midi-import-btn').onclick = () => {
+    // Global time offset: align all included tracks to bar 0
+    const allMinTick = detectedTracks
+      .filter((_, i) => document.getElementById(`midi-inc-${i}`)?.checked)
+      .flatMap(dt => dt.notes.map(n => n.startTick))
+      .reduce((m, t) => Math.min(m, t), Infinity);
 
-    // Convert ticks → bars using NESForge tempo
-    // bpm from ProjectState; ppq from MIDI header
-    const bpm = ProjectState.bpm || 120;
-    const ppq = midiData.ppq;
-    const beatsPerBar = ProjectState.timeSignature ? ProjectState.timeSignature[0] : 4;
-    const ticksPerBar = ppq * beatsPerBar;
-
-    // Normalize: shift all notes so the earliest starts at bar 0
-    const minTick = rawNotes.reduce((m, n) => Math.min(m, n.startTick), Infinity);
-
-    // Build notes array
-    const notes = rawNotes.map(n => ({
-      id:       makeId(),
-      selected: false,
-      pitch:    Math.max(0, Math.min(127, n.pitch)),
-      start:    (n.startTick - minTick) / ticksPerBar,
-      duration: Math.max(1/32, n.durationTicks / ticksPerBar),
-      velocity: Math.max(1, Math.min(127, n.velocity)),
-    }));
-
-    // Determine pattern length (round up to whole bar)
-    const maxEnd = notes.reduce((m, n) => Math.max(m, n.start + n.duration), 0);
-    const patternBars = Math.max(1, Math.ceil(maxEnd));
-
-    // Use proper helpers so all track fields (volume, fuzz, delay, etc.) are initialised
     History.push();
-    const newTrack = addTrack(channelType, trackName);
-    const newPattern = addPattern(newTrack.id, 0, patternBars);
-    newPattern.notes = notes;
+    let imported = 0;
+
+    detectedTracks.forEach((dt, i) => {
+      if (!document.getElementById(`midi-inc-${i}`)?.checked) return;
+
+      const name = document.getElementById(`midi-name-${i}`)?.value.trim() || dt.name;
+      const type = document.getElementById(`midi-type-${i}`)?.value || 'pulse50';
+      const isDrumTrack = type === 'pcm7' || type === 'noise';
+
+      const notes = dt.notes.map(n => {
+        let pitch = Math.max(0, Math.min(127, n.pitch));
+
+        if (isDrumTrack) {
+          const presetName = DRUM_MIDI[pitch];
+          if (presetName) {
+            // Remap to NESForge canonical pitch via DRUM_MIDI_EXPORT
+            pitch = DRUM_MIDI_EXPORT[presetName] ?? pitch;
+          } else {
+            // Smart fallback for unmapped GM drum pitches
+            if      (pitch < 38) pitch = 36; // low  → kick
+            else if (pitch < 45) pitch = 38; // mid-low → snare
+            else if (pitch < 52) pitch = 42; // mid → closed hat
+            else                 pitch = 46; // high → open hat
+          }
+        }
+
+        return {
+          id:       makeId(),
+          selected: false,
+          pitch,
+          start:    (n.startTick - allMinTick) / ticksPerBar,
+          duration: Math.max(1 / 32, n.durationTicks / ticksPerBar),
+          velocity: Math.max(1, Math.min(127, n.velocity)),
+        };
+      });
+
+      const maxEnd = notes.reduce((m, n) => Math.max(m, n.start + n.duration), 0);
+      const patBars = Math.max(1, Math.ceil(maxEnd));
+
+      const track   = addTrack(type, name);
+      const pattern = addPattern(track.id, 0, patBars);
+      pattern.notes = notes;
+      imported++;
+    });
+
     AV.resize();
     AV.draw();
-    el.remove();
+    overlay.remove();
+
+    if (imported > 1) {
+      const toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;bottom:60px;left:50%;transform:translateX(-50%);' +
+        'background:var(--bg-deep);border:2px solid var(--hi);color:var(--text);' +
+        "font:var(--t-xs) 'Press Start 2P',monospace;padding:8px 16px;" +
+        'z-index:9999;pointer-events:none;';
+      toast.textContent = `${imported} TRACKS IMPORTED`;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2500);
+    }
   };
 }
 
@@ -8321,6 +8464,66 @@ const ExportEngine = {
     });
   },
 
+  async exportMP3() {
+    const formats = [
+      { mime: 'audio/webm;codecs=opus', ext: 'webm', label: 'WEBM/OPUS' },
+      { mime: 'audio/mp4',              ext: 'm4a',  label: 'M4A/AAC'  },
+      { mime: 'audio/ogg;codecs=opus',  ext: 'ogg',  label: 'OGG/OPUS' },
+      { mime: 'audio/webm',             ext: 'webm', label: 'WEBM'     },
+    ];
+    const supported = formats.find(f => MediaRecorder.isTypeSupported(f.mime));
+
+    if (!supported) {
+      alert('Compressed audio not supported in this browser — exporting WAV instead.');
+      return this.exportWAV();
+    }
+
+    const btn = document.getElementById('exp-mp3');
+    const origText = btn?.textContent || '';
+    if (btn) btn.textContent = 'RENDERING...';
+
+    try {
+      // Step 1: render the entire song to an AudioBuffer offline
+      const audioBuffer = await this.renderOffline();
+
+      // Step 2: play that buffer through a live AudioContext while
+      //         MediaRecorder captures the output stream
+      const liveCtx = new AudioContext();
+      const dest    = liveCtx.createMediaStreamDestination();
+      const bufSrc  = liveCtx.createBufferSource();
+      bufSrc.buffer = audioBuffer;
+      bufSrc.connect(dest);
+
+      const recorder = new MediaRecorder(dest.stream, { mimeType: supported.mime });
+      const chunks   = [];
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+      const recordingDone = new Promise(resolve => { recorder.onstop = () => resolve(); });
+
+      recorder.start();
+      bufSrc.start();
+      if (btn) btn.textContent = 'ENCODING...';
+
+      // Stop recorder as soon as the buffer finishes playing
+      bufSrc.onended = () => { recorder.stop(); liveCtx.close(); };
+
+      await recordingDone;
+
+      const blob     = new Blob(chunks, { type: supported.mime });
+      const filename = `nesforge-${Date.now()}.${supported.ext}`;
+      const url      = URL.createObjectURL(blob);
+      const a        = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+    } catch (e) {
+      alert('Export failed: ' + e.message);
+    } finally {
+      if (btn) btn.textContent = origText;
+    }
+  },
+
   // --- MIDI Binary Encoding ---
   encodeVarLen(v) {
     const out = [];
@@ -8383,16 +8586,23 @@ const ExportEngine = {
     return new Uint8Array(all).buffer;
   },
 
+  // Remap a drum note pitch to its canonical GM export pitch
+  _drumExportPitch(pitch) {
+    const preset = DRUM_MIDI[pitch];
+    return preset ? (DRUM_MIDI_EXPORT[preset] ?? pitch) : pitch;
+  },
+
   exportMIDICombined() {
     const ticksPerBeat = 480;
     const trackData = ProjectState.tracks.map(track => {
+      const isDrumTrack = track.channelType === 'noise' || track.channelType === 'pcm7';
       const allNotes = [];
       for (const entry of track.arrangement) {
         const pat = track.patterns.find(p => p.id === entry.patternId);
         if (!pat) continue;
         for (const note of pat.notes) {
-          // note.start and entry.startBar are both in bars — just add them directly
-          allNotes.push({ ...note, start: note.start + entry.startBar });
+          const exportPitch = isDrumTrack ? this._drumExportPitch(note.pitch) : note.pitch;
+          allNotes.push({ ...note, start: note.start + entry.startBar, pitch: exportPitch });
         }
       }
       return this.buildMIDITrack(allNotes, ProjectState.bpm, ticksPerBeat);
@@ -8407,13 +8617,14 @@ const ExportEngine = {
     const ticksPerBeat = 480;
     const zip = new JSZip();
     for (const track of ProjectState.tracks) {
+      const isDrumTrack = track.channelType === 'noise' || track.channelType === 'pcm7';
       const allNotes = [];
       for (const entry of track.arrangement) {
         const pat = track.patterns.find(p => p.id === entry.patternId);
         if (!pat) continue;
         for (const note of pat.notes) {
-          // note.start and entry.startBar are both in bars — just add them directly
-          allNotes.push({ ...note, start: note.start + entry.startBar });
+          const exportPitch = isDrumTrack ? this._drumExportPitch(note.pitch) : note.pitch;
+          allNotes.push({ ...note, start: note.start + entry.startBar, pitch: exportPitch });
         }
       }
       const trackData = this.buildMIDITrack(allNotes, ProjectState.bpm, ticksPerBeat);
@@ -8513,6 +8724,7 @@ const ExportEngine = {
         <div class="modal-title">EXPORT</div>
         <div class="modal-section" style="gap:6px;">
           <button class="btn btn--full" id="exp-wav">EXPORT WAV</button>
+          <button class="btn btn--full" id="exp-mp3">EXPORT AUDIO (COMPRESSED)</button>
           <button class="btn btn--full" id="exp-midi">EXPORT MIDI</button>
           <button class="btn btn--full" id="exp-stems">EXPORT STEMS</button>
         </div>
@@ -8523,6 +8735,7 @@ const ExportEngine = {
     modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.7);' +
       'align-items:center;justify-content:center;z-index:2000;';
     document.getElementById('exp-wav').onclick = () => ExportEngine.exportWAV();
+    document.getElementById('exp-mp3').onclick = () => ExportEngine.exportMP3();
     document.getElementById('exp-midi').onclick = () => ExportEngine.exportMIDICombined();
     document.getElementById('exp-stems').onclick = () => ExportEngine.exportMIDIStems();
   }
@@ -8790,6 +9003,52 @@ const ExportEngine = {
           const buf = await ExportEngine.renderOffline(p => this._showToast('RENDERING... ' + Math.round(p * 100) + '%'));
           const wav = ExportEngine.encodeWAV(buf);
           ExportEngine.downloadBlob(wav, 'nesforge-' + Date.now() + '.wav', 'audio/wav');
+        } catch (err) {
+          this._showToast('ERROR: ' + err.message);
+        }
+      });
+      document.getElementById('mob-exp-mp3').addEventListener('click', async () => {
+        document.getElementById('mob-export-dialog').classList.remove('open');
+        const formats = [
+          { mime: 'audio/webm;codecs=opus', ext: 'webm' },
+          { mime: 'audio/mp4',              ext: 'm4a'  },
+          { mime: 'audio/ogg;codecs=opus',  ext: 'ogg'  },
+          { mime: 'audio/webm',             ext: 'webm' },
+        ];
+        const supported = formats.find(f => MediaRecorder.isTypeSupported(f.mime));
+        if (!supported) {
+          this._showToast('COMPRESSED AUDIO NOT SUPPORTED — USE DOWNLOAD WAV');
+          return;
+        }
+        this._showToast('RENDERING...');
+        try {
+          const audioBuffer = await ExportEngine.renderOffline();
+          const liveCtx = new AudioContext();
+          const dest    = liveCtx.createMediaStreamDestination();
+          const bufSrc  = liveCtx.createBufferSource();
+          bufSrc.buffer = audioBuffer;
+          bufSrc.connect(dest);
+          const recorder = new MediaRecorder(dest.stream, { mimeType: supported.mime });
+          const chunks   = [];
+          recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+          const done = new Promise(resolve => { recorder.onstop = () => resolve(); });
+          recorder.start();
+          bufSrc.start();
+          this._showToast('ENCODING...');
+          bufSrc.onended = () => { recorder.stop(); liveCtx.close(); };
+          await done;
+          const blob     = new Blob(chunks, { type: supported.mime });
+          const filename = `nesforge-${Date.now()}.${supported.ext}`;
+          const file     = new File([blob], filename, { type: supported.mime });
+          let shared = false;
+          if (navigator.canShare?.({ files: [file] })) {
+            try { await navigator.share({ files: [file], title: 'NESForge Export' }); shared = true; }
+            catch (err) { if (err.name !== 'AbortError') throw err; shared = true; }
+          }
+          if (!shared) {
+            ExportEngine.downloadBlob(blob, filename, supported.mime);
+          }
+          this._showToast('DONE');
         } catch (err) {
           this._showToast('ERROR: ' + err.message);
         }
