@@ -222,8 +222,8 @@ input:focus, select:focus { border-color: var(--hi-dim); }
 @keyframes blink  { 50% { opacity: 0.3; } }
 
 
-/* MagicGen modal */
-#magic-modal {
+/* NoteSeq modal */
+#noteseq-modal {
   display: none;
   position: fixed;
   inset: 0;
@@ -232,8 +232,8 @@ input:focus, select:focus { border-color: var(--hi-dim); }
   justify-content: center;
   z-index: var(--z-modal-top);
 }
-#magic-modal.open { display: flex; }
-#magic-modal-content {
+#noteseq-modal.open { display: flex; }
+#noteseq-modal-content {
   background: var(--bg-deep);
   border: 2px solid var(--bg3);
   padding: 14px;
@@ -1004,8 +1004,8 @@ body.mobile-mode #mobile-app { display: flex !important; }
     </div>
   </div>
   <div id="export-modal" style="display:none;"></div>
-  <div id="magic-modal">
-    <div id="magic-modal-content"></div>
+  <div id="noteseq-modal">
+    <div id="noteseq-modal-content"></div>
   </div>
 </div>
 
@@ -1048,7 +1048,7 @@ body.mobile-mode #mobile-app { display: flex !important; }
       <button id="mob-rem-bar" class="btn btn--mob btn--danger" style="min-width:32px;height:36px;">−</button>
       <button id="mob-add-bar" class="btn btn--mob" style="min-width:32px;height:36px;">+</button>
       <button id="mob-clear-track" class="btn btn--mob btn--danger" style="min-width:32px;height:36px;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 512 512" width="16" height="16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="m210.82 60.24h90.35v30.12h-90.35z"/><path d="m60.24 90.35h391.53v30.12h-391.53z"/><path d="m90.35 120.47h30.12v301.18h-30.12z"/><path d="m391.53 120.47h30.12v301.18h-30.12z"/><path d="m90.35 421.65h331.29v30.12h-331.29z"/><path d="m180.71 150.59h30.12v271.06h-30.12z"/><path d="m301.18 150.59h30.12v271.06h-30.12z"/></svg></button>
-      <button id="mob-magic-btn" class="btn btn--mob" style="min-width:48px;height:36px;">MAGIC</button>
+      <button id="mob-noteseq-btn" class="btn btn--mob" style="min-width:48px;height:36px;">SEQUENCER</button>
     </div>
     <div id="mob-playhead-bar"><div id="mob-playhead-fill"></div></div>
     <div id="mob-grid"></div>
@@ -2979,10 +2979,10 @@ body.mobile-mode #mobile-app { display: flex !important; }
       } else {
         const pos = posToNote(mx, my);
         if (!pos) return;
-        if (MagicGen.engaged) {
+        if (NoteSeq.engaged) {
           this._selectedCell = pos;
           this.draw();
-          MagicGen.open({ rootMidi: pos.pitch, snappedStart: pos.snappedStart });
+          NoteSeq.open({ rootMidi: pos.pitch, snappedStart: pos.snappedStart });
           return;
         }
         if (PR._tool === 'stamp') {
@@ -5622,7 +5622,7 @@ function buildTopBar() {
     AV.draw();
   };
 
-  // Open MagicGen chord/arpeggio generator
+  // Open NoteSeq chord/arpeggio generator
 
   document.getElementById('btn-save').onclick = () => { if (typeof ExportEngine !== 'undefined') ExportEngine.saveProject(); };
   document.getElementById('btn-load').onclick = () => document.getElementById('load-input').click();
@@ -5715,9 +5715,9 @@ const ChordTool = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MagicGen — chord & arpeggio generator modal
+// NoteSeq — chord & arpeggio generator modal
 // ─────────────────────────────────────────────────────────────────────────────
-const MagicGen = (() => {
+const NoteSeq = (() => {
   // Chord interval table (semitones from root): 3-note and 4-note voicings
   const INTERVALS = {
     'Major':      { 3:[0,4,7],      4:[0,4,7,12]  },
@@ -6156,7 +6156,7 @@ const MagicGen = (() => {
   }
 
 
-  // ── DRUM MAGIC ──
+  // ── DRUM SEQUENCER ──
 
   // Generate a run of hat notes at a given step interval
   function _drumHats(pitch, step, vel) {
@@ -6410,17 +6410,17 @@ const MagicGen = (() => {
     History.push();
     ap.pattern.notes = [...ap.pattern.notes, ...tiled].sort((a, b) => a.start - b.start);
     PR.draw(); PR.drawVelocity();
-    MagicGen.close();
+    NoteSeq.close();
   }
 
   function _renderDrumModal() {
-    const content = document.getElementById('magic-modal-content');
+    const content = document.getElementById('noteseq-modal-content');
     if (!content) return;
 
     // Header — title left, randomize middle, close right
     let html = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div class="modal-title" style="margin:0;">✦ DRUM MAGIC</div>
+        <div class="modal-title" style="margin:0;">✦ DRUM SEQUENCER</div>
         <div style="display:flex;align-items:center;gap:6px;">
           <button id="mg-drum-randomize" class="btn btn--sm">⚄ RANDOM</button>
           <button id="mg-close" class="btn btn--sm" style="background:none;border:none;">×</button>
@@ -6545,7 +6545,7 @@ const MagicGen = (() => {
 
   // ── Build the modal content HTML ──
   function _renderModal() {
-    const content = document.getElementById('magic-modal-content');
+    const content = document.getElementById('noteseq-modal-content');
     if (!content) return;
 
     // Preserve step-scroll position across re-renders
@@ -6560,7 +6560,7 @@ const MagicGen = (() => {
     // Header row
     let html = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div class="modal-title" style="margin:0;">USE MAGIC</div>
+        <div class="modal-title" style="margin:0;">USE SEQUENCER</div>
         <button id="mg-close" class="btn btn--sm" style="background:none;border:none;">×</button>
       </div>
     `;
@@ -6946,7 +6946,7 @@ const MagicGen = (() => {
     if (!_openIsDrum && ctx && ctx.rootMidi != null) {
       _state.root = NOTE_NAMES[ctx.rootMidi % 12];
     }
-    const modal = document.getElementById('magic-modal');
+    const modal = document.getElementById('noteseq-modal');
     _renderModal();
     modal.classList.add('open');
     // Close on overlay click (not content click)
@@ -6959,7 +6959,7 @@ const MagicGen = (() => {
   function close() {
     _stopPreviewDrum();
     _stopArpPreview();
-    const modal = document.getElementById('magic-modal');
+    const modal = document.getElementById('noteseq-modal');
     modal.classList.remove('open');
     modal.onclick = null;
   }
@@ -8324,9 +8324,9 @@ const ExportEngine = {
         this._showToast(ProjectState.loopEnabled ? 'LOOP ON' : 'LOOP OFF');
       });
 
-      // Magic generator button
-      document.getElementById('mob-magic-btn').addEventListener('click', () => {
-        MagicGen.open();
+      // Sequencer generator button
+      document.getElementById('mob-noteseq-btn').addEventListener('click', () => {
+        NoteSeq.open();
       });
 
       // Tap tempo
@@ -9046,7 +9046,7 @@ const ExportEngine = {
         <div style="display:flex;">
           <button id="pr-tool-default" class="btn btn--sm pr-topbar-btn btn--engaged">SINGLE</button>
           <button id="pr-tool-stamp"   class="btn btn--sm pr-topbar-btn" style="margin-left:-2px;">MULTI</button>
-          <button id="pr-tool-magic"   class="btn btn--sm pr-topbar-btn" style="margin-left:-2px;">&#10022; MAGIC</button>
+          <button id="pr-tool-noteseq"   class="btn btn--sm pr-topbar-btn" style="margin-left:-2px;">&#10022; SEQUENCER</button>
         </div>
       </div>
 
@@ -9116,18 +9116,18 @@ const ExportEngine = {
       PR._tool = t;
       document.getElementById('pr-tool-default').classList.toggle('btn--engaged',t === 'default');
       document.getElementById('pr-tool-stamp').classList.toggle('btn--engaged',t === 'stamp');
-      document.getElementById('pr-tool-magic').classList.toggle('btn--engaged',t === 'magic');
+      document.getElementById('pr-tool-noteseq').classList.toggle('btn--engaged',t === 'sequencer');
       const sc = document.getElementById('pr-stamp-controls');
       if (sc) sc.style.display = t === 'stamp' ? 'flex' : 'none';
-      MagicGen.engaged = (t === 'magic');
+      NoteSeq.engaged = (t === 'sequencer');
     };
 
-    // Sync initial tool if MagicGen was already engaged (e.g. re-opening panel)
-    if (MagicGen.engaged) PR._tool = 'magic';
+    // Sync initial tool if NoteSeq was already engaged (e.g. re-opening panel)
+    if (NoteSeq.engaged) PR._tool = 'sequencer';
 
     document.getElementById('pr-tool-default').onclick = () => setTool('default');
     document.getElementById('pr-tool-stamp').onclick   = () => setTool('stamp');
-    document.getElementById('pr-tool-magic').onclick   = () => setTool(PR._tool === 'magic' ? 'default' : 'magic');
+    document.getElementById('pr-tool-noteseq').onclick   = () => setTool(PR._tool === 'sequencer' ? 'default' : 'sequencer');
     setTool(PR._tool);
 
     document.getElementById('pr-snap-sel').value = String(PR._snapVal);
