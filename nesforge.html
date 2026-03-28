@@ -2478,8 +2478,16 @@ body.mobile-mode #mobile-app { display: flex !important; }
         const normalColor = this.NOTE_COLORS[ap.track.channelType] || '#ff6973';
         const selectedColor = this.SELECTED_NOTE_COLORS[ap.track.channelType] || '#ff6644';
         for (const note of ap.pattern.notes) {
-          const rowIdx = (isNoise || isPads) ? rows.indexOf(note.pitch) : (127 - note.pitch);
-          if (rowIdx < 0) continue;
+          let rowIdx = (isNoise || isPads) ? rows.indexOf(note.pitch) : (127 - note.pitch);
+          if (isNoise && rowIdx < 0) {
+            // Heal: snap to nearest drum row so the note is visible and draggable.
+            // This is a fallback; _paste() should prevent this from happening on copy/paste.
+            const nearest = rows.reduce((best, row, ri) =>
+              Math.abs(row - note.pitch) < Math.abs(rows[best] - note.pitch) ? ri : best, 0);
+            rowIdx = nearest;
+            note.pitch = rows[nearest]; // heal in-place so drag/hit-test also work
+          }
+          if (rowIdx < 0) continue; // non-drum: keep existing guard
           const y = drumOffset + rowIdx * ROW_HEIGHT - scrollY;
           const x = KEY_WIDTH + note.start * this.barWidth() - scrollX;
           const w = note.duration * this.barWidth() - 1;
@@ -2990,7 +2998,12 @@ body.mobile-mode #mobile-app { display: flex !important; }
       const barW = this.barWidth();
       const drumOffset = (isNoise || isPads) ? this.RULER_HEIGHT : 0;
       for (const note of ap.pattern.notes) {
-        const rowIdx = (isNoise || isPads) ? rows.indexOf(note.pitch) : (127 - note.pitch);
+        let rowIdx = (isNoise || isPads) ? rows.indexOf(note.pitch) : (127 - note.pitch);
+        if (isNoise && rowIdx < 0) {
+          rowIdx = rows.reduce((best, row, ri) =>
+            Math.abs(row - note.pitch) < Math.abs(rows[best] - note.pitch) ? ri : best, 0);
+          note.pitch = rows[rowIdx]; // heal in-place
+        }
         const y = drumOffset + rowIdx * this.ROW_HEIGHT - this.scrollY;
         const x = this.KEY_WIDTH + note.start * barW - this.scrollX;
         const w = note.duration * barW;
@@ -8191,8 +8204,29 @@ function _paste() {
   // No upper clamp — allow pasting past the current pattern end (auto-extends below)
   const snapped = Math.max(0, Math.floor(relBar / sixteenth) * sixteenth);
   ap.pattern.notes.forEach(n => { n.selected = false; });
+  const isTargetDrum = isDrumChannel(ap.track.channelType);
+  const drumRows = PR.DRUM_ROWS; // [46,42,39,37,38,36]
+
   for (const note of _clipboard) {
-    ap.pattern.notes.push({ ...note, start: snapped + note.start, selected: true });
+    let pitch = note.pitch;
+
+    if (isTargetDrum) {
+      // If pitch is already a valid drum row, keep it.
+      // Otherwise snap to the nearest valid drum row by absolute distance.
+      if (!drumRows.includes(pitch)) {
+        pitch = drumRows.reduce((best, row) =>
+          Math.abs(row - pitch) < Math.abs(best - pitch) ? row : best,
+          drumRows[0]
+        );
+      }
+    }
+
+    ap.pattern.notes.push({
+      ...note,
+      pitch,
+      start: snapped + note.start,
+      selected: true,
+    });
   }
   // Auto-extend pattern and container if pasted notes exceed current length
   const maxEnd = Math.max(..._clipboard.map(n => snapped + n.start + n.duration));
