@@ -5494,12 +5494,55 @@ function showTrackSettings(track, x, y) {
   xBtn.onclick = () => el.remove();
   el.appendChild(xBtn);
 
-  // Title
-  const title = document.createElement('div');
-  title.className = 'modal-title';
-  title.style.cssText = 'margin-bottom:12px; padding-bottom:8px; padding-right:20px; border-bottom:1px solid var(--hi-dim); letter-spacing:1px;';
-  title.textContent = track.name;
-  el.appendChild(title);
+  // Title — double-click or ✎ to rename inline
+  const titleWrap = document.createElement('div');
+  titleWrap.style.cssText = 'margin-bottom:12px; padding-bottom:8px; padding-right:20px; border-bottom:1px solid var(--hi-dim); display:flex; align-items:center; gap:6px;';
+  const titleText = document.createElement('span');
+  titleText.className = 'modal-title';
+  titleText.style.cssText = 'letter-spacing:1px; flex:1;';
+  titleText.textContent = track.name;
+  const editIcon = document.createElement('span');
+  editIcon.textContent = '✎';
+  editIcon.title = 'Rename track';
+  editIcon.style.cssText = 'font-size:10px; color:var(--hi); cursor:pointer; opacity:0.7; flex-shrink:0;';
+  titleWrap.appendChild(titleText);
+  titleWrap.appendChild(editIcon);
+  el.appendChild(titleWrap);
+
+  function activateTitleEdit() {
+    const orig = track.name;
+    titleWrap.innerHTML = '';
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.value = orig;
+    inp.className = 'field-select';
+    inp.style.cssText = 'flex:1; width:100%; box-sizing:border-box;';
+    titleWrap.appendChild(inp);
+    inp.focus(); inp.select();
+
+    let committed = false;
+    function commit() {
+      if (committed) return; committed = true;
+      const val = inp.value.trim();
+      if (val) { History.push(); track.name = val; AV.draw(); }
+      restore(val || orig);
+    }
+    function cancel() { if (committed) return; committed = true; restore(orig); }
+    function restore(name) {
+      titleWrap.innerHTML = '';
+      titleText.textContent = name;
+      titleWrap.appendChild(titleText);
+      titleWrap.appendChild(editIcon);
+    }
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+      e.stopPropagation();
+    });
+    inp.addEventListener('blur', commit);
+  }
+  titleWrap.addEventListener('dblclick', activateTitleEdit);
+  editIcon.addEventListener('click', e => { e.stopPropagation(); activateTitleEdit(); });
 
   // Delete track button (appended after close button below)
   const trashBtn = document.createElement('button');
@@ -5586,6 +5629,79 @@ function showTrackSettings(track, x, y) {
     ph.textContent = '—';
     d.appendChild(lbl); d.appendChild(ph);
     return d;
+  };
+
+  // Track Type row
+  const TRACK_TYPE_LABELS = {
+    pulse50:  'LEAD (Pulse 50%)',
+    pulse25:  'HARMONY (Pulse 25%)',
+    triangle: 'BASS (Triangle)',
+    chord:    'CHORD (Pulse 50%)',
+    noise:    'DRUMS (Noise)',
+    pcm7:     'DRUMS (PCM7)',
+    sampler:  'SAMPLER',
+  };
+  const PITCHED = new Set(['pulse50','pulse25','triangle','chord']);
+  const fromType = track.channelType;
+  const _isDrum = ct => ct === 'noise' || ct === 'pcm7';
+
+  const typeRowWrap = document.createElement('div');
+  typeRowWrap.style.cssText = 'margin-bottom:10px;';
+  const typeLbl = document.createElement('div');
+  typeLbl.className = 'modal-label';
+  typeLbl.style.cssText = 'margin-bottom:2px;';
+  typeLbl.textContent = 'TRACK TYPE';
+  const typeSelect = document.createElement('select');
+  typeSelect.className = 'field-select';
+  Object.entries(TRACK_TYPE_LABELS).forEach(([val, label]) => {
+    const opt = document.createElement('option');
+    opt.value = val; opt.textContent = label;
+    if (val === fromType) opt.selected = true;
+    typeSelect.appendChild(opt);
+  });
+  typeRowWrap.appendChild(typeLbl);
+  typeRowWrap.appendChild(typeSelect);
+  el.appendChild(typeRowWrap);
+
+  function applyTypeChange(newType) {
+    History.push();
+    track.channelType = newType;
+    el.remove();
+    showTrackSettings(track, x, y);
+    if (PR.activePattern?.track === track) PR.draw();
+    AV.resize(); AV.draw();
+  }
+
+  typeSelect.onchange = () => {
+    const toType = typeSelect.value;
+    if (toType === fromType) return;
+    const existing = document.getElementById('ts-type-warn');
+    if (existing) existing.remove();
+    if (PITCHED.has(fromType) && PITCHED.has(toType)) { applyTypeChange(toType); return; }
+    const warn = document.createElement('div');
+    warn.id = 'ts-type-warn';
+    warn.style.cssText = 'margin-top:4px; margin-bottom:8px; padding:6px 8px; background:rgba(255,105,115,.12); border:1px solid var(--accent); font-size:var(--t-xs); color:var(--accent); line-height:1.7;';
+    warn.textContent = (!_isDrum(fromType) && _isDrum(toType))
+      ? '⚠ PITCHED NOTES WILL REMAP TO DRUM PITCHES.'
+      : (_isDrum(fromType) && !_isDrum(toType))
+      ? '⚠ DRUM PITCHES WILL APPEAR AS LOW PIANO ROLL NOTES.'
+      : '⚠ THIS MAY AFFECT HOW EXISTING NOTES SOUND.';
+    const warnBtnRow = document.createElement('div');
+    warnBtnRow.style.cssText = 'display:flex; gap:4px; margin-top:6px;';
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = 'btn btn--sm btn--danger';
+    confirmBtn.style.flex = '1';
+    confirmBtn.textContent = 'CONFIRM CHANGE';
+    confirmBtn.onclick = () => applyTypeChange(toType);
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn--sm';
+    cancelBtn.style.flex = '1';
+    cancelBtn.textContent = 'CANCEL';
+    cancelBtn.onclick = () => { typeSelect.value = fromType; warn.remove(); };
+    warnBtnRow.appendChild(confirmBtn);
+    warnBtnRow.appendChild(cancelBtn);
+    warn.appendChild(warnBtnRow);
+    typeRowWrap.after(warn);
   };
 
   const eligible = ['pulse50','pulse25','triangle','chord'].includes(track.channelType);
