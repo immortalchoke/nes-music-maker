@@ -4405,7 +4405,7 @@ const AV = {
       // Header
       const _isDragTarget = this._trackDrag && this._trackDrag.track === track;
       const _isSelected   = track.id === ProjectState.selectedTrackId;
-      ctx.fillStyle = _isDragTarget ? '#5a5680' : (_isSelected ? '#4e4a6a' : '#46425e');
+      ctx.fillStyle = (_isDragTarget || _isSelected) ? '#5a5680' : '#46425e';
       ctx.fillRect(0, y, HEADER_WIDTH, TRACK_HEIGHT);
       ctx.strokeStyle = (_isDragTarget || _isSelected) ? '#00ccaa' : '#15788c';
       ctx.lineWidth = 2;
