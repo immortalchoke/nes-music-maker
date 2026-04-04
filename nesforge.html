@@ -4679,7 +4679,14 @@ AV.initEvents = function() {
       const barW = this.barWidth();
       const bar = (mx - HEADER_WIDTH + scrollX) / barW;
       ProjectState.playheadBar = Math.max(0, bar);
-      if (typeof Sequencer !== 'undefined') Sequencer._playStartBar = ProjectState.playheadBar;
+      if (typeof Sequencer !== 'undefined') {
+        Sequencer._playStartBar = ProjectState.playheadBar;
+        if (Sequencer._playing) {
+          const _ctx = getAudioCtx();
+          Sequencer._playStartTime = _ctx.currentTime;
+          Sequencer._scheduledUpToTime = _ctx.currentTime;
+        }
+      }
       playheadDrag = true;
       AV.draw();
       return;
@@ -5079,7 +5086,14 @@ AV.initEvents = function() {
       }
       const bar = (mx - this.HEADER_WIDTH + this.scrollX) / barW;
       ProjectState.playheadBar = Math.max(0, bar);
-      if (typeof Sequencer !== 'undefined') Sequencer._playStartBar = ProjectState.playheadBar;
+      if (typeof Sequencer !== 'undefined') {
+        Sequencer._playStartBar = ProjectState.playheadBar;
+        if (Sequencer._playing) {
+          const _ctx = getAudioCtx();
+          Sequencer._playStartTime = _ctx.currentTime;
+          Sequencer._scheduledUpToTime = _ctx.currentTime;
+        }
+      }
       AV.draw();
       if (PR.activePattern) PR.draw();
       return;
