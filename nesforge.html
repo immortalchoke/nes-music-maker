@@ -11082,6 +11082,9 @@ const ProgBuilder = (() => {
     };
     document.getElementById('psc-demo').onclick = () => {
       ProgBuilder.close(); createDemoState();
+      ProjectState.playheadBar = 0;
+      AV.scrollX = 0; AV.scrollY = 0;
+      AV.draw();
     };
     document.getElementById('psc-prog').onclick = () => {
       document.getElementById('prog-startup-modal').classList.remove('open');
