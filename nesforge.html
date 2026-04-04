@@ -4220,6 +4220,18 @@ const AV = {
   LOOP_BAR_H: 18,   // top strip of ruler reserved for loop region (= timeline bar height)
   scrollX: 0,
   scrollY: 0,
+  _scrollAnim: null,
+  animateScrollY(target) {
+    if (this._scrollAnim) cancelAnimationFrame(this._scrollAnim);
+    const step = () => {
+      const d = target - this.scrollY;
+      if (Math.abs(d) < 0.5) { this.scrollY = target; this.draw(); this._scrollAnim = null; return; }
+      this.scrollY += d * 0.18;
+      this.draw();
+      this._scrollAnim = requestAnimationFrame(step);
+    };
+    step();
+  },
   NOTE_COLORS: PR.NOTE_COLORS,
   _selEntries: new Set(),   // selected arrangement entry objects
   _avMarquee: null,         // { startX, startY, currentX, currentY }
@@ -5069,9 +5081,7 @@ AV.initEvents = function() {
     } else if (hit.zone === 'pattern') {
       ProjectState.selectedTrackId = hit.track.id;
       ProjectState.selectedPatternId = hit.pat.id;
-      PR.open(hit.track, hit.pat);
-      AV.scrollY = Math.max(0, ProjectState.tracks.indexOf(hit.track) * AV.TRACK_HEIGHT);
-      AV.draw();
+      openPianoRoll(hit.track, hit.pat);
     }
   });
 
@@ -5239,10 +5249,8 @@ AV.initEvents = function() {
       if (changed) History._pushSnapshot(dragState.snapshot);
       // Open piano roll on release (deferred from mousedown so dragging isn't obstructed)
       if (dragState.type === 'move-pattern') {
-        PR.open(dragState.track, dragState.pat);
         ProjectState.selectedTrackId = dragState.track.id;
-        AV.scrollY = Math.max(0, ProjectState.tracks.indexOf(dragState.track) * AV.TRACK_HEIGHT);
-        AV.draw();
+        openPianoRoll(dragState.track, dragState.pat);
       }
     }
     if (loopDragState) {
@@ -5359,9 +5367,7 @@ AV.initEvents = function() {
         { label: 'Open in Piano Roll', action: () => {
           ProjectState.selectedTrackId = hit.track.id;
           ProjectState.selectedPatternId = hit.pat.id;
-          PR.open(hit.track, hit.pat);
-          AV.scrollY = Math.max(0, ProjectState.tracks.indexOf(hit.track) * AV.TRACK_HEIGHT);
-          AV.draw();
+          openPianoRoll(hit.track, hit.pat);
         }},
         { label: 'Rename', action: () => {
           const n = prompt('Pattern name:', hit.pat.name);
@@ -8827,6 +8833,132 @@ function _paste() {
 }
 
 // Wire transport buttons (after buildTopBar is called)
+// ─── Piano Roll panel open/close with slide animation ─────────────────
+let _prAnimRAF = null;
+
+function openPianoRoll(track, pat) {
+  if (_prAnimRAF) { cancelAnimationFrame(_prAnimRAF); _prAnimRAF = null; }
+  const prPanel = document.getElementById('pianoroll-panel');
+  const avPanel = document.getElementById('arrangement-panel');
+  const divider  = document.getElementById('panel-divider');
+
+  PR.activePattern = { track, pattern: pat };
+  divider.style.display = 'block';
+  if (typeof buildPRTopbar === 'function') buildPRTopbar();
+
+  // If panel is already visible just refresh content — no slide needed
+  if (prPanel.style.display !== 'none' && prPanel.offsetHeight > 10) {
+    AV.resize(); AV.draw();
+    PR.resizeCanvases();
+    _prApplyScrollY(track, pat);
+    PR.draw(); PR.drawVelocity();
+    _prScrollIfCovered(track);
+    return;
+  }
+
+  // Slide in from 0
+  const avH0      = avPanel.getBoundingClientRect().height;
+  const targetPrH = Math.max(150, Math.round(avH0 / 2));
+  const targetAvH = avH0 - targetPrH;
+
+  avPanel.style.flex = 'none'; avPanel.style.height = avH0 + 'px';
+  prPanel.style.display  = 'flex';
+  prPanel.style.flex     = 'none';
+  prPanel.style.minHeight = '0';
+  prPanel.style.overflow = 'hidden';
+  prPanel.style.height   = '0px';
+
+  let curPrH = 0, curAvH = avH0;
+  const tick = () => {
+    const pd = targetPrH - curPrH, ad = targetAvH - curAvH;
+    if (Math.abs(pd) < 0.5) {
+      // Settle — hand layout back to CSS flex
+      prPanel.style.height = ''; prPanel.style.minHeight = '';
+      prPanel.style.overflow = ''; prPanel.style.flex = '';
+      avPanel.style.flex = ''; avPanel.style.height = '';
+      _prAnimRAF = null;
+      AV.resize(); AV.draw();
+      PR.resizeCanvases();
+      _prApplyScrollY(track, pat);
+      PR.draw(); PR.drawVelocity();
+      _prScrollIfCovered(track);
+      return;
+    }
+    curPrH += pd * 0.2; curAvH += ad * 0.2;
+    prPanel.style.height = Math.round(curPrH) + 'px';
+    avPanel.style.height = Math.round(curAvH) + 'px';
+    AV.resize(); AV.draw();
+    PR.resizeCanvases(); PR.draw();
+    _prAnimRAF = requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+function _prApplyScrollY(track, pat) {
+  const isDrum = track.channelType === 'noise' || track.channelType === 'pcm7';
+  if (isDrum) { PR.scrollY = 0; return; }
+  if (!pat.notes.length) return;
+  const sorted = pat.notes.map(n => n.pitch).sort((a, b) => a - b);
+  const mid = sorted[Math.floor(sorted.length / 2)];
+  const H = PR.getCanvas().height;
+  PR.scrollY = Math.max(0, (127 - mid) * PR.ROW_HEIGHT - Math.floor(H / 2) + PR.ROW_HEIGHT / 2);
+}
+
+function _prScrollIfCovered(track) {
+  const canvas = AV.getCanvas();
+  const idx = ProjectState.tracks.indexOf(track);
+  const trackBottom = AV.RULER_HEIGHT + (idx + 1) * AV.TRACK_HEIGHT - AV.scrollY;
+  if (trackBottom > canvas.height) {
+    AV.animateScrollY(Math.max(0, idx * AV.TRACK_HEIGHT));
+  }
+}
+
+function closePianoRoll(onDone) {
+  if (_prAnimRAF) { cancelAnimationFrame(_prAnimRAF); _prAnimRAF = null; }
+  const prPanel = document.getElementById('pianoroll-panel');
+  const avPanel = document.getElementById('arrangement-panel');
+  const divider  = document.getElementById('panel-divider');
+
+  const prH0 = prPanel.getBoundingClientRect().height;
+  const avH0 = avPanel.getBoundingClientRect().height;
+
+  if (!prH0 || prPanel.style.display === 'none') {
+    prPanel.style.display = 'none'; divider.style.display = 'none';
+    avPanel.style.flex = ''; avPanel.style.height = '';
+    PR.activePattern = null;
+    requestAnimationFrame(() => { AV.resize(); AV.draw(); });
+    if (onDone) onDone();
+    return;
+  }
+
+  const targetAvH = avH0 + prH0;
+  avPanel.style.flex = 'none'; avPanel.style.height = avH0 + 'px';
+  prPanel.style.flex = 'none'; prPanel.style.minHeight = '0';
+  prPanel.style.overflow = 'hidden'; prPanel.style.height = prH0 + 'px';
+
+  let curPrH = prH0, curAvH = avH0;
+  const tick = () => {
+    if (curPrH < 0.5) {
+      prPanel.style.display = 'none';
+      prPanel.style.height = ''; prPanel.style.minHeight = '';
+      prPanel.style.overflow = ''; prPanel.style.flex = '';
+      divider.style.display = 'none';
+      avPanel.style.flex = ''; avPanel.style.height = '';
+      PR.activePattern = null; _prAnimRAF = null;
+      requestAnimationFrame(() => { AV.resize(); AV.draw(); });
+      if (onDone) onDone();
+      return;
+    }
+    curPrH += (0 - curPrH) * 0.2;
+    curAvH += (targetAvH - curAvH) * 0.2;
+    prPanel.style.height = Math.max(0, Math.round(curPrH)) + 'px';
+    avPanel.style.height = Math.round(curAvH) + 'px';
+    AV.resize(); AV.draw();
+    _prAnimRAF = requestAnimationFrame(tick);
+  };
+  tick();
+}
+
 function wireDivider() {
   const divider = document.getElementById('panel-divider');
   const avPanel = document.getElementById('arrangement-panel');
@@ -8968,10 +9100,7 @@ function wireTransport() {
           if (before !== track.arrangement.length && ap) {
             const stillExists = track.arrangement.some(en => en.patternId === ap.pattern.id);
             if (!stillExists) {
-              document.getElementById('pianoroll-panel').style.display = 'none';
-              document.getElementById('panel-divider').style.display = 'none';
-              PR.activePattern = null;
-              requestAnimationFrame(() => { AV.resize(); AV.draw(); });
+              closePianoRoll();
             }
           }
         }
@@ -10477,11 +10606,8 @@ const ExportEngine = {
     intSel.onchange = function() { PR._stampInterval = parseFloat(this.value); };
 
     document.getElementById('pr-close-btn').onclick = () => {
-      document.getElementById('pianoroll-panel').style.display = 'none';
-      document.getElementById('panel-divider').style.display = 'none';
-      PR.activePattern = null;
       setTool('default');
-      requestAnimationFrame(() => { AV.resize(); AV.draw(); });
+      closePianoRoll();
     };
 
     // Expose setTool so btn-chord can sync the toggle
