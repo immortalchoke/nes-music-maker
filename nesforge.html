@@ -4453,9 +4453,10 @@ const AV = {
       drawPanKnob(ctx, 184, y + 42, 12, track.pan, '#00b9be');
 
       // Timeline area
-      ctx.fillStyle = '#46425e';
+      const isSelected = track.id === ProjectState.selectedTrackId;
+      ctx.fillStyle = isSelected ? '#4e4a6a' : '#46425e';
       ctx.fillRect(HEADER_WIDTH, y, W - HEADER_WIDTH, TRACK_HEIGHT);
-      ctx.strokeStyle = '#15788c';
+      ctx.strokeStyle = isSelected ? '#00b9be' : '#15788c';
       ctx.lineWidth = 1;
       ctx.strokeRect(HEADER_WIDTH, y, W - HEADER_WIDTH, TRACK_HEIGHT);
 
@@ -4824,7 +4825,9 @@ AV.initEvents = function() {
           document.addEventListener('mouseup', onUp);
           return;
         }
-        // Default header click: begin track drag-or-settings gesture
+        // Default header click: select track + begin drag-or-settings gesture
+        ProjectState.selectedTrackId = track.id;
+        AV.draw();
         const _startX = e.clientX, _startY = e.clientY;
         this._trackDrag = { track, idx: trackIdx, startX: _startX, startY: _startY, insertIdx: trackIdx, dragging: false };
         AV.draw();
@@ -4878,6 +4881,7 @@ AV.initEvents = function() {
     if (hit.zone === 'empty') {
       AV._selEntries.clear();
       ProjectState.selectedPatternId = null;
+      ProjectState.selectedTrackId = hit.track.id;
       AV._avMarquee = { startX: mx, startY: my, currentX: mx, currentY: my };
       AV.draw();
       return;
@@ -8874,7 +8878,21 @@ function wireTransport() {
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.code === 'KeyC') {
-      e.preventDefault(); _copySelected(); return;
+      e.preventDefault();
+      if (AV._selEntries.size > 0) {
+        // Copy selected arrangement blocks
+        _avClipboard = [];
+        for (const track of ProjectState.tracks) {
+          for (const en of track.arrangement) {
+            if (!AV._selEntries.has(en)) continue;
+            const pat = track.patterns.find(p => p.id === en.patternId);
+            if (pat) _avClipboard.push({ pat: JSON.parse(JSON.stringify(pat)), trackId: track.id });
+          }
+        }
+      } else {
+        _copySelected();
+      }
+      return;
     }
     if ((e.metaKey || e.ctrlKey) && e.code === 'KeyX') {
       e.preventDefault();
