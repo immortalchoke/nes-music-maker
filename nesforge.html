@@ -4404,10 +4404,11 @@ const AV = {
 
       // Header
       const _isDragTarget = this._trackDrag && this._trackDrag.track === track;
-      ctx.fillStyle = _isDragTarget ? '#5a5680' : '#46425e';
+      const _isSelected   = track.id === ProjectState.selectedTrackId;
+      ctx.fillStyle = _isDragTarget ? '#5a5680' : (_isSelected ? '#4e4a6a' : '#46425e');
       ctx.fillRect(0, y, HEADER_WIDTH, TRACK_HEIGHT);
-      ctx.strokeStyle = _isDragTarget ? '#00ccaa' : '#15788c';
-      ctx.lineWidth = _isDragTarget ? 2 : 2;
+      ctx.strokeStyle = (_isDragTarget || _isSelected) ? '#00ccaa' : '#15788c';
+      ctx.lineWidth = 2;
       ctx.strokeRect(0, y, HEADER_WIDTH, TRACK_HEIGHT);
       ctx.lineWidth = 1;
 
@@ -4671,7 +4672,7 @@ AV.initEvents = function() {
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     const hit = getHit(mx, my);
-    if (!hit) { _lastMdZone = null; return; }
+    if (!hit) { _lastMdZone = null; ProjectState.selectedTrackId = null; AV.draw(); return; }
     _lastMdZone = hit.zone;
 
     if (hit.zone === 'loop-bar') {
