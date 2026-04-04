@@ -5070,6 +5070,7 @@ AV.initEvents = function() {
       ProjectState.selectedTrackId = hit.track.id;
       ProjectState.selectedPatternId = hit.pat.id;
       PR.open(hit.track, hit.pat);
+      AV.scrollY = Math.max(0, ProjectState.tracks.indexOf(hit.track) * AV.TRACK_HEIGHT);
       AV.draw();
     }
   });
@@ -5240,6 +5241,7 @@ AV.initEvents = function() {
       if (dragState.type === 'move-pattern') {
         PR.open(dragState.track, dragState.pat);
         ProjectState.selectedTrackId = dragState.track.id;
+        AV.scrollY = Math.max(0, ProjectState.tracks.indexOf(dragState.track) * AV.TRACK_HEIGHT);
         AV.draw();
       }
     }
@@ -5358,6 +5360,7 @@ AV.initEvents = function() {
           ProjectState.selectedTrackId = hit.track.id;
           ProjectState.selectedPatternId = hit.pat.id;
           PR.open(hit.track, hit.pat);
+          AV.scrollY = Math.max(0, ProjectState.tracks.indexOf(hit.track) * AV.TRACK_HEIGHT);
           AV.draw();
         }},
         { label: 'Rename', action: () => {
