@@ -9015,8 +9015,11 @@ function wireTransport() {
     }
     if ((e.metaKey || e.ctrlKey) && e.code === 'KeyC') {
       e.preventDefault();
-      if (AV._selEntries.size > 0) {
-        // Copy selected arrangement blocks
+      const _ap = PR.activePattern;
+      const _hasSelectedNotes = _ap && _ap.pattern.notes.some(n => n.selected);
+      if (!_hasSelectedNotes && AV._selEntries.size > 0) {
+        // Copy selected arrangement blocks; clear PR clipboard so paste routes correctly
+        _clipboard = null;
         _avClipboard = [];
         for (const track of ProjectState.tracks) {
           for (const en of track.arrangement) {
@@ -9026,6 +9029,8 @@ function wireTransport() {
           }
         }
       } else {
+        // Copy piano roll notes; clear AV clipboard so paste routes correctly
+        _avClipboard = null;
         _copySelected();
       }
       return;
